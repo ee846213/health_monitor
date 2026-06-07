@@ -1,399 +1,414 @@
-# Health Monitor App Design
+# 健康监测 App 产品设计文档
 
-Date: 2026-06-07
-Status: Draft for review
+日期：2026-06-07  
+状态：待评审
 
-## 1. Product Summary
+## 1. 文档约定
 
-Health Monitor is a mobile health assistant focused on passive sensing. The product uses built-in phone sensors and low-friction device signals to infer daily movement, posture-related phone habits, digital lifestyle patterns, and environmental context without requiring extra hardware or heavy manual logging.
+本项目自本版设计文档起，后续产品文档、技术方案、任务拆解、注释说明、开发沟通与默认命名语境均以中文为主。若涉及框架、系统 API、第三方库或平台字段，可保留必要英文术语，但整体表达、设计讨论与实现说明应优先使用中文。
 
-The first release is designed to validate one core hypothesis:
+## 2. 产品概述
 
-Users will keep a health assistant installed and enabled if it can produce useful, credible, low-interruption health insights from passive phone data alone.
+健康监测 App 是一款面向日常健康管理的被动感知型移动应用。产品通过手机内置传感器与低打扰设备信号，在不依赖额外硬件、尽量不要求用户手动记录的前提下，识别用户的活动状态、用机姿势风险、数字生活习惯与环境上下文，并输出易理解、可执行的健康建议。
 
-The product is aimed at two initial audiences:
+首版产品要验证的核心假设是：
 
-- Urban desk workers who want help with sedentary behavior, low activity, and neck or shoulder strain but do not want to log data manually.
-- Mildly health-anxious users who want lightweight awareness of daily patterns and healthier routines without buying wearables.
+只依赖手机本身的被动数据采集，也能够持续为用户提供有价值、可信、低打扰的健康洞察，从而让用户愿意长期保留并开启该应用。
 
-## 2. Product Goals
+产品初期面向两类典型用户：
 
-The MVP should achieve the following:
+- 都市久坐白领：关注久坐、活动不足、颈肩负担和不良用机习惯，但不愿主动记录健康数据。
+- 轻度健康焦虑者：希望了解日常状态与习惯风险，但不愿额外购买智能穿戴设备。
 
-- Passively detect a small, stable set of high-value daily behaviors.
-- Translate raw sensing into simple, explainable health insights.
-- Generate lightweight, actionable suggestions rather than medical conclusions.
-- Create enough daily value that users return to view summaries and keep permissions enabled.
+## 3. 产品目标
 
-The MVP will not try to:
+首版 MVP 需要达成以下目标：
 
-- Provide medical diagnosis.
-- Infer mental health conditions or emotional state.
-- Depend on external hardware such as watches or rings.
-- Build a social, community, or habit-gamification system.
-- Rely on large cloud models for core product logic.
+- 被动识别一组稳定、可解释、对用户有直接价值的日常行为模式。
+- 将原始传感器信号转化为简单明确的健康洞察，而不是技术性指标堆叠。
+- 生成轻量、可执行的生活建议，而不是医学级结论。
+- 让用户形成查看每日简报和保留核心权限的使用习惯。
 
-## 3. MVP Scope
+首版 MVP 明确不追求以下目标：
 
-The MVP follows a unified minimum-capability approach across both iPhone and Android. Product outputs should remain consistent across platforms even if the underlying data access differs.
+- 不提供医学诊断。
+- 不推断精神疾病、心理状态或情绪状态。
+- 不依赖手表、手环、戒指等额外硬件。
+- 不建设社区、社交、打卡或重度游戏化体系。
+- 不依赖大模型或重云端计算作为核心产品能力。
 
-### Included in MVP
+## 4. MVP 范围
 
-- Passive activity detection for walking, running, static periods, and sedentary behavior.
-- Screen and digital lifestyle analysis for phone checking frequency, usage periods, and app-category preferences.
-- Posture-related phone use risk detection, including prolonged head-down phone use, prolonged holding sessions, and probable lying-down phone use.
-- Risk behavior detection for probable phone use while moving.
-- Low-frequency context analysis for commute distance and outdoor activity time.
-- Environmental noise level analysis without storing raw audio.
-- Daily summaries, low-interruption reminders, and explainable rule-based suggestions.
+首版采用“统一能力最小集”策略，同时规划 iPhone 与 Android，两端保持一致的产品输出与核心体验，但允许底层采集方式因平台能力不同而有所适配。
 
-### Explicitly Excluded from MVP
+### 4.1 纳入 MVP 的能力
 
-- Sleep-stage detection.
-- Stress or recovery scoring.
-- Heart-rate, blood oxygen, or other biometric sensing.
-- Detailed social-activity inference from microphone data.
-- Uploading raw audio, raw sensor streams, or replayable fine-grained movement traces.
-- Medical claims about cervical spine, lumbar spine, anxiety, or sleep disorders.
+- 被动活动识别：走路、跑步、静止、久坐。
+- 数字生活习惯分析：查看手机频率、使用时段、应用类别偏好。
+- 手机使用姿势风险检测：长时间低头用机、连续持机过久、疑似躺姿或半躺姿用机。
+- 风险行为识别：疑似边走路边看手机。
+- 低频位置与活动环境分析：通勤距离、户外活动时长。
+- 环境噪音等级分析：仅判断环境安静或嘈杂程度，不保存原始音频。
+- 每日健康简报、低打扰提醒与可解释规则建议。
 
-## 4. Core Product Loop
+### 4.2 明确不纳入 MVP 的能力
 
-The product loop is:
+- 睡眠分期检测。
+- 压力、恢复状态评分。
+- 心率、血氧等生理指标采集。
+- 基于麦克风的社交活跃度推断。
+- 上传原始音频、原始传感器流或可重建的精细轨迹数据。
+- 对颈椎、腰椎、焦虑、睡眠障碍等进行医学结论输出。
 
-Passive sensing -> state recognition -> daily metric aggregation -> rule evaluation -> summary and reminders
+## 5. 核心产品闭环
 
-The product experience should feel low effort and low pressure. The app should not overwhelm users with dashboards or highly technical sensor interpretations. It should convert sensing into a small set of understandable outputs and suggestions.
+首版产品闭环为：
 
-## 5. Core User Outputs
+被动采集 -> 状态识别 -> 每日指标汇总 -> 规则判断 -> 简报与提醒输出
 
-The first release should revolve around three user-facing outputs:
+产品体验应强调“低负担、低打扰、可理解”。用户看到的应是少量高价值结论与建议，而不是原始传感器数据看板。
 
-### 5.1 Today Overview
+## 6. 核心用户输出
 
-The home screen answers: how am I doing today?
+首版围绕三个核心用户可见结果展开：
 
-It should include:
+### 6.1 首页今日概览
 
-- A one-line daily status summary.
-- Three core metrics: step count, sedentary duration, and screen usage duration.
-- Secondary insight cards such as outdoor activity time, commute distance, noise overview, risky phone-while-moving events, and posture-risk summary.
-- One or two recommended actions only.
+首页需要回答的问题是：我今天状态怎么样？
 
-### 5.2 Daily Health Brief
+首页建议包含：
 
-The daily brief should summarize the previous day with:
+- 一句今日状态总结。
+- 三个核心指标：步数、久坐时长、屏幕使用时长。
+- 扩展洞察卡片：户外活动时长、通勤距离、环境噪音概览、移动中看屏风险次数、姿势风险摘要。
+- 1 到 2 条当下最值得执行的建议。
 
-- Date and overall summary.
-- Step count, sedentary duration, and screen usage duration.
-- Activity pattern summary across the day.
-- Digital lifestyle summary.
-- Posture habit summary.
-- Environment and mobility summary.
-- One high-priority suggestion for tomorrow.
+### 6.2 每日健康简报
 
-### 5.3 Reminder History
+每日简报用于回顾前一天的整体行为模式，建议包含：
 
-This screen exists to build trust by showing:
+- 日期与整体判断。
+- 步数、久坐时长、屏幕使用时长。
+- 活动节律摘要。
+- 数字生活习惯摘要。
+- 姿势使用习惯摘要。
+- 环境与出行摘要。
+- 明日优先建议 1 条。
 
-- What reminders fired.
-- Why each reminder was triggered.
-- Whether the user acted on or dismissed it.
-- Simple reminder intensity and quiet-hours controls.
+### 6.3 提醒记录页
 
-## 6. Sensing and Inference Scope
+提醒记录页用于建立用户信任，需要展示：
 
-### 6.1 Movement and Posture-Related Sensing
+- 今天或历史触发过哪些提醒。
+- 每条提醒为什么被触发。
+- 用户是否忽略或采纳了该提醒。
+- 简单的提醒强度与免打扰时间设置入口。
 
-Use accelerometer and gyroscope signals to infer:
+## 7. 感知与推断范围
 
-- Walking
-- Running
-- Static periods
-- Sedentary periods
-- Motion plus active-screen combinations that indicate probable phone use while moving
-- Device-angle patterns that indicate prolonged head-down use
-- Extended holding sessions with limited posture variation
-- Probable lying-down or reclined phone-use sessions
+### 7.1 运动与姿势相关感知
 
-This layer should be framed as posture-risk and usage-pattern detection, not full-body posture diagnosis.
+通过加速度计和陀螺仪识别以下状态：
 
-### 6.2 Location and Environment Sensing
+- 走路
+- 跑步
+- 静止
+- 久坐
+- 移动状态下持续亮屏，疑似边走边看手机
+- 长时间低角度持机，疑似低头用机
+- 长时间连续持机且姿势变化很少
+- 疑似躺姿或半躺姿持续用机
 
-Use low-frequency GPS and available context signals to infer:
+这一层能力在产品中应被表述为“姿势风险与用机习惯识别”，而不是“全身姿态诊断”。
 
-- Commute distance
-- Outdoor activity duration
-- Daily movement radius
+### 7.2 位置与环境感知
 
-Use microphone analysis only for non-content environmental noise estimation:
+通过低频 GPS 及相关上下文信号识别：
 
-- Quiet environment
-- Moderate noise
-- Sustained noisy environment
+- 通勤距离
+- 户外活动时长
+- 日常活动半径
 
-No raw audio should be stored or uploaded. No speech recognition or content interpretation should occur in the MVP.
+通过麦克风做非内容级环境噪音判断：
 
-### 6.3 Digital Lifestyle Sensing
+- 安静环境
+- 中等噪音环境
+- 持续嘈杂环境
 
-Use phone interaction signals to infer:
+首版不得保存或上传原始音频，不做语音识别，不做内容理解。
 
-- Phone check frequency
-- Concentrated late-night usage
-- High fragmentation during work or daytime blocks
-- App-category preference patterns such as social, video, reading, tools, and productivity
+### 7.3 数字生活习惯感知
 
-The MVP should prioritize category-level habits over exposing highly detailed app-by-app surveillance views.
+通过用机行为信号识别：
 
-## 7. Core Metrics
+- 查看手机频率
+- 深夜使用集中度
+- 工作时段或白天时段的碎片化使用情况
+- 社交、视频、阅读、工具、效率类等应用类别偏好
 
-The primary metrics in the MVP are:
+首版应优先输出类别级习惯模式，不默认呈现过细的应用逐项监控视图。
 
-- Step count
-- Sedentary duration
-- Screen usage duration
+## 8. 核心指标设计
 
-The secondary metrics are:
+### 8.1 一级核心指标
 
-- Outdoor activity duration
-- Commute distance
-- Noise environment overview
-- Phone check frequency
-- Late-night usage duration
-- Mobile-use risk event count
-- Prolonged head-down usage duration
-- Long uninterrupted phone-use sessions
+- 步数
+- 久坐时长
+- 屏幕使用时长
 
-These metrics should be expressed in user-friendly terms and not in raw sensor units.
+### 8.2 二级扩展指标
 
-## 8. Functional Modules
+- 户外活动时长
+- 通勤距离
+- 环境噪音概览
+- 手机查看频率
+- 深夜使用时长
+- 移动中看屏风险次数
+- 长时间低头用机时长
+- 长时间连续持机次数或时长
 
-### 8.1 Passive Collection Layer
+所有指标应使用用户能理解的自然语言和生活化单位表达，不直接展示原始传感器数值。
 
-Collect the minimum required device signals from:
+## 9. 功能模块划分
 
-- Accelerometer
-- Gyroscope
-- Screen state and usage signals
+### 9.1 被动采集层
+
+采集实现首版功能所需的最小设备信号，包括：
+
+- 加速度计
+- 陀螺仪
+- 屏幕状态与使用相关信号
 - GPS
-- Barometer where available
-- Microphone for non-content noise level analysis
+- 气压计（如平台可用）
+- 麦克风环境噪音等级信号
 
-Collection should be low-frequency and scene-aware wherever possible to protect battery life.
+采集策略应坚持低频、场景感知、尽可能省电。
 
-### 8.2 State Recognition Layer
+### 9.2 状态识别层
 
-Convert raw device signals into interpretable states such as:
+将原始信号转换为可理解状态，例如：
 
-- Walking
-- Running
-- Static
-- Sedentary
-- Probable phone use while moving
-- Outdoor period
-- Commute period
-- Quiet environment
-- Noisy environment
-- Head-down usage pattern
-- Lying-down usage pattern
-- Long continuous phone-use session
+- 走路
+- 跑步
+- 静止
+- 久坐
+- 疑似移动中看屏
+- 户外时段
+- 通勤时段
+- 安静环境
+- 嘈杂环境
+- 低头用机模式
+- 躺姿用机模式
+- 长时间连续用机模式
 
-### 8.3 Daily Aggregation Layer
+### 9.3 每日汇总层
 
-Aggregate state slices into daily metrics, time windows, patterns, and event counts.
+将离散状态片段汇总为：
 
-### 8.4 Rule Engine
+- 每日指标
+- 时段分布
+- 事件次数
+- 习惯模式摘要
 
-Use explainable rules to generate reminders and recommendations.
+### 9.4 规则引擎层
 
-### 8.5 Presentation Layer
+基于可解释规则生成建议与提醒。
 
-Render the home view, daily brief, reminder history, permission education, and settings.
+### 9.5 用户呈现层
 
-## 9. Rule Engine Design
+负责首页、每日简报、提醒记录、权限引导、设置等页面与交互。
 
-The MVP should use a deterministic rule engine rather than opaque scoring models.
+## 10. 规则引擎设计
 
-### 9.1 Activity Rules
+首版建议全部采用确定性、可解释的规则，不依赖黑盒评分模型。
 
-- If uninterrupted sedentary time exceeds a threshold, trigger a movement reminder.
-- If total daily steps remain below a target by late afternoon or evening, trigger a light activity suggestion.
+### 10.1 活动类规则
 
-### 9.2 Risk Behavior Rules
+- 连续久坐超过阈值时，触发起身活动提醒。
+- 到下午或晚上时，若步数明显低于目标，触发轻量活动建议。
 
-- If the user appears to be moving while actively viewing the screen, trigger a safety reminder.
+### 10.2 风险行为规则
 
-### 9.3 Environment Rules
+- 若用户处于移动状态且持续看屏，触发安全提醒。
 
-- If nighttime environmental noise remains elevated for a sustained period, surface a sleep-environment suggestion.
-- If outdoor activity is very low, suggest a short outdoor break.
+### 10.3 环境类规则
 
-### 9.4 Digital Lifestyle Rules
+- 若夜间环境噪音持续偏高，给出睡眠环境建议。
+- 若户外活动时长过低，建议安排短时外出活动。
 
-- If phone checking frequency is unusually high, suggest reducing fragmented checking.
-- If late-night screen usage exceeds a threshold, suggest a lower-stimulation wind-down period.
-- If certain daily blocks show heavy repeated phone activation, surface a routine-awareness suggestion.
+### 10.4 数字生活习惯规则
 
-### 9.5 Posture-Risk Rules
+- 手机查看频率异常偏高时，提示减少碎片化查看。
+- 深夜屏幕使用时长过长时，提示提前进入低刺激状态。
+- 某些时段重复激活手机过密时，提示关注日常节律。
 
-- If head-down phone use remains prolonged, suggest lifting the device and relaxing neck and shoulders.
-- If a continuous phone-use session becomes too long, suggest an eye and posture break.
-- If lying-down phone use is prolonged at night, suggest ending screen use earlier.
+### 10.5 姿势风险规则
 
-All triggered outputs should remain explainable in plain language.
+- 长时间低头用机时，提醒抬高设备、放松颈肩。
+- 单次连续持机时间过长时，提醒休息眼睛并切换姿势。
+- 夜间躺姿或半躺姿持续用机时，提醒尽早结束屏幕使用。
 
-## 10. Experience Principles
+所有提醒与建议都必须能用一句生活化语言解释其触发原因。
 
-The front-end language should remain everyday and supportive, not clinical or sensor-centric.
+## 11. 体验表达原则
 
-The product should say:
+产品前台语言应保持支持性、生活化，不应使用临床化或传感器导向表述。
 
-- You have been sitting for a while this afternoon.
-- You checked your phone frequently tonight.
-- Your nighttime environment was noisier than usual.
-- Your head-down phone use was high today.
+建议使用的表达：
 
-The product should avoid saying:
+- 你今天下午坐得有点久。
+- 你今晚看手机比较频繁。
+- 昨晚环境有些嘈杂，可能不利于休息。
+- 你今天低头看手机的时间偏长。
 
-- Accelerometer variance indicates abnormal posture.
-- Audio threshold exceeded environmental baseline.
-- Cervical risk score is elevated.
+避免使用的表达：
 
-The app should feel like a transparent assistant, not a surveillance or diagnostic tool.
+- 加速度方差提示姿势异常。
+- 环境音频阈值高于基线。
+- 颈椎风险评分升高。
 
-## 11. Privacy and Trust Strategy
+产品整体应被感知为“透明助手”，而不是“监控工具”或“诊断系统”。
 
-The MVP must treat privacy as a product feature.
+## 12. 隐私与信任策略
 
-### 11.1 Principles
+首版必须把隐私设计视为产品能力的一部分。
 
-- Local-first processing for raw sensor interpretation wherever feasible.
-- Minimum necessary data collection.
-- No raw-audio storage.
-- No replayable raw sensor history uploaded by default.
-- Clear explanation of why each permission is requested.
-- Graceful degradation when users deny optional permissions.
+### 12.1 核心原则
 
-### 11.2 Permission Strategy
+- 本地优先处理：原始传感器解释尽量在设备端完成。
+- 最小必要采集：只采实现功能必须的数据。
+- 不保存原始音频。
+- 默认不上传可回放原始传感器历史。
+- 每项权限都要明确解释用途。
+- 用户关闭可选权限后，产品应允许降级运行，而不是整体不可用。
 
-Permissions should be requested progressively, not all at once.
+### 12.2 权限请求策略
 
-Recommended sequence:
+权限应采用渐进式申请，而不是首次启动全部弹出。
 
-- Onboarding requests core activity and notification permissions first.
-- Location permission is requested only when mobility or outdoor insights are introduced.
-- Microphone permission is requested only when environment-noise insight is introduced.
-- Screen-usage or equivalent digital-lifestyle permissions are requested only when digital habit insights are introduced.
+建议顺序：
 
-Each permission prompt should explain:
+- 首次启动优先申请活动识别和通知相关权限。
+- 当用户需要查看出行或户外洞察时，再申请位置权限。
+- 当用户需要启用环境噪音洞察时，再申请麦克风权限。
+- 当用户需要数字生活习惯分析时，再引导开启相关屏幕使用权限。
 
-- What feature it enables
-- What data is or is not stored
-- What the user loses if they decline
+每个权限说明都应回答三个问题：
 
-## 12. Cross-Platform Strategy
+- 这个权限会启用什么功能？
+- 什么数据不会被保存？
+- 如果拒绝，会失去哪些能力？
 
-The MVP should use a unified product definition with platform adapters.
+## 13. 双平台策略
 
-### 12.1 Unified Product Layer
+首版采用“统一产品定义 + 平台能力适配”的方式推进。
 
-Both platforms should present the same top-level metrics, summary structure, and reminder categories.
+### 13.1 统一产品层
 
-### 12.2 Platform Adaptation Layer
+iPhone 与 Android 应共享同一套指标定义、简报结构、提醒分类和页面信息架构。
 
-Android and iPhone may use different APIs, sampling models, and permission flows. Those differences should be normalized into a shared state model before they reach the product layer.
+### 13.2 平台适配层
 
-The user should not feel that the app is fundamentally different on each platform.
+两端可根据系统 API、后台限制、权限流程、采样方式差异进行实现适配，但必须先归一到同一套状态模型，再进入产品层。
 
-## 13. Technical Architecture Direction
+用户不应明显感知两个平台是“两个不同产品”。
 
-The recommended structure is:
+## 14. 技术架构方向
 
-### 13.1 Shared Client Experience Layer
+建议采用以下四层结构：
 
-Shared UI, navigation, summary rendering, rule presentation, settings, and product logic where feasible.
+### 14.1 共享客户端体验层
 
-### 13.2 Native Sensing Adapter Layer
+负责：
 
-Platform-specific code that:
+- 页面与导航
+- 简报渲染
+- 建议展示
+- 设置与权限引导
+- 可共享的产品逻辑
 
-- Reads device signals
-- Handles permissions
-- Applies platform-specific background collection strategies
-- Normalizes data into common event and state models
+### 14.2 原生感知适配层
 
-### 13.3 On-Device Processing Layer
+负责：
 
-Performs:
+- 读取设备信号
+- 处理权限申请
+- 适配平台后台采集方式
+- 归一原始数据为统一事件与状态模型
 
-- Sensor preprocessing
-- State recognition
-- Daily aggregation
-- Rule evaluation
+### 14.3 端上处理层
 
-This layer should remain on device for the MVP wherever possible.
+负责：
 
-### 13.4 Lightweight Backend
+- 传感器预处理
+- 状态识别
+- 每日汇总
+- 规则判断
 
-The backend should be limited to:
+MVP 阶段应尽量在本地完成以上处理。
 
-- Authentication if needed
-- User preferences and settings sync
-- Daily brief backup and retrieval
-- Future experimentation hooks
+### 14.4 轻后端层
 
-The backend should not be required for core daily inference in the MVP.
+后端能力应控制在以下范围：
 
-## 14. Success Criteria for MVP
+- 账号系统（如需要）
+- 用户设置同步
+- 每日简报备份与读取
+- 后续实验能力预留
 
-The MVP is successful if it can demonstrate:
+首版核心感知与推断不应依赖后端实时计算。
 
-- Users understand the value of passive health sensing without extra hardware.
-- Users keep core permissions enabled after onboarding.
-- Users read daily summaries repeatedly.
-- Users find reminders helpful rather than intrusive.
-- Users perceive the insights as understandable and credible.
+## 15. MVP 成功标准
 
-## 15. Risks and Mitigations
+若首版要被视为成功，至少应验证以下结果：
 
-### 15.1 Privacy Concern
+- 用户能理解“只靠手机被动感知”带来的价值。
+- 用户在完成引导后愿意保留核心权限。
+- 用户愿意重复查看每日简报。
+- 用户认为提醒总体有帮助，而不是频繁打扰。
+- 用户觉得产品结论可信、易懂、不过度夸张。
 
-Risk:
-Users may fear the product is over-collecting, especially with microphone and location.
+## 16. 风险与缓解策略
 
-Mitigation:
-Use local-first processing, progressive permission prompts, plain-language explanations, and explicit statements that raw audio is not stored.
+### 16.1 隐私敏感风险
 
-### 15.2 Battery Drain
+风险：
+用户可能对位置与麦克风权限产生明显顾虑。
 
-Risk:
-Passive sensing may create unacceptable battery cost.
+缓解：
+采用本地优先、渐进式授权、原始音频不保存、清晰权限解释等策略建立信任。
 
-Mitigation:
-Use minimum viable sampling, scene-based activation, and conservative background collection.
+### 16.2 耗电风险
 
-### 15.3 Overclaiming
+风险：
+被动采集可能造成明显电量压力。
 
-Risk:
-Users may interpret behavior suggestions as medical judgment.
+缓解：
+坚持最小采样、按场景启停、保守后台采集策略。
 
-Mitigation:
-Frame outputs as habits, patterns, and risk tendencies, not diagnosis.
+### 16.3 过度承诺风险
 
-### 15.4 Cross-Platform Inconsistency
+风险：
+用户可能将产品建议误解为医学判断。
 
-Risk:
-Different platform limits may create divergent experiences.
+缓解：
+统一使用“习惯、模式、风险倾向、建议”这类表达，不输出诊断性结论。
 
-Mitigation:
-Keep the MVP capability set intentionally small and normalize platform outputs into the same product vocabulary.
+### 16.4 双平台体验不一致风险
 
-## 16. Recommended Next Step
+风险：
+平台限制差异可能导致两端体验偏差。
 
-The next phase should convert this design into an implementation plan covering:
+缓解：
+刻意控制首版能力范围，并将平台采集差异收敛到统一产品词汇和状态模型内。
 
-- Product milestones
-- Feature breakdown
-- Data model design
-- Cross-platform architecture choices
-- Permission and onboarding flow
-- Measurement and QA strategy
+## 17. 下一步建议
+
+下一阶段应基于本设计文档继续输出实现计划，重点拆解：
+
+- 产品里程碑
+- 功能模块任务分解
+- 数据模型设计
+- 双平台技术选型与边界
+- 权限引导与 onboarding 流程
+- 埋点、验证与测试策略
