@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health_monitor/domain/background/android_background_capture_host_status.dart';
+import 'package:health_monitor/domain/background/android_foreground_service_strategy.dart';
 import 'package:health_monitor/domain/background/background_capture_state.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/features/diagnostics/pages/sensor_debug_page.dart';
@@ -29,6 +30,13 @@ void main() {
       androidHostStatus: AndroidBackgroundCaptureHostStatus(
         isRunning: true,
         summary: 'Android 宿主后台骨架已启动。',
+      ),
+      androidForegroundServiceStrategy: AndroidForegroundServiceStrategy(
+        isEnabled: true,
+        title: '健康监测正在后台运行',
+        body: '用于持续积累活动、位置与用机样本。',
+        sampleIntervalMinutes: 15,
+        reasons: <String>[],
       ),
       storageStatus: DiagnosticsStorageStatus(
         kind: DiagnosticsStorageStatusKind.empty,
@@ -73,6 +81,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('后台采集状态'), findsOneWidget);
+    expect(find.text('Android 前台服务策略'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('Android 宿主状态'),

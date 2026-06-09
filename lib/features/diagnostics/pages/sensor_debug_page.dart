@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_monitor/domain/background/android_background_capture_host_status.dart';
+import 'package:health_monitor/domain/background/android_foreground_service_strategy.dart';
 import 'package:health_monitor/domain/background/background_capture_state.dart';
 import 'package:health_monitor/domain/environment/noise_sample.dart';
 import 'package:health_monitor/domain/location/location_summary.dart';
@@ -61,6 +62,14 @@ class SensorDebugPage extends ConsumerWidget {
               _SectionCard(
                 title: 'Android 宿主状态',
                 child: Text(_androidHostSummary(snapshot.androidHostStatus)),
+              ),
+              _SectionCard(
+                title: 'Android 前台服务策略',
+                child: Text(
+                  _foregroundServiceSummary(
+                    snapshot.androidForegroundServiceStrategy,
+                  ),
+                ),
               ),
               _SectionCard(
                 title: '本地写入状态',
@@ -127,6 +136,14 @@ class SensorDebugPage extends ConsumerWidget {
       return 'Android 宿主状态暂不可读，说明原生后台桥接尚未返回状态摘要。';
     }
     return '${status.isRunning ? '运行中' : '未运行'} · ${status.summary}';
+  }
+
+  String _foregroundServiceSummary(AndroidForegroundServiceStrategy strategy) {
+    final stateLabel = strategy.isEnabled ? '已启用' : '已降级';
+    if (strategy.reasons.isEmpty) {
+      return '$stateLabel · ${strategy.title} · ${strategy.body}';
+    }
+    return '$stateLabel · ${strategy.reasons.join('；')}';
   }
 }
 

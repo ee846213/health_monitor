@@ -1,4 +1,5 @@
 import 'package:health_monitor/domain/background/android_background_capture_config.dart';
+import 'package:health_monitor/domain/background/android_foreground_service_strategy.dart';
 import 'package:health_monitor/domain/background/background_capture_state.dart';
 import 'package:health_monitor/domain/capability_matrix.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
@@ -15,11 +16,14 @@ abstract class AndroidBackgroundCaptureGateway {
 class AndroidBackgroundCaptureCoordinator {
   AndroidBackgroundCaptureCoordinator({
     required BackgroundCaptureStateService backgroundCaptureStateService,
+    required AndroidForegroundServiceStrategyResolver foregroundServiceStrategyResolver,
     required AndroidBackgroundCaptureGateway backgroundCaptureGateway,
   }) : _backgroundCaptureStateService = backgroundCaptureStateService,
+       _foregroundServiceStrategyResolver = foregroundServiceStrategyResolver,
        _backgroundCaptureGateway = backgroundCaptureGateway;
 
   final BackgroundCaptureStateService _backgroundCaptureStateService;
+  final AndroidForegroundServiceStrategyResolver _foregroundServiceStrategyResolver;
   final AndroidBackgroundCaptureGateway _backgroundCaptureGateway;
 
   Future<BackgroundCaptureState> syncCapture({
@@ -31,9 +35,14 @@ class AndroidBackgroundCaptureCoordinator {
       capabilitySet: capabilitySet,
       permissionStatuses: permissionStatuses,
     );
+    final strategy = _foregroundServiceStrategyResolver.resolve(
+      capabilitySet: capabilitySet,
+      permissionStatuses: permissionStatuses,
+      config: config,
+    );
 
     // 先用共享状态模型统一决定启停，避免页面层绕过降级规则直接驱动原生后台能力。
-    if (state.status == BackgroundCaptureStatus.running) {
+    if (state.status == BackgroundCaptureStatus.running && strategy.isEnabled) {
       await _backgroundCaptureGateway.startBackgroundCapture(config);
       return state;
     }

@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_monitor/domain/background/android_background_capture_host_status.dart';
+import 'package:health_monitor/domain/background/android_background_capture_config.dart';
 import 'package:health_monitor/domain/background/background_capture_state.dart';
+import 'package:health_monitor/domain/background/android_foreground_service_strategy.dart';
 import 'package:health_monitor/domain/capability_matrix.dart';
 import 'package:health_monitor/domain/environment/noise_sample.dart';
 import 'package:health_monitor/domain/location/location_summary.dart';
@@ -65,6 +67,11 @@ final backgroundCaptureServiceProvider = Provider<BackgroundCaptureStateService>
   return const BackgroundCaptureService();
 });
 
+final androidForegroundServiceStrategyResolverProvider =
+    Provider<AndroidForegroundServiceStrategyResolver>((Ref ref) {
+      return const AndroidForegroundServiceStrategyResolver();
+    });
+
 final androidBackgroundHostStatusServiceProvider =
     Provider<AndroidBackgroundCaptureHostStatusService>((Ref ref) {
       return AndroidBackgroundCaptureBridge(
@@ -98,6 +105,7 @@ class DiagnosticsSnapshot {
     required this.latestUsageSummary,
     required this.backgroundCaptureState,
     required this.androidHostStatus,
+    required this.androidForegroundServiceStrategy,
     required this.storageStatus,
   });
 
@@ -110,6 +118,7 @@ class DiagnosticsSnapshot {
   final DigitalUsageSummary? latestUsageSummary;
   final BackgroundCaptureState backgroundCaptureState;
   final AndroidBackgroundCaptureHostStatus? androidHostStatus;
+  final AndroidForegroundServiceStrategy androidForegroundServiceStrategy;
   final DiagnosticsStorageStatus storageStatus;
 }
 
@@ -125,6 +134,9 @@ final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref
   final noiseCaptureService = ref.watch(noiseCaptureServiceProvider);
   final digitalUsageCaptureService = ref.watch(digitalUsageCaptureServiceProvider);
   final backgroundCaptureService = ref.watch(backgroundCaptureServiceProvider);
+  final androidForegroundServiceStrategyResolver = ref.watch(
+    androidForegroundServiceStrategyResolverProvider,
+  );
   final androidBackgroundHostStatusService = ref.watch(
     androidBackgroundHostStatusServiceProvider,
   );
@@ -145,6 +157,19 @@ final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref
   final backgroundCaptureState = await backgroundCaptureService.evaluateState(
     capabilitySet: capabilityMatrix.android,
     permissionStatuses: permissionStatuses,
+  );
+  final androidForegroundServiceStrategy = androidForegroundServiceStrategyResolver.resolve(
+    capabilitySet: capabilityMatrix.android,
+    permissionStatuses: permissionStatuses,
+    config: const AndroidBackgroundCaptureConfig(
+      notificationTitle: '健康监测正在后台运行',
+      notificationBody: '用于持续积累活动、位置与用机样本。',
+      enableMotion: true,
+      enableLocation: true,
+      enableNoise: false,
+      enableDigitalUsage: true,
+      sampleIntervalMinutes: 15,
+    ),
   );
   AndroidBackgroundCaptureHostStatus? androidHostStatus;
   try {
@@ -203,6 +228,7 @@ final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref
     latestUsageSummary: usageSummary ?? liveUsageSummary,
     backgroundCaptureState: backgroundCaptureState,
     androidHostStatus: androidHostStatus,
+    androidForegroundServiceStrategy: androidForegroundServiceStrategy,
     storageStatus: DiagnosticsStorageStatus(
       kind: hasRecentWrites
           ? DiagnosticsStorageStatusKind.hasRecentWrites

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health_monitor/domain/background/android_background_capture_config.dart';
 import 'package:health_monitor/domain/background/background_capture_state.dart';
+import 'package:health_monitor/domain/background/android_foreground_service_strategy.dart';
 import 'package:health_monitor/domain/capability_matrix.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/platform/android/android_background_capture_coordinator.dart';
@@ -18,6 +19,7 @@ void main() {
           reason: '前台服务已就绪。',
         ),
       ),
+      foregroundServiceStrategyResolver: const AndroidForegroundServiceStrategyResolver(),
       backgroundCaptureGateway: bridge,
     );
 
@@ -46,6 +48,7 @@ void main() {
           reason: '当前只会在前台积累样本。',
         ),
       ),
+      foregroundServiceStrategyResolver: const AndroidForegroundServiceStrategyResolver(),
       backgroundCaptureGateway: bridge,
     );
 
