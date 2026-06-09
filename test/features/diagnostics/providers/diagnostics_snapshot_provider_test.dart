@@ -1,12 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health_monitor/domain/background/background_capture_state.dart';
+import 'package:health_monitor/domain/background/android_background_capture_host_status.dart';
 import 'package:health_monitor/domain/environment/noise_sample.dart';
 import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/motion/activity_sample.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
 import 'package:health_monitor/features/diagnostics/providers/diagnostics_providers.dart';
+import 'package:health_monitor/services/android_background_capture_bridge.dart';
 import 'package:health_monitor/services/background_capture_service.dart';
 import 'package:health_monitor/services/location_capture_service.dart';
 import 'package:health_monitor/services/motion_capture_service.dart';
@@ -155,6 +157,14 @@ void main() {
             ),
           ),
         ),
+        androidBackgroundHostStatusServiceProvider.overrideWithValue(
+          const FakeAndroidBackgroundCaptureHostStatusService(
+            AndroidBackgroundCaptureHostStatus(
+              isRunning: true,
+              summary: 'Android 宿主后台骨架已启动。',
+            ),
+          ),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -169,6 +179,8 @@ void main() {
     expect(snapshot.liveUsageSummary?.unlockCount, 1);
     expect(snapshot.latestUsageSummary?.topCategory, UsageCategory.tools);
     expect(snapshot.backgroundCaptureState.status, BackgroundCaptureStatus.running);
+    expect(snapshot.androidHostStatus?.isRunning, isTrue);
+    expect(snapshot.androidHostStatus?.summary, contains('宿主后台骨架'));
     expect(snapshot.storageStatus.kind, DiagnosticsStorageStatusKind.hasRecentWrites);
   });
 
@@ -218,6 +230,14 @@ void main() {
             ),
           ),
         ),
+        androidBackgroundHostStatusServiceProvider.overrideWithValue(
+          const FakeAndroidBackgroundCaptureHostStatusService(
+            AndroidBackgroundCaptureHostStatus(
+              isRunning: false,
+              summary: 'Android 宿主后台状态暂未启动。',
+            ),
+          ),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -231,6 +251,7 @@ void main() {
     expect(snapshot.liveUsageSummary, isNull);
     expect(snapshot.latestUsageSummary, isNull);
     expect(snapshot.backgroundCaptureState.status, BackgroundCaptureStatus.permissionDenied);
+    expect(snapshot.androidHostStatus?.summary, contains('暂未启动'));
     expect(snapshot.storageStatus.kind, DiagnosticsStorageStatusKind.empty);
   });
 }

@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:health_monitor/domain/background/android_background_capture_host_status.dart';
 import 'package:health_monitor/domain/background/background_capture_state.dart';
 import 'package:health_monitor/domain/capability_matrix.dart';
 import 'package:health_monitor/domain/environment/noise_sample.dart';
@@ -6,12 +7,14 @@ import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/motion/activity_sample.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
+import 'package:health_monitor/services/android_background_capture_bridge.dart';
 import 'package:health_monitor/services/background_capture_service.dart';
 import 'package:health_monitor/services/digital_usage_capture_service.dart';
 import 'package:health_monitor/services/location_capture_service.dart';
 import 'package:health_monitor/services/motion_capture_service.dart';
 import 'package:health_monitor/services/noise_capture_service.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
+import 'package:health_monitor/services/platform_bridge_service.dart';
 import 'package:health_monitor/storage/repositories/activity_repository.dart';
 import 'package:health_monitor/storage/repositories/location_summary_repository.dart';
 import 'package:health_monitor/storage/repositories/noise_sample_repository.dart';
@@ -62,6 +65,13 @@ final backgroundCaptureServiceProvider = Provider<BackgroundCaptureStateService>
   return const BackgroundCaptureService();
 });
 
+final androidBackgroundHostStatusServiceProvider =
+    Provider<AndroidBackgroundCaptureHostStatusService>((Ref ref) {
+      return AndroidBackgroundCaptureBridge(
+        platformBridgeService: PlatformBridgeService(),
+      );
+    });
+
 enum DiagnosticsStorageStatusKind {
   empty,
   hasRecentWrites,
@@ -87,6 +97,7 @@ class DiagnosticsSnapshot {
     required this.liveUsageSummary,
     required this.latestUsageSummary,
     required this.backgroundCaptureState,
+    required this.androidHostStatus,
     required this.storageStatus,
   });
 
@@ -98,6 +109,7 @@ class DiagnosticsSnapshot {
   final DigitalUsageSummary? liveUsageSummary;
   final DigitalUsageSummary? latestUsageSummary;
   final BackgroundCaptureState backgroundCaptureState;
+  final AndroidBackgroundCaptureHostStatus? androidHostStatus;
   final DiagnosticsStorageStatus storageStatus;
 }
 
@@ -113,6 +125,9 @@ final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref
   final noiseCaptureService = ref.watch(noiseCaptureServiceProvider);
   final digitalUsageCaptureService = ref.watch(digitalUsageCaptureServiceProvider);
   final backgroundCaptureService = ref.watch(backgroundCaptureServiceProvider);
+  final androidBackgroundHostStatusService = ref.watch(
+    androidBackgroundHostStatusServiceProvider,
+  );
 
   final referenceTime = DateTime(2026, 6, 9, 23, 59);
   final activitySamples = await activityRepository.listByWindow(
@@ -131,6 +146,12 @@ final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref
     capabilitySet: capabilityMatrix.android,
     permissionStatuses: permissionStatuses,
   );
+  AndroidBackgroundCaptureHostStatus? androidHostStatus;
+  try {
+    androidHostStatus = await androidBackgroundHostStatusService.getHostStatus();
+  } on AndroidBackgroundCaptureException {
+    androidHostStatus = null;
+  }
   ActivitySample? liveActivity;
   try {
     liveActivity = await motionCaptureService.watchActivitySamples().first;
@@ -181,6 +202,7 @@ final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref
     liveUsageSummary: liveUsageSummary,
     latestUsageSummary: usageSummary ?? liveUsageSummary,
     backgroundCaptureState: backgroundCaptureState,
+    androidHostStatus: androidHostStatus,
     storageStatus: DiagnosticsStorageStatus(
       kind: hasRecentWrites
           ? DiagnosticsStorageStatusKind.hasRecentWrites

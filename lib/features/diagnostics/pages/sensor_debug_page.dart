@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:health_monitor/domain/background/android_background_capture_host_status.dart';
 import 'package:health_monitor/domain/background/background_capture_state.dart';
 import 'package:health_monitor/domain/environment/noise_sample.dart';
 import 'package:health_monitor/domain/location/location_summary.dart';
@@ -56,6 +57,10 @@ class SensorDebugPage extends ConsumerWidget {
               _SectionCard(
                 title: '后台采集状态',
                 child: Text(_backgroundSummary(snapshot.backgroundCaptureState)),
+              ),
+              _SectionCard(
+                title: 'Android 宿主状态',
+                child: Text(_androidHostSummary(snapshot.androidHostStatus)),
               ),
               _SectionCard(
                 title: '本地写入状态',
@@ -115,6 +120,13 @@ class SensorDebugPage extends ConsumerWidget {
 
   String _backgroundSummary(BackgroundCaptureState state) {
     return '${state.label} · ${state.reason}';
+  }
+
+  String _androidHostSummary(AndroidBackgroundCaptureHostStatus? status) {
+    if (status == null) {
+      return 'Android 宿主状态暂不可读，说明原生后台桥接尚未返回状态摘要。';
+    }
+    return '${status.isRunning ? '运行中' : '未运行'} · ${status.summary}';
   }
 }
 

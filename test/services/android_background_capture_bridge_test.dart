@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health_monitor/domain/background/android_background_capture_config.dart';
+import 'package:health_monitor/domain/background/android_background_capture_host_status.dart';
 import 'package:health_monitor/services/android_background_capture_bridge.dart';
 import 'package:health_monitor/services/platform_bridge_service.dart';
 
@@ -93,6 +94,33 @@ void main() {
         ),
       ),
       throwsA(isA<AndroidBackgroundCaptureException>()),
+    );
+  });
+
+  test('查询 Android 宿主后台状态时应解析桥接结果', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(methodChannel, (MethodCall call) async {
+          return <String, Object?>{
+            'isRunning': true,
+            'summary': 'Android 后台采集已进入宿主骨架阶段。',
+          };
+        });
+
+    final bridge = AndroidBackgroundCaptureBridge(
+      platformBridgeService: PlatformBridgeService(
+        methodChannel: methodChannel,
+        eventChannel: eventChannel,
+      ),
+    );
+
+    final status = await bridge.getHostStatus();
+
+    expect(
+      status,
+      const AndroidBackgroundCaptureHostStatus(
+        isRunning: true,
+        summary: 'Android 后台采集已进入宿主骨架阶段。',
+      ),
     );
   });
 }

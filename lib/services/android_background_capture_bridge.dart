@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:health_monitor/domain/background/android_background_capture_config.dart';
+import 'package:health_monitor/domain/background/android_background_capture_host_status.dart';
 import 'package:health_monitor/services/platform_bridge_service.dart';
 
 class AndroidBackgroundCaptureException implements Exception {
@@ -11,7 +12,12 @@ class AndroidBackgroundCaptureException implements Exception {
   String toString() => 'AndroidBackgroundCaptureException($message)';
 }
 
-class AndroidBackgroundCaptureBridge {
+abstract class AndroidBackgroundCaptureHostStatusService {
+  Future<AndroidBackgroundCaptureHostStatus> getHostStatus();
+}
+
+class AndroidBackgroundCaptureBridge
+    implements AndroidBackgroundCaptureHostStatusService {
   AndroidBackgroundCaptureBridge({
     required PlatformBridgeService platformBridgeService,
   }) : _platformBridgeService = platformBridgeService;
@@ -43,5 +49,32 @@ class AndroidBackgroundCaptureBridge {
         '停止 Android 后台采集失败: ${error.message ?? error.code}',
       );
     }
+  }
+
+  @override
+  Future<AndroidBackgroundCaptureHostStatus> getHostStatus() async {
+    try {
+      final payload =
+          await _platformBridgeService.methodChannel
+              .invokeMapMethod<Object?, Object?>('android.background.status') ??
+          const <Object?, Object?>{};
+      return AndroidBackgroundCaptureHostStatus.fromChannelPayload(payload);
+    } on PlatformException catch (error) {
+      throw AndroidBackgroundCaptureException(
+        '读取 Android 宿主后台状态失败: ${error.message ?? error.code}',
+      );
+    }
+  }
+}
+
+class FakeAndroidBackgroundCaptureHostStatusService
+    implements AndroidBackgroundCaptureHostStatusService {
+  const FakeAndroidBackgroundCaptureHostStatusService(this._status);
+
+  final AndroidBackgroundCaptureHostStatus _status;
+
+  @override
+  Future<AndroidBackgroundCaptureHostStatus> getHostStatus() async {
+    return _status;
   }
 }

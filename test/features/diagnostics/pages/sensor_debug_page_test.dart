@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:health_monitor/domain/background/android_background_capture_host_status.dart';
 import 'package:health_monitor/domain/background/background_capture_state.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/features/diagnostics/pages/sensor_debug_page.dart';
@@ -24,6 +25,10 @@ void main() {
         status: BackgroundCaptureStatus.restricted,
         label: '后台能力受限',
         reason: '系统限制了当前平台的后台连续性。',
+      ),
+      androidHostStatus: AndroidBackgroundCaptureHostStatus(
+        isRunning: true,
+        summary: 'Android 宿主后台骨架已启动。',
       ),
       storageStatus: DiagnosticsStorageStatus(
         kind: DiagnosticsStorageStatusKind.empty,
@@ -68,6 +73,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('后台采集状态'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Android 宿主状态'),
+      200,
+      scrollable: find.byType(Scrollable),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Android 宿主状态'), findsOneWidget);
+    expect(find.textContaining('宿主后台骨架已启动'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('本地写入状态'),
