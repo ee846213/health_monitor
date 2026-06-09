@@ -1,5 +1,8 @@
 .dart_tool/
 build/
+.idea/
+*.iml
+.flutter-plugins-dependencies
 
 .superpowers/
 
