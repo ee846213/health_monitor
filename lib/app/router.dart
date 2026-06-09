@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:health_monitor/features/diagnostics/pages/sensor_debug_page.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/overview',
@@ -8,6 +9,12 @@ final GoRouter appRouter = GoRouter(
       path: '/overview',
       builder: (BuildContext context, GoRouterState state) {
         return const _OverviewPage();
+      },
+    ),
+    GoRoute(
+      path: '/diagnostics',
+      builder: (BuildContext context, GoRouterState state) {
+        return const SensorDebugPage();
       },
     ),
   ],
@@ -36,6 +43,11 @@ class _OverviewPage extends StatelessWidget {
               Text(
                 '看看你今天的状态，先从最重要的一件事开始。',
                 style: theme.textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: () => context.go('/diagnostics'),
+                child: const Text('打开采集调试'),
               ),
             ],
           ),

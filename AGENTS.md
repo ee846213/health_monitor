@@ -5,6 +5,8 @@
 - 本项目默认使用中文语境。
 - 产品文档、技术文档、实现计划、注释说明、提交说明优先使用中文。
 - 若涉及 Flutter、Dart、Android、iOS、系统 API、第三方库名称，可保留必要英文术语，但解释与结论应使用中文。
+- 新增或修改代码中的注释统一使用中文。
+- 注释优先解释复杂逻辑、边界条件、设计原因与降级策略，避免“变量赋值”“调用函数”这类无意义注释。
 
 ## 产品目标
 
@@ -24,6 +26,24 @@
 - 基础能力插件优先：permission_handler、geolocator、sensors_plus
 - 平台桥接：MethodChannel / EventChannel
 
+## 当前仓库状态
+
+截至 2026-06-09，仓库当前已完成的真实基线包括：
+
+- Flutter 最小应用壳、基础主题与 GoRouter 最小路由
+- 阶段 0 平台能力矩阵正式版
+- 阶段 0 权限与降级矩阵文档、权限说明领域模型
+- 阶段 1 真实数据依赖恢复：Isar、logger、permission_handler、geolocator、sensors_plus
+- 阶段 1 正式领域模型：活动、姿势、位置、环境噪音、数字生活、每日指标
+- 阶段 1 Isar collection 落库边界与映射测试
+
+当前仍在推进中的重点包括：
+
+- repository 查询接口
+- 真实采集调试页
+- 第一条真实采集链路
+- 后台采集状态与双平台后台能力
+
 ## 架构原则
 
 - Flutter 负责产品层、页面层、共享业务逻辑、规则引擎、简报生成、本地数据聚合。
@@ -38,6 +58,8 @@
 - 业务模型优先放在 `lib/domain/`。
 - 平台适配与桥接优先放在 `lib/platform/`，原生实现按能力拆分在 `android/` 与 `ios/`。
 - 页面按 feature 拆分，不要把所有逻辑堆进单文件。
+- Isar collection 负责落库结构，领域模型负责业务语义，不要把页面语义直接塞进存储层。
+- 数字生活能力必须同时考虑 Android 全量能力与 iPhone 替代指标，不能只围绕 Android 建模。
 
 ## 隐私原则
 
@@ -49,9 +71,10 @@
 
 ## 开发顺序
 
-- 先验证平台能力，再推进正式实现。
-- 先搭 Flutter 产品壳和共享模型，再接感知能力。
-- 先做规则闭环，再做高级感知与后台任务。
+- 以 `docs/superpowers/plans/2026-06-07-health-monitor-mvp-implementation-plan.md` 的新顺序为准，优先推进“能力链路”，不回退到“先页面后能力”。
+- 阶段 0 已完成后，优先推进阶段 1：真实数据依赖、正式领域模型、本地存储层、调试页、第一条真实采集链路。
+- 阶段 1 未完成前，不要把重心切回静态页面扩展。
+- 规则、聚合、提醒等共享业务逻辑优先形成可测试闭环，再接 UI 消费。
 - 若实现计划与最新技术选型文档冲突，以最新 Flutter 技术选型文档为准。
 
 ## 当前基线文档
@@ -59,9 +82,15 @@
 - 产品设计：`docs/superpowers/specs/2026-06-07-health-monitor-design.md`
 - 技术选型：`docs/superpowers/specs/2026-06-07-health-monitor-technical-selection.md`
 - 实现计划：`docs/superpowers/plans/2026-06-07-health-monitor-mvp-implementation-plan.md`
+- Flutter 设计落地：`docs/superpowers/specs/2026-06-09-health-monitor-flutter-design-implementation.md`
+- 平台能力矩阵：`docs/research/2026-06-07-platform-capability-checklist.md`
+- 权限与降级矩阵：`docs/research/2026-06-09-permission-and-degrade-matrix.md`
 
 ## 提交与变更要求
 
 - 每次改动优先保持范围小、边界清楚。
 - 若执行实现计划，应按任务粒度推进并保留验证证据。
+- 每完成一个“阶段”后必须进行一次提交，提交说明优先使用中文，并明确阶段编号与完成范围。
+- 阶段未完成时，可以按任务粒度保留本地改动，但不要把多个已完成阶段混在一次提交里。
+- 提交前至少运行与本次改动直接相关的测试；若声明阶段完成，还应补充全量验证证据。
 - 未经确认，不要擅自改回 React Native、Expo 或其他旧技术路线。

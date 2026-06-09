@@ -34,19 +34,21 @@
 - Flutter 最小应用壳
 - GoRouter 最小路由
 - 基础主题文件
-- 平台能力矩阵雏形
+- 平台能力矩阵正式版
+- 权限与降级矩阵基线
+- 真实数据依赖恢复
+- 正式领域模型
+- Isar collection 落库边界与最小 repository 查询接口
 - 设计文档、UI/UX 文档、Flutter 设计落地文档
 
 当前仍明显缺失的关键能力包括：
 
 - 真实传感器接入
-- 本地数据库与历史记录结构
+- 调试页与可见真实结果页
 - 双平台后台采集链路
-- 真实数字生活数据链路
-- 真实环境噪音链路
 - 真实规则引擎输入
 - 页面对真实状态的消费
-- 权限拒绝与降级闭环
+- 真机级写入与读取闭环
 
 因此，后续计划必须从“产品壳 + 页面继续扩展”切换为“能力链路优先”。
 
@@ -165,10 +167,10 @@
 - Update: `C:\Users\13692\Documents\health_monitor\lib\domain\capability_matrix.dart`
 - Update: `C:\Users\13692\Documents\health_monitor\test\domain\capability_matrix_test.dart`
 
-- [ ] 把“初步判断”升级为正式结论字段
-- [ ] 为每项能力补充 Android / iPhone 分别结论
-- [ ] 在能力矩阵中补充后台采集、数字生活替代能力、环境能力字段
-- [ ] 增加测试覆盖默认能力矩阵与平台分层判断
+- [x] 把“初步判断”升级为正式结论字段
+- [x] 为每项能力补充 Android / iPhone 分别结论
+- [x] 在能力矩阵中补充后台采集、数字生活替代能力、环境能力字段
+- [x] 增加测试覆盖默认能力矩阵与平台分层判断
 
 #### 任务 0.2：定义权限与降级文案
 
@@ -177,10 +179,10 @@
 - Create: `C:\Users\13692\Documents\health_monitor\lib\domain\permission\permission_descriptor.dart`
 - Create: `C:\Users\13692\Documents\health_monitor\test\domain\permission_descriptor_test.dart`
 
-- [ ] 为运动、位置、麦克风、通知、Usage Access、后台采集能力分别定义说明
-- [ ] 明确“不开启会失去什么能力”
-- [ ] 明确“开启后用于什么分析”
-- [ ] 明确拒绝后的降级逻辑
+- [x] 为运动、位置、麦克风、通知、Usage Access、后台采集能力分别定义说明
+- [x] 明确“不开启会失去什么能力”
+- [x] 明确“开启后用于什么分析”
+- [x] 明确拒绝后的降级逻辑
 
 ---
 
@@ -197,8 +199,8 @@
 - 真实传感器采集服务
 - 真实位置摘要服务
 - 真实环境噪音等级服务
-- Android 真实数字生活采集服务
-- iPhone 真实数字生活替代采集服务
+- 跨平台最小数字生活采集入口
+- Android Usage Access 全量能力的后续桥接预留
 - 本地数据库结构与 repository
 - 调试页 / 状态页查看真实结果
 
@@ -216,14 +218,14 @@
 **Files:**
 - Update: `C:\Users\13692\Documents\health_monitor\pubspec.yaml`
 
-- [ ] 重新引入 `isar`
-- [ ] 重新引入 `isar_flutter_libs`
-- [ ] 引入 `logger`
-- [ ] 引入 `permission_handler`
-- [ ] 引入 `geolocator`
-- [ ] 引入 `sensors_plus`
+- [x] 重新引入 `isar`
+- [x] 重新引入 `isar_flutter_libs`
+- [x] 引入 `logger`
+- [x] 引入 `permission_handler`
+- [x] 引入 `geolocator`
+- [x] 引入 `sensors_plus`
 - [ ] 根据需要补充后台任务与原生桥接相关依赖
-- [ ] 确保 `flutter pub get` 在当前环境稳定通过
+- [x] 确保 `flutter pub get` 在当前环境稳定通过
 
 #### 任务 1.2：建立领域模型正式版
 
@@ -236,12 +238,12 @@
 - Create: `C:\Users\13692\Documents\health_monitor\lib\domain\metrics\daily_metrics.dart`
 - Create: `C:\Users\13692\Documents\health_monitor\test\domain\...`
 
-- [ ] 定义活动样本模型
-- [ ] 定义姿势样本模型
-- [ ] 定义位置摘要模型
-- [ ] 定义噪音等级模型
-- [ ] 定义数字生活摘要模型
-- [ ] 定义首页 / 简报聚合指标模型
+- [x] 定义活动样本模型
+- [x] 定义姿势样本模型
+- [x] 定义位置摘要模型
+- [x] 定义噪音等级模型
+- [x] 定义数字生活摘要模型
+- [x] 定义首页 / 简报聚合指标模型
 
 #### 任务 1.3：建立本地存储层
 
@@ -250,9 +252,10 @@
 - Create: `C:\Users\13692\Documents\health_monitor\lib\storage\repositories\...`
 - Create: `C:\Users\13692\Documents\health_monitor\test\storage\...`
 
-- [ ] 为活动、姿势、位置、噪音、数字生活、提醒记录分别建表
-- [ ] 为聚合查询建立 repository
-- [ ] 为最近数小时、最近一天、最近 7 天查询建立接口
+- [x] 为活动、姿势、位置、噪音、数字生活分别建表
+- [ ] 为提醒记录建表
+- [x] 为聚合查询建立最小 repository
+- [x] 为最近数小时、最近一天、最近 7 天查询建立接口
 
 #### 任务 1.4：建立真实采集调试页
 
@@ -261,12 +264,16 @@
 - Create: `C:\Users\13692\Documents\health_monitor\lib\features\diagnostics\providers\...`
 - Update: `C:\Users\13692\Documents\health_monitor\lib\app\router.dart`
 
-- [ ] 页面显示当前权限状态
-- [ ] 页面显示最近活动样本
-- [ ] 页面显示最近位置摘要
-- [ ] 页面显示最近噪音等级
-- [ ] 页面显示最近数字生活结果
-- [ ] 页面显示本地数据库写入状态
+- [x] 页面显示当前权限状态
+- [x] 页面显示最近活动样本
+- [x] 页面显示最近位置摘要
+- [x] 页面显示最近噪音等级
+- [x] 页面显示最近数字生活结果
+- [x] 页面显示本地数据库写入状态
+- [x] 页面显示实时活动样本入口
+- [x] 页面显示实时位置摘要入口
+- [x] 页面显示实时噪音样本入口
+- [x] 页面显示实时数字生活入口
 
 ---
 
@@ -505,18 +512,33 @@
 
 ## 当前已完成项
 
-- [x] 平台能力矩阵雏形
+- [x] 阶段 0：平台能力矩阵正式版与权限降级矩阵
 - [x] Flutter 最小应用壳
 - [x] 路由与基础主题最小闭环
 - [x] Flutter 设计落地文档
+- [x] 阶段 1：真实数据依赖恢复
+- [x] 阶段 1：正式领域模型
+- [x] 阶段 1：Isar collection 与最小 repository 查询接口
+- [x] 阶段 1：真实权限状态、活动/位置/噪音采集服务
+- [x] 阶段 1：数字生活最小真实入口与调试页混合快照
+- [x] 阶段 1：采集调试页与路由入口
+
+## 已提交阶段
+
+- [x] 阶段 0 已提交：`6bbb85d 完成阶段0：固化平台能力矩阵与权限降级基线`
 
 ## 当前下一步
 
-- [ ] 恢复真实数据依赖并确保稳定安装
-- [ ] 扩展能力矩阵到正式版
-- [ ] 建立权限与降级矩阵
-- [ ] 建立真实领域模型与存储模型
-- [ ] 建立调试页与真实采集闭环
+- [x] 让数字生活进入真实采集链路
+- [x] 让调试页消费真实存储与实时样本的混合结果
+- [ ] 为阶段 1 做全量验证并单独提交
+- [ ] 进入阶段 2：后台被动采集闭环
+
+## 阶段 1 收口说明
+
+- 当前“数字生活”已接入跨平台可运行的最小真实入口：以前后台生命周期事件近似生成亮屏时长、解锁次数与专注打断次数。
+- Android 全量 `Usage Access` 采集与 iPhone 更强替代指标仍需后续原生桥接，不在本次阶段 1 提交中强行扩展。
+- 因此，阶段 1 以“真实链路打通与调试可见”为完成标准，阶段 2 再进入后台连续采集与平台增强能力。
 
 ---
 

@@ -1,0 +1,171 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:health_monitor/domain/environment/noise_sample.dart';
+import 'package:health_monitor/domain/location/location_summary.dart';
+import 'package:health_monitor/domain/motion/activity_sample.dart';
+import 'package:health_monitor/domain/permission/permission_descriptor.dart';
+import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
+import 'package:health_monitor/services/digital_usage_capture_service.dart';
+import 'package:health_monitor/services/location_capture_service.dart';
+import 'package:health_monitor/services/motion_capture_service.dart';
+import 'package:health_monitor/services/noise_capture_service.dart';
+import 'package:health_monitor/services/permission_status_service.dart';
+import 'package:health_monitor/storage/repositories/activity_repository.dart';
+import 'package:health_monitor/storage/repositories/location_summary_repository.dart';
+import 'package:health_monitor/storage/repositories/noise_sample_repository.dart';
+import 'package:health_monitor/storage/repositories/query_window.dart';
+import 'package:health_monitor/storage/repositories/usage_summary_repository.dart';
+
+final activityRepositoryProvider = Provider<ActivityRepository>((Ref ref) {
+  return InMemoryActivityRepository(samples: const <ActivitySample>[]);
+});
+
+final locationSummaryRepositoryProvider = Provider<LocationSummaryRepository>((Ref ref) {
+  return InMemoryLocationSummaryRepository(summaries: const <LocationSummary>[]);
+});
+
+final noiseSampleRepositoryProvider = Provider<NoiseSampleRepository>((Ref ref) {
+  return InMemoryNoiseSampleRepository(samples: const <NoiseSample>[]);
+});
+
+final usageSummaryRepositoryProvider = Provider<UsageSummaryRepository>((Ref ref) {
+  return InMemoryUsageSummaryRepository(summaries: const <DigitalUsageSummary>[]);
+});
+
+final permissionStatusServiceProvider = Provider<PermissionStatusService>((Ref ref) {
+  return const PermissionHandlerStatusService();
+});
+
+final motionCaptureServiceProvider = Provider<MotionCaptureService>((Ref ref) {
+  return MotionCaptureService();
+});
+
+final locationCaptureServiceProvider = Provider<LocationCaptureService>((Ref ref) {
+  return LocationCaptureService();
+});
+
+final noiseCaptureServiceProvider = Provider<NoiseCaptureService>((Ref ref) {
+  return NoiseCaptureService();
+});
+
+final digitalUsageCaptureServiceProvider = Provider<DigitalUsageCaptureService>((Ref ref) {
+  return DigitalUsageCaptureService();
+});
+
+enum DiagnosticsStorageStatusKind {
+  empty,
+  hasRecentWrites,
+}
+
+class DiagnosticsStorageStatus {
+  const DiagnosticsStorageStatus({
+    required this.kind,
+    required this.label,
+  });
+
+  final DiagnosticsStorageStatusKind kind;
+  final String label;
+}
+
+class DiagnosticsSnapshot {
+  const DiagnosticsSnapshot({
+    required this.permissionStatuses,
+    required this.liveActivity,
+    required this.latestActivity,
+    required this.latestLocationSummary,
+    required this.latestNoise,
+    required this.liveUsageSummary,
+    required this.latestUsageSummary,
+    required this.storageStatus,
+  });
+
+  final Map<PermissionType, PermissionGrantStatus> permissionStatuses;
+  final ActivitySample? liveActivity;
+  final ActivitySample? latestActivity;
+  final LocationSummary? latestLocationSummary;
+  final NoiseSample? latestNoise;
+  final DigitalUsageSummary? liveUsageSummary;
+  final DigitalUsageSummary? latestUsageSummary;
+  final DiagnosticsStorageStatus storageStatus;
+}
+
+final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref) async {
+  final activityRepository = ref.watch(activityRepositoryProvider);
+  final locationRepository = ref.watch(locationSummaryRepositoryProvider);
+  final noiseRepository = ref.watch(noiseSampleRepositoryProvider);
+  final usageRepository = ref.watch(usageSummaryRepositoryProvider);
+  final permissionService = ref.watch(permissionStatusServiceProvider);
+  final motionCaptureService = ref.watch(motionCaptureServiceProvider);
+  final locationCaptureService = ref.watch(locationCaptureServiceProvider);
+  final noiseCaptureService = ref.watch(noiseCaptureServiceProvider);
+  final digitalUsageCaptureService = ref.watch(digitalUsageCaptureServiceProvider);
+
+  final referenceTime = DateTime(2026, 6, 9, 23, 59);
+  final activitySamples = await activityRepository.listByWindow(
+    QueryWindow.recentHours(24, referenceTime: referenceTime),
+  );
+  final noiseSamples = await noiseRepository.listByWindow(
+    QueryWindow.recentHours(24, referenceTime: referenceTime),
+  );
+  final locationSummaries = await locationRepository.listRecentDays(
+    1,
+    referenceDate: referenceTime,
+  );
+  final usageSummary = await usageRepository.getByDate(referenceTime);
+  final permissionStatuses = await permissionService.getStatuses();
+  ActivitySample? liveActivity;
+  try {
+    liveActivity = await motionCaptureService.watchActivitySamples().first;
+  } on MotionCaptureException {
+    liveActivity = null;
+  } on StateError {
+    liveActivity = null;
+  }
+  LocationSummary? liveLocationSummary;
+  try {
+    liveLocationSummary = await locationCaptureService.watchLocationSummaries().first;
+  } on LocationCaptureException {
+    liveLocationSummary = null;
+  } on StateError {
+    liveLocationSummary = null;
+  }
+  NoiseSample? liveNoise;
+  try {
+    liveNoise = await noiseCaptureService.watchNoiseSamples().first;
+  } on NoiseCaptureException {
+    liveNoise = null;
+  } on StateError {
+    liveNoise = null;
+  }
+  DigitalUsageSummary? liveUsageSummary;
+  try {
+    liveUsageSummary = await digitalUsageCaptureService.watchUsageSummaries().first;
+  } on DigitalUsageCaptureException {
+    liveUsageSummary = null;
+  } on StateError {
+    liveUsageSummary = null;
+  }
+
+  final hasRecentWrites =
+      activitySamples.isNotEmpty ||
+      noiseSamples.isNotEmpty ||
+      locationSummaries.isNotEmpty ||
+      usageSummary != null;
+
+  return DiagnosticsSnapshot(
+    permissionStatuses: permissionStatuses,
+    liveActivity: liveActivity,
+    latestActivity: activitySamples.isEmpty ? null : activitySamples.last,
+    latestLocationSummary: locationSummaries.isEmpty
+        ? liveLocationSummary
+        : locationSummaries.last,
+    latestNoise: noiseSamples.isEmpty ? liveNoise : noiseSamples.last,
+    liveUsageSummary: liveUsageSummary,
+    latestUsageSummary: usageSummary ?? liveUsageSummary,
+    storageStatus: DiagnosticsStorageStatus(
+      kind: hasRecentWrites
+          ? DiagnosticsStorageStatusKind.hasRecentWrites
+          : DiagnosticsStorageStatusKind.empty,
+      label: hasRecentWrites ? '最近已写入本地记录' : '暂无本地写入记录',
+    ),
+  );
+});
