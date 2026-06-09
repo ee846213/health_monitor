@@ -306,6 +306,8 @@
 - Create: `C:\Users\13692\Documents\health_monitor\android\background\...`
 - Create: `C:\Users\13692\Documents\health_monitor\lib\platform\android\...`
 
+- [x] Flutter 侧前台服务配置模型
+- [x] Flutter 侧 Android 后台桥接协议
 - [ ] 前台服务策略
 - [ ] 后台任务调度
 - [ ] 运动 / 位置 / 数字生活 / 环境采集调度
@@ -541,6 +543,7 @@
 ## 阶段 2 当前进展
 
 - 已补齐统一后台采集状态模型，并把后台链路状态接入采集调试页。
+- 已补齐 Android 后台采集的 Flutter 侧配置模型与桥接协议。
 - 当前仍缺 Android 前台服务 / 调度实现，以及 iPhone 平台侧后台策略实现。
 - 后续阶段 2 的重点应转到 `android/`、`ios/` 与 `lib/platform/` 的正式实现，而不是继续只停留在共享层抽象。
 
