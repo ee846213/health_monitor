@@ -4,6 +4,12 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+dependencies {
+    testImplementation("junit:junit:4.13.2")
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+}
+
 android {
     namespace = "com.example.health_monitor"
     compileSdk = flutter.compileSdkVersion
@@ -38,6 +44,10 @@ kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
+}
+
+tasks.withType<Test>().configureEach {
+    useJUnit()
 }
 
 flutter {

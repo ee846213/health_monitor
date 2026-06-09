@@ -303,16 +303,18 @@
 #### 任务 2.1：Android 后台采集正式实现
 
 **Files:**
-- Create: `C:\Users\13692\Documents\health_monitor\android\background\...`
+- Create: `C:\Users\13692\Documents\health_monitor\android\app\src\main\kotlin\com\example\health_monitor\background\...`
 - Create: `C:\Users\13692\Documents\health_monitor\lib\platform\android\...`
 
 - [x] Flutter 侧前台服务配置模型
 - [x] Flutter 侧 Android 后台桥接协议
-- [ ] 前台服务策略
-- [ ] 后台任务调度
-- [ ] 运动 / 位置 / 数字生活 / 环境采集调度
-- [ ] 通知常驻与状态展示
-- [ ] 异常恢复
+- [x] 前台服务策略
+- [x] 后台任务调度
+- [x] 运动 / 位置 / 数字生活 / 环境采集调度
+- [x] 通知常驻与状态展示
+- [x] 异常恢复
+
+> 说明：这一任务已推进到可用的 Android 原生系统边界，包含前台服务、通知通道、WorkManager 调度入口与异常恢复路径。
 
 #### 任务 2.2：iPhone 后台采集正式实现
 
@@ -550,6 +552,9 @@
 - 已补齐 Android / iOS 宿主工程基线，解决原生后台能力无落点的问题。
 - 已补齐 Android 宿主侧 `MethodChannel` 启停骨架与最小状态控制器，后续可在此基础上接前台服务与调度实现。
 - 已补齐 Android 宿主后台状态查询出口，并把原生宿主摘要接入 Flutter 调试页，便于继续推进前台服务与调度实现时做联调观测。
+- 已补齐 Android 前台服务策略、原生调度门面、通知组装、Worker 骨架与恢复刷新入口，正在等待原生单测验证。
+- 已补齐 Android 前台服务编排器、周期任务计划器、执行器和可恢复状态仓，正在等待 Gradle wrapper 锁释放后进行原生单测验证。
+- 已补齐 Android 前台 `Service` 壳、WorkManager worker 壳、可持久化状态仓和请求编码器，系统级恢复链路已具备最小实现。
 - 当前仍缺 Android 前台服务 / 调度实现，以及 iPhone 平台侧后台策略实现。
 - 后续阶段 2 的重点应转到 `android/`、`ios/` 与 `lib/platform/` 的正式实现，而不是继续只停留在共享层抽象。
 
