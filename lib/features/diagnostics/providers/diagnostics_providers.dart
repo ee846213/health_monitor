@@ -1,9 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:health_monitor/domain/background/background_capture_state.dart';
+import 'package:health_monitor/domain/capability_matrix.dart';
 import 'package:health_monitor/domain/environment/noise_sample.dart';
 import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/motion/activity_sample.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
+import 'package:health_monitor/services/background_capture_service.dart';
 import 'package:health_monitor/services/digital_usage_capture_service.dart';
 import 'package:health_monitor/services/location_capture_service.dart';
 import 'package:health_monitor/services/motion_capture_service.dart';
@@ -31,6 +34,10 @@ final usageSummaryRepositoryProvider = Provider<UsageSummaryRepository>((Ref ref
   return InMemoryUsageSummaryRepository(summaries: const <DigitalUsageSummary>[]);
 });
 
+final capabilityMatrixProvider = Provider<CapabilityMatrix>((Ref ref) {
+  return CapabilityMatrix.defaultMatrix();
+});
+
 final permissionStatusServiceProvider = Provider<PermissionStatusService>((Ref ref) {
   return const PermissionHandlerStatusService();
 });
@@ -49,6 +56,10 @@ final noiseCaptureServiceProvider = Provider<NoiseCaptureService>((Ref ref) {
 
 final digitalUsageCaptureServiceProvider = Provider<DigitalUsageCaptureService>((Ref ref) {
   return DigitalUsageCaptureService();
+});
+
+final backgroundCaptureServiceProvider = Provider<BackgroundCaptureStateService>((Ref ref) {
+  return const BackgroundCaptureService();
 });
 
 enum DiagnosticsStorageStatusKind {
@@ -75,6 +86,7 @@ class DiagnosticsSnapshot {
     required this.latestNoise,
     required this.liveUsageSummary,
     required this.latestUsageSummary,
+    required this.backgroundCaptureState,
     required this.storageStatus,
   });
 
@@ -85,10 +97,12 @@ class DiagnosticsSnapshot {
   final NoiseSample? latestNoise;
   final DigitalUsageSummary? liveUsageSummary;
   final DigitalUsageSummary? latestUsageSummary;
+  final BackgroundCaptureState backgroundCaptureState;
   final DiagnosticsStorageStatus storageStatus;
 }
 
 final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref) async {
+  final capabilityMatrix = ref.watch(capabilityMatrixProvider);
   final activityRepository = ref.watch(activityRepositoryProvider);
   final locationRepository = ref.watch(locationSummaryRepositoryProvider);
   final noiseRepository = ref.watch(noiseSampleRepositoryProvider);
@@ -98,6 +112,7 @@ final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref
   final locationCaptureService = ref.watch(locationCaptureServiceProvider);
   final noiseCaptureService = ref.watch(noiseCaptureServiceProvider);
   final digitalUsageCaptureService = ref.watch(digitalUsageCaptureServiceProvider);
+  final backgroundCaptureService = ref.watch(backgroundCaptureServiceProvider);
 
   final referenceTime = DateTime(2026, 6, 9, 23, 59);
   final activitySamples = await activityRepository.listByWindow(
@@ -112,6 +127,10 @@ final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref
   );
   final usageSummary = await usageRepository.getByDate(referenceTime);
   final permissionStatuses = await permissionService.getStatuses();
+  final backgroundCaptureState = await backgroundCaptureService.evaluateState(
+    capabilitySet: capabilityMatrix.android,
+    permissionStatuses: permissionStatuses,
+  );
   ActivitySample? liveActivity;
   try {
     liveActivity = await motionCaptureService.watchActivitySamples().first;
@@ -161,6 +180,7 @@ final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref
     latestNoise: noiseSamples.isEmpty ? liveNoise : noiseSamples.last,
     liveUsageSummary: liveUsageSummary,
     latestUsageSummary: usageSummary ?? liveUsageSummary,
+    backgroundCaptureState: backgroundCaptureState,
     storageStatus: DiagnosticsStorageStatus(
       kind: hasRecentWrites
           ? DiagnosticsStorageStatusKind.hasRecentWrites

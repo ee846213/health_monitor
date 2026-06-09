@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:health_monitor/domain/background/background_capture_state.dart';
 import 'package:health_monitor/domain/environment/noise_sample.dart';
 import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/motion/activity_sample.dart';
@@ -51,6 +52,10 @@ class SensorDebugPage extends ConsumerWidget {
               _SectionCard(
                 title: '最近数字生活',
                 child: Text(_usageSummary(snapshot.latestUsageSummary)),
+              ),
+              _SectionCard(
+                title: '后台采集状态',
+                child: Text(_backgroundSummary(snapshot.backgroundCaptureState)),
               ),
               _SectionCard(
                 title: '本地写入状态',
@@ -106,6 +111,10 @@ class SensorDebugPage extends ConsumerWidget {
       return '暂无数字生活摘要';
     }
     return '${summary.topCategory.name} · 亮屏 ${summary.screenOnDuration.inHours} 小时';
+  }
+
+  String _backgroundSummary(BackgroundCaptureState state) {
+    return '${state.label} · ${state.reason}';
   }
 }
 

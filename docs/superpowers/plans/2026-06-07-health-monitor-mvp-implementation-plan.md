@@ -330,8 +330,8 @@
 - Create: `C:\Users\13692\Documents\health_monitor\lib\services\background_capture_service.dart`
 - Create: `C:\Users\13692\Documents\health_monitor\test\domain\background_capture_state_test.dart`
 
-- [ ] 定义运行中、受限、暂停、失败、权限不足等状态
-- [ ] 页面层统一读取后台链路状态
+- [x] 定义运行中、受限、暂停、失败、权限不足等状态
+- [x] 页面层统一读取后台链路状态
 
 ---
 
@@ -536,7 +536,13 @@
 - [x] 让调试页消费真实存储与实时样本的混合结果
 - [x] 为阶段 1 做全量验证并单独提交
 - [ ] 为阶段 1 剩余收尾项补充增量提交
-- [ ] 进入阶段 2：后台被动采集闭环
+- [ ] 进入阶段 2：Android / iPhone 平台侧后台采集实现
+
+## 阶段 2 当前进展
+
+- 已补齐统一后台采集状态模型，并把后台链路状态接入采集调试页。
+- 当前仍缺 Android 前台服务 / 调度实现，以及 iPhone 平台侧后台策略实现。
+- 后续阶段 2 的重点应转到 `android/`、`ios/` 与 `lib/platform/` 的正式实现，而不是继续只停留在共享层抽象。
 
 ## 阶段 1 收口说明
 

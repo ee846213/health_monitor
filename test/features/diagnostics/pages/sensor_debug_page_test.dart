@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:health_monitor/domain/background/background_capture_state.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/features/diagnostics/pages/sensor_debug_page.dart';
 import 'package:health_monitor/features/diagnostics/providers/diagnostics_providers.dart';
@@ -19,6 +20,11 @@ void main() {
       latestNoise: null,
       liveUsageSummary: null,
       latestUsageSummary: null,
+      backgroundCaptureState: BackgroundCaptureState(
+        status: BackgroundCaptureStatus.restricted,
+        label: '后台能力受限',
+        reason: '系统限制了当前平台的后台连续性。',
+      ),
       storageStatus: DiagnosticsStorageStatus(
         kind: DiagnosticsStorageStatusKind.empty,
         label: '暂无本地写入记录',
@@ -53,6 +59,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('最近数字生活'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('后台采集状态'),
+      200,
+      scrollable: find.byType(Scrollable),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('后台采集状态'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('本地写入状态'),

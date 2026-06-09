@@ -1,11 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:health_monitor/domain/background/background_capture_state.dart';
 import 'package:health_monitor/domain/environment/noise_sample.dart';
 import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/motion/activity_sample.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
 import 'package:health_monitor/features/diagnostics/providers/diagnostics_providers.dart';
+import 'package:health_monitor/services/background_capture_service.dart';
 import 'package:health_monitor/services/location_capture_service.dart';
 import 'package:health_monitor/services/motion_capture_service.dart';
 import 'package:health_monitor/services/noise_capture_service.dart';
@@ -144,6 +146,15 @@ void main() {
             },
           ),
         ),
+        backgroundCaptureServiceProvider.overrideWithValue(
+          const FakeBackgroundCaptureService(
+            BackgroundCaptureState(
+              status: BackgroundCaptureStatus.running,
+              label: '后台采集中',
+              reason: '前台服务与调度都已就绪。',
+            ),
+          ),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -157,6 +168,7 @@ void main() {
     expect(snapshot.latestNoise?.level, NoiseLevel.moderate);
     expect(snapshot.liveUsageSummary?.unlockCount, 1);
     expect(snapshot.latestUsageSummary?.topCategory, UsageCategory.tools);
+    expect(snapshot.backgroundCaptureState.status, BackgroundCaptureStatus.running);
     expect(snapshot.storageStatus.kind, DiagnosticsStorageStatusKind.hasRecentWrites);
   });
 
@@ -197,6 +209,15 @@ void main() {
             lifecycleEventStreamFactory: () => const Stream<AppUsageEvent>.empty(),
           ),
         ),
+        backgroundCaptureServiceProvider.overrideWithValue(
+          const FakeBackgroundCaptureService(
+            BackgroundCaptureState(
+              status: BackgroundCaptureStatus.permissionDenied,
+              label: '后台权限未开启',
+              reason: '当前只会在前台积累样本。',
+            ),
+          ),
+        ),
       ],
     );
     addTearDown(container.dispose);
@@ -209,6 +230,7 @@ void main() {
     expect(snapshot.latestNoise, isNull);
     expect(snapshot.liveUsageSummary, isNull);
     expect(snapshot.latestUsageSummary, isNull);
+    expect(snapshot.backgroundCaptureState.status, BackgroundCaptureStatus.permissionDenied);
     expect(snapshot.storageStatus.kind, DiagnosticsStorageStatusKind.empty);
   });
 }
