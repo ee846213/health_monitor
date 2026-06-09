@@ -4,12 +4,14 @@ import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/metrics/daily_metrics.dart';
 import 'package:health_monitor/domain/motion/activity_sample.dart';
 import 'package:health_monitor/domain/motion/posture_sample.dart';
+import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
 import 'package:health_monitor/storage/isar/collections/activity_sample_record.dart';
 import 'package:health_monitor/storage/isar/collections/daily_metrics_record.dart';
 import 'package:health_monitor/storage/isar/collections/location_summary_record.dart';
 import 'package:health_monitor/storage/isar/collections/noise_sample_record.dart';
 import 'package:health_monitor/storage/isar/collections/posture_sample_record.dart';
+import 'package:health_monitor/storage/isar/collections/reminder_record_entity.dart';
 import 'package:health_monitor/storage/isar/collections/usage_summary_record.dart';
 
 void main() {
@@ -95,5 +97,24 @@ void main() {
     expect(noiseRecord.durationSeconds, 600);
     expect(metricsRecord.dateKey, '2026-06-09');
     expect(metricsRecord.highNoiseExposureSeconds, 2100);
+  });
+
+  test('提醒记录应保留解释与交互回写所需字段', () {
+    final reminder = ReminderRecord(
+      triggeredAt: DateTime(2026, 6, 9, 15, 30),
+      type: ReminderType.sedentaryBreak,
+      title: '起身走一走',
+      message: '你下午已经连续坐了很久。',
+      reasonSummary: '14:00 到 15:30 几乎没有活动。',
+      actionSuggestion: '先活动两分钟再继续。',
+      response: ReminderResponse.taken,
+    );
+
+    final record = ReminderRecordEntity.fromDomain(reminder);
+
+    expect(record.dateKey, '2026-06-09');
+    expect(record.typeKey, ReminderType.sedentaryBreak.name);
+    expect(record.responseKey, ReminderResponse.taken.name);
+    expect(record.reasonSummary, contains('没有活动'));
   });
 }

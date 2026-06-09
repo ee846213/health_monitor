@@ -1,9 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/metrics/daily_metrics.dart';
+import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
 import 'package:health_monitor/storage/repositories/location_summary_repository.dart';
 import 'package:health_monitor/storage/repositories/metrics_repository.dart';
+import 'package:health_monitor/storage/repositories/reminder_repository.dart';
 import 'package:health_monitor/storage/repositories/usage_summary_repository.dart';
 
 void main() {
@@ -93,5 +95,35 @@ void main() {
     );
 
     expect(result.map((item) => item.date.day), <int>[5, 9]);
+  });
+
+  test('提醒仓储应支持读取最近提醒结果', () async {
+    final repository = InMemoryReminderRepository(
+      records: <ReminderRecord>[
+        ReminderRecord(
+          triggeredAt: DateTime(2026, 6, 8, 9),
+          type: ReminderType.postureRisk,
+          title: '把手机抬高一点',
+          message: '低头时间有点久。',
+          reasonSummary: '连续低头持机超过阈值。',
+          actionSuggestion: '把手肘垫高一点。',
+          response: ReminderResponse.pending,
+        ),
+        ReminderRecord(
+          triggeredAt: DateTime(2026, 6, 9, 21),
+          type: ReminderType.nightUsage,
+          title: '今晚早点放下手机',
+          message: '再看一会儿可能会更晚睡。',
+          reasonSummary: '夜间亮屏时长已经偏高。',
+          actionSuggestion: '把最后十分钟留给放松。',
+          response: ReminderResponse.dismissed,
+        ),
+      ],
+    );
+
+    final latest = await repository.getLatest();
+
+    expect(latest?.triggeredAt.day, 9);
+    expect(latest?.type, ReminderType.nightUsage);
   });
 }
