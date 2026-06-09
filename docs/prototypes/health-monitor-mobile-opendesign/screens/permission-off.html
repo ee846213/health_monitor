@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>权限未开启态</title>
+  <link rel="stylesheet" href="../shared.css">
+</head>
+<body class="screen-body">
+  <main class="screen-shell">
+    <div class="statusbar">
+      <span>9:41</span>
+      <div class="statusbar-icons">
+        <span class="signal"><i></i><i></i><i></i><i></i></span>
+        <span class="wifi"><i></i><i></i><i></i></span>
+        <span class="battery"><i></i></span>
+      </div>
+    </div>
+
+    <section class="app-header" data-od-id="permission-header">
+      <div>
+        <h1>通知还没开启</h1>
+        <p class="header-copy">不开也能继续用，只是少了需要时的轻提醒。</p>
+      </div>
+      <span class="header-chip">权限状态</span>
+    </section>
+
+    <section class="card" data-od-id="permission-main">
+      <div class="permission-art">
+        <span class="art-badge" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 4a4 4 0 0 1 4 4v2.7c0 .5.16.98.46 1.38L18 14.5H6l1.54-2.42c.3-.4.46-.88.46-1.38V8a4 4 0 0 1 4-4Z"/><path d="M10 18a2 2 0 0 0 4 0"/></svg>
+        </span>
+        <div>
+          <p class="list-title">不开通知，也没关系。</p>
+          <p class="list-meta" style="margin-top: 8px;">只是系统没法在更合适的时机轻轻提醒你。</p>
+        </div>
+      </div>
+
+      <div class="trust-list" style="margin-top: 16px;">
+        <div class="trust-item">
+          <span class="icon-wrap" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+          </span>
+          <div class="text-stack">
+            <p class="list-title">开启后会多什么</p>
+            <p class="list-meta">只在值得的时候出现，不会为了刷存在感频繁打断。</p>
+          </div>
+        </div>
+
+        <div class="trust-item">
+          <span class="icon-wrap cool" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="4" width="14" height="16" rx="3"/><path d="M8 9h8M8 13h6"/></svg>
+          </span>
+          <div class="text-stack">
+            <p class="list-title">不开也能看什么</p>
+            <p class="list-meta">首页、日报和周回顾都还在，只是不会主动提醒。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="cta-row" style="margin-top: 18px;">
+        <button class="btn primary" type="button">去系统设置</button>
+        <a class="btn secondary" href="profile.html">稍后再说</a>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabbar" aria-label="底部导航">
+    <a href="home.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3.5 10.5 12 4l8.5 6.5V20H14v-5h-4v5H3.5z"/></svg>
+      <span>首页</span>
+    </a>
+    <a href="report-list.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
+      <span>简报</span>
+    </a>
+    <a href="profile.html" class="active" aria-current="page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.5"/><path d="M5 19c1.8-3 4.2-4.5 7-4.5s5.2 1.5 7 4.5"/></svg>
+      <span>我</span>
+    </a>
+  </nav>
+</body>
+</html>

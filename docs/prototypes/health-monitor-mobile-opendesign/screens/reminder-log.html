@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>提醒记录</title>
+  <link rel="stylesheet" href="../shared.css">
+</head>
+<body class="screen-body">
+  <main class="screen-shell">
+    <div class="statusbar">
+      <span>9:41</span>
+      <div class="statusbar-icons">
+        <span class="signal"><i></i><i></i><i></i><i></i></span>
+        <span class="wifi"><i></i><i></i><i></i></span>
+        <span class="battery"><i></i></span>
+      </div>
+    </div>
+
+    <section class="app-header" data-od-id="reminder-log-header">
+      <div>
+        <h1>提醒记录</h1>
+        <p class="header-copy">每条提醒都能回看时间、内容和为什么会出现。</p>
+      </div>
+      <span class="header-chip">今天 2 条</span>
+    </section>
+
+    <section class="card soft tight" data-od-id="reminder-log-list">
+      <div class="card-header">
+        <div>
+          <h2 class="card-title">今天</h2>
+          <p class="card-subtitle">提醒不多，但都能解释清楚。</p>
+        </div>
+      </div>
+
+      <div class="record-list">
+        <a class="record-item" href="reason.html">
+          <div class="record-head">
+            <span class="record-time">15:00</span>
+            <span class="status-pill soft">已查看</span>
+          </div>
+          <p class="record-title">起身走一走</p>
+          <p class="record-copy">下午久坐有点集中，现在活动 3 分钟会更轻松。</p>
+          <p class="record-reason">原因解释：14:00 到 17:00 基本没起身，今天步数补得回来，不必着急。</p>
+        </a>
+
+        <article class="record-item muted">
+          <div class="record-head">
+            <span class="record-time">11:20</span>
+            <span class="status-pill soft">摘要</span>
+          </div>
+          <p class="record-title">看远一点</p>
+          <p class="record-copy">上午看屏切换偏多，眼睛该放松一下了。</p>
+          <p class="record-reason">原因解释：连续碎片查看较频繁，所以用更轻的方式提醒你离屏片刻。</p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabbar" aria-label="底部导航">
+    <a href="home.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3.5 10.5 12 4l8.5 6.5V20H14v-5h-4v5H3.5z"/></svg>
+      <span>首页</span>
+    </a>
+    <a href="report-list.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
+      <span>简报</span>
+    </a>
+    <a href="profile.html" class="active" aria-current="page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.5"/><path d="M5 19c1.8-3 4.2-4.5 7-4.5s5.2 1.5 7 4.5"/></svg>
+      <span>我</span>
+    </a>
+  </nav>
+</body>
+</html>

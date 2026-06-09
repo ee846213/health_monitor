@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>健康监测 - iPhone 原型总览</title>
+  <link rel="stylesheet" href="shared.css">
+</head>
+<body class="launcher-body">
+  <main class="launcher-shell">
+    <aside class="launcher-panel">
+      <p class="eyebrow">iPhone Prototype</p>
+      <h1 class="launcher-title">健康监测</h1>
+      <p class="launcher-copy">一套偏 iPhone 原生气质、以“温和陪伴”为核心的移动端高保真原型。</p>
+      <ol class="launcher-list">
+        <li>
+          <button class="launcher-link" data-screen-target="screens/home.html" data-screen-label="首页默认态">
+            <strong>01 首页默认态</strong>
+            <span>先给结论，再给关键数据。</span>
+          </button>
+        </li>
+        <li>
+          <button class="launcher-link" data-screen-target="screens/home-sheet.html" data-screen-label="今日状态卡半屏展开">
+            <strong>02 今日状态卡半屏展开</strong>
+            <span>解释为什么这样判断，以及现在做什么。</span>
+          </button>
+        </li>
+        <li>
+          <button class="launcher-link" data-screen-target="screens/report.html" data-screen-label="单张日报">
+            <strong>03 单张日报</strong>
+            <span>一页看完今天的回顾与建议。</span>
+          </button>
+        </li>
+        <li>
+          <button class="launcher-link" data-screen-target="screens/report-list.html" data-screen-label="最近7天简报">
+            <strong>04 最近7天简报</strong>
+            <span>按时间流回看这一周的状态。</span>
+          </button>
+        </li>
+        <li>
+          <button class="launcher-link" data-screen-target="screens/profile.html" data-screen-label="我页主入口">
+            <strong>05 我页主入口</strong>
+            <span>提醒、偏好和感知状态入口。</span>
+          </button>
+        </li>
+        <li>
+          <button class="launcher-link" data-screen-target="screens/reason.html" data-screen-label="提醒详情">
+            <strong>06 提醒详情</strong>
+            <span>查看触发时间、提醒文案和原因。</span>
+          </button>
+        </li>
+        <li>
+          <button class="launcher-link" data-screen-target="screens/permission-off.html" data-screen-label="权限未开启态">
+            <strong>07 权限未开启态</strong>
+            <span>权限缺失时的柔性说明。</span>
+          </button>
+        </li>
+        <li>
+          <button class="launcher-link" data-screen-target="screens/empty-data.html" data-screen-label="数据不足空态">
+            <strong>08 数据不足空态</strong>
+            <span>记录不足时的诚实降级。</span>
+          </button>
+        </li>
+      </ol>
+    </aside>
+
+    <section class="launcher-preview" data-od-id="launcher-preview">
+      <div class="preview-head">
+        <div>
+          <p class="eyebrow">默认预览</p>
+          <h2 data-launcher-label>首页默认态</h2>
+        </div>
+        <p class="preview-meta">使用 iPhone 15 Pro 设备框架加载各页面。</p>
+      </div>
+      <div class="preview-stage">
+        <div class="device-main">
+          <iframe data-launcher-frame title="主预览"></iframe>
+        </div>
+        <div class="tile-grid">
+          <article class="tile">
+            <h3>首页默认态</h3>
+            <iframe src="/frames/iphone-15-pro.html?screen=screens/home.html" title="首页默认态"></iframe>
+          </article>
+          <article class="tile">
+            <h3>今日状态卡半屏展开</h3>
+            <iframe src="/frames/iphone-15-pro.html?screen=screens/home-sheet.html" title="今日状态卡半屏展开"></iframe>
+          </article>
+          <article class="tile">
+            <h3>最近7天简报</h3>
+            <iframe src="/frames/iphone-15-pro.html?screen=screens/report-list.html" title="最近7天简报"></iframe>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

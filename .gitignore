@@ -1,0 +1,9 @@
+.dart_tool/
+build/
+
+.superpowers/
+
+pubget.err.log
+pubget.out.log
+pubget_cmd.err
+pubget_cmd.out

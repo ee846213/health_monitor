@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>今日日报</title>
+  <link rel="stylesheet" href="../shared.css">
+</head>
+<body class="screen-body">
+  <main class="screen-shell">
+    <div class="statusbar">
+      <span>9:41</span>
+      <div class="statusbar-icons">
+        <span class="signal"><i></i><i></i><i></i><i></i></span>
+        <span class="wifi"><i></i><i></i><i></i></span>
+        <span class="battery"><i></i></span>
+      </div>
+    </div>
+
+    <section class="app-header" data-od-id="report-header">
+      <div>
+        <h1>简报</h1>
+        <p class="header-copy">按今天、昨天、最近7天回看状态。</p>
+      </div>
+      <span class="header-chip">今日日报</span>
+    </section>
+
+    <section class="card soft tight" data-od-id="report-segments">
+      <div class="segment-control" role="tablist" aria-label="简报时间切换">
+        <button class="segment-button is-active" type="button" role="tab" aria-selected="true" data-report-tab="today">今天</button>
+        <button class="segment-button" type="button" role="tab" aria-selected="false" data-report-tab="yesterday">昨天</button>
+        <button class="segment-button" type="button" role="tab" aria-selected="false" data-report-tab="week">最近7天</button>
+      </div>
+    </section>
+
+    <section class="report-panel is-active" data-report-panel="today">
+      <section class="back-row" data-od-id="report-back">
+        <a class="back-link" href="report-list.html">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m15 6-6 6 6 6"/></svg>
+          <span>回到最近7天</span>
+        </a>
+      </section>
+
+      <section class="card report-day-card" data-od-id="report-today-card">
+        <div class="card-header">
+          <div>
+            <span class="nav-pill">6 月 7 日 · 周日</span>
+            <h2 class="card-title">今天整体还不错，下午久坐有点集中。</h2>
+          </div>
+          <span class="badge success">偏稳</span>
+        </div>
+
+        <div class="report-block">
+          <p class="report-label">三大核心指标</p>
+          <div class="summary-pills">
+            <span class="summary-pill"><strong>步数</strong> 6,240</span>
+            <span class="summary-pill"><strong>久坐</strong> 3.2 小时</span>
+            <span class="summary-pill"><strong>看屏</strong> 2.8 小时</span>
+          </div>
+        </div>
+
+        <div class="report-block">
+          <p class="report-label">活动节律总结</p>
+          <p class="report-copy">上午节奏平稳，下午两段久坐连在了一起，晚饭后走动把状态稍微拉回来了。</p>
+        </div>
+
+        <div class="report-block">
+          <p class="report-label">数字生活摘要</p>
+          <p class="report-copy">今晚解锁次数偏多，但多是碎片时间里的短查看，没有持续沉进去太久。</p>
+        </div>
+
+        <div class="report-block">
+          <p class="report-label">姿势或环境摘要</p>
+          <p class="report-copy">今天大多在室内，低头用机主要集中在通勤后和睡前这两段时间。</p>
+        </div>
+
+        <div class="action-card report-action">
+          <span class="icon-wrap" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+          </span>
+          <div class="action-copy">
+            <strong>明天优先把下午第一段久坐打断。</strong>
+            <span>先起身走 3 分钟，比晚上补步数更容易做到。</span>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section class="report-panel" data-report-panel="yesterday" hidden>
+      <section class="card report-day-card" data-od-id="report-yesterday-card">
+        <div class="card-header">
+          <div>
+            <span class="nav-pill">6 月 6 日 · 周六</span>
+            <h2 class="card-title">昨天恢复偏慢，晚上的收尾比平时更迟一点。</h2>
+          </div>
+          <span class="badge warn">偏慢</span>
+        </div>
+
+        <div class="report-block">
+          <p class="report-label">三大核心指标</p>
+          <div class="summary-pills">
+            <span class="summary-pill"><strong>步数</strong> 5,480</span>
+            <span class="summary-pill"><strong>久坐</strong> 3.7 小时</span>
+            <span class="summary-pill"><strong>看屏</strong> 3.1 小时</span>
+          </div>
+        </div>
+
+        <div class="report-block">
+          <p class="report-label">活动节律总结</p>
+          <p class="report-copy">中午后活动量没有接上，两段会议后坐得更久，整天节奏显得有点拖。</p>
+        </div>
+
+        <div class="report-block">
+          <p class="report-label">数字生活摘要</p>
+          <p class="report-copy">睡前看屏收得偏晚，放松开始得慢，所以整晚的恢复感也被拖后了。</p>
+        </div>
+
+        <div class="report-block">
+          <p class="report-label">姿势或环境摘要</p>
+          <p class="report-copy">昨天在桌前的时间更长，肩颈低头状态出现得比平时更频繁。</p>
+        </div>
+
+        <div class="action-card report-action">
+          <span class="icon-wrap warm" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+          </span>
+          <div class="action-copy">
+            <strong>今晚把最后一条提醒提前 20 分钟。</strong>
+            <span>早点开始收尾，恢复会更顺一点。</span>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <section class="report-panel" data-report-panel="week" hidden>
+      <section class="card report-day-card" data-od-id="report-week-card">
+        <div class="card-header">
+          <div>
+            <span class="nav-pill">最近7天</span>
+            <h2 class="card-title">这一周最常见的问题，还是下午久坐和晚间碎片看屏。</h2>
+          </div>
+          <span class="badge">回顾</span>
+        </div>
+
+        <div class="report-block">
+          <p class="report-label">三大核心指标</p>
+          <div class="summary-pills">
+            <span class="summary-pill"><strong>步数波动</strong> 5.4k - 7.1k</span>
+            <span class="summary-pill"><strong>久坐高点</strong> 周三下午</span>
+            <span class="summary-pill"><strong>看屏高点</strong> 周五夜间</span>
+          </div>
+        </div>
+
+        <div class="report-block">
+          <p class="report-label">活动节律总结</p>
+          <p class="report-copy">工作日的下午容易出现连续久坐，周末一放松，整体节律会自然好一些。</p>
+        </div>
+
+        <div class="report-block">
+          <p class="report-label">数字生活摘要</p>
+          <p class="report-copy">这周多次出现短频快地看手机，尤其在任务切换和晚间放松前后更明显。</p>
+        </div>
+
+        <div class="report-block">
+          <p class="report-label">姿势或环境摘要</p>
+          <p class="report-copy">本周室内停留时间偏长，低头用机和桌前久坐大多是一起出现的。</p>
+        </div>
+
+        <div class="action-card report-action">
+          <span class="icon-wrap cool" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 12h16M12 4v16"/></svg>
+          </span>
+          <div class="action-copy">
+            <strong>下周先盯住下午第一段久坐。</strong>
+            <span>如果这里能早点打断，整周的波动会轻很多。</span>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <nav class="tabbar" aria-label="底部导航">
+    <a href="home.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3.5 10.5 12 4l8.5 6.5V20H14v-5h-4v5H3.5z"/></svg>
+      <span>首页</span>
+    </a>
+    <a href="report-list.html" class="active" aria-current="page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>
+      <span>简报</span>
+    </a>
+    <a href="profile.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.5"/><path d="M5 19c1.8-3 4.2-4.5 7-4.5s5.2 1.5 7 4.5"/></svg>
+      <span>我</span>
+    </a>
+  </nav>
+
+  <script src="../app.js"></script>
+</body>
+</html>
