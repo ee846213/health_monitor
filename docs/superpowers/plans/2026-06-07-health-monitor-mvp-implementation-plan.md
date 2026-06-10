@@ -432,8 +432,8 @@
 - Refactor: `C:\Users\13692\Documents\health_monitor\lib\app\theme.dart`
 - Create: `C:\Users\13692\Documents\health_monitor\lib\app\theme\...`
 
-- [ ] 把当前最小主题升级为 design tokens 正式版
-- [ ] 对齐 Flutter 设计落地文档
+- [x] 把当前最小主题升级为 design tokens 正式版
+- [x] 对齐 Flutter 设计落地文档
 
 #### 任务 4.2：首页正式接入
 
@@ -441,16 +441,16 @@
 - Create: `C:\Users\13692\Documents\health_monitor\lib\features\overview\...`
 - Test: `C:\Users\13692\Documents\health_monitor\test\features\overview\...`
 
-- [ ] 首页读取真实状态
-- [ ] 首页展开态读取真实解释
-- [ ] 首页空态与权限态接入真实分支
+- [x] 首页读取真实状态
+- [x] 首页展开态读取真实解释
+- [x] 首页空态与权限态接入真实分支
 
 #### 任务 4.3：简报、我页、提醒页正式接入
 
-- [ ] 简报页读取真实聚合结果
-- [ ] 我页读取真实能力状态与权限状态
-- [ ] 提醒记录页读取真实提醒历史
-- [ ] 提醒原因页读取真实解释依据
+- [x] 简报页读取真实聚合结果
+- [x] 我页读取真实能力状态与权限状态
+- [x] 提醒记录页读取真实提醒历史
+- [x] 提醒原因页读取真实解释依据
 
 ---
 
