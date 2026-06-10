@@ -41,7 +41,18 @@ class QueryWindow {
     );
   }
 
-  bool contains(DateTime value) {
-    return !value.isBefore(startAt) && !value.isAfter(endAt);
+ bool contains(DateTime value) {
+   return !value.isBefore(startAt) && !value.isAfter(endAt);
+ }
+ 
+  List<DateTime> dailyDates() {
+    final dates = <DateTime>[];
+    var current = DateTime(startAt.year, startAt.month, startAt.day);
+    final endDay = DateTime(endAt.year, endAt.month, endAt.day);
+    while (!current.isAfter(endDay)) {
+      dates.add(current);
+      current = current.add(const Duration(days: 1));
+    }
+    return dates;
   }
 }
