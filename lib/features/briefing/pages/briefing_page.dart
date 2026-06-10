@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:health_monitor/app/theme/app_icons.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
 
 const _surface = Color(0xFFFFFDF8);
@@ -119,7 +120,7 @@ class _SuggestionBanner extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(color: const Color(0xFFF3EBE2), borderRadius: BorderRadius.circular(22), border: Border.all(color: _line)),
       child: Row(children: [
-        Container(width: 38, height: 38, decoration: BoxDecoration(color: _sageSoft, borderRadius: BorderRadius.circular(19)), child: const Icon(Icons.notifications_active_rounded, size: 18, color: _sageDeep)),
+        Container(width: 38, height: 38, decoration: BoxDecoration(color: _sageSoft, borderRadius: BorderRadius.circular(19)), child: const Icon(AppIcons.bellRing, size: 18, color: _sageDeep)),
         const SizedBox(width: 12),
         const Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

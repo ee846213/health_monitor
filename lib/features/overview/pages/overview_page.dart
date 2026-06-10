@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:health_monitor/app/theme/app_icons.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
 import 'package:health_monitor/rules/engine/rule_verdict.dart';
 
@@ -322,7 +323,7 @@ class _SuggestionRow extends StatelessWidget {
         Container(
           width: 38, height: 38,
           decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(19)),
-          child: Icon(Icons.notifications_active_rounded, size: 18, color: iconColor),
+          child: Icon(AppIcons.bellRing, size: 18, color: iconColor),
         ),
         const SizedBox(width: 12),
         Expanded(
