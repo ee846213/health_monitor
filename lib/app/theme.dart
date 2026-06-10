@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:health_monitor/app/theme/app_theme_extension.dart';
 
 ThemeData buildAppTheme() {
   const Color canvas = Color(0xFFF5F3EE);
@@ -23,6 +24,9 @@ ThemeData buildAppTheme() {
     useMaterial3: true,
     colorScheme: colorScheme,
     scaffoldBackgroundColor: canvas,
+    extensions: <ThemeExtension<dynamic>>[
+  HealthMonitorTheme.fallback(),
+],
     textTheme: const TextTheme(
       headlineMedium: TextStyle(
         fontSize: 30,
