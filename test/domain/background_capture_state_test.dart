@@ -1,4 +1,4 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:health_monitor/domain/background/background_capture_state.dart';
 import 'package:health_monitor/domain/background/ios_background_capture_strategy.dart';
 import 'package:health_monitor/domain/capability_matrix.dart';
@@ -7,6 +7,7 @@ import 'package:health_monitor/services/background_capture_service.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
 
 void main() {
+  setUp(() => TestWidgetsFlutterBinding.ensureInitialized());
   const service = BackgroundCaptureService();
 
   group('BackgroundCaptureState', () {
