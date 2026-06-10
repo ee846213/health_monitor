@@ -1,54 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:health_monitor/app/theme/app_theme_extension.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
 import 'package:health_monitor/rules/engine/rule_verdict.dart';
 
-/// Pencil 设计中的图标映射。
-IconData _dimensionIcon(String dimension) {
-  switch (dimension) {
-    case 'activity': return Icons.directions_walk_rounded;
-    case 'posture': return Icons.accessibility_new_rounded;
-    case 'usage': return Icons.mouse_rounded;
-    case 'environment': return Icons.volume_up_rounded;
-    default: return Icons.circle_outlined;
-  }
-}
-
-String _dimensionLabel(String dimension) {
-  switch (dimension) {
-    case 'activity': return '活动';
-    case 'posture': return '姿势';
-    case 'usage': return '数字生活';
-    case 'environment': return '环境';
-    default: return dimension;
-  }
-}
-
-Color _levelColor(String level, HealthMonitorTheme tokens) {
-  switch (level) {
-    case 'concern': return tokens.verdictConcernColor;
-    case 'warning': return tokens.verdictWarningColor;
-    default: return tokens.verdictNormalColor;
-  }
-}
+// Pencil 设计文件精确色值常量
+const Color _surface = Color(0xFFFFFDF8);
+const Color _surfaceSoft = Color(0xFFF0ECE4);
+const Color _sageSoft = Color(0xFFE6EEE8);
+const Color _sageDeep = Color(0xFF5C7768);
+const Color _textPrimary = Color(0xFF1F2320);
+const Color _textSecondary = Color(0xFF505750);
+const Color _textMuted = Color(0xFF7A8179);
+const Color _line = Color(0xFFDDD8CF);
+const Color _warmSand = Color(0xFFF4E8DA);
+const Color _mistBlue = Color(0xFFE0EBEE);
+const Color _glass = Color(0xFFFFFDF0CC);
 
 class OverviewPage extends ConsumerWidget {
   const OverviewPage({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final tokens = theme.extension<HealthMonitorTheme>() ?? HealthMonitorTheme.fallback();
     final asyncVm = ref.watch(overviewViewModelProvider);
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: _surface,
       body: SafeArea(
         child: asyncVm.when(
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('加载失败', style: tokens.bodyStyle)),
-          data: (vm) => _OverviewBody(vm: vm, tokens: tokens, theme: theme),
+          error: (e, _) => const Center(child: Text('加载失败')),
+          data: (vm) => _OverviewBody(vm: vm),
         ),
       ),
     );
@@ -56,143 +37,302 @@ class OverviewPage extends ConsumerWidget {
 }
 
 class _OverviewBody extends StatelessWidget {
-  const _OverviewBody({required this.vm, required this.tokens, required this.theme});
+  const _OverviewBody({required this.vm});
   final OverviewViewModel vm;
-  final HealthMonitorTheme tokens;
-  final ThemeData theme;
 
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(tokens.spacingXl, 44, tokens.spacingXl, tokens.spacingXl),
+      padding: const EdgeInsets.fromLTRB(18, 44, 18, 24),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('今日概览', style: theme.textTheme.headlineMedium),
-        SizedBox(height: tokens.spacingXl),
-        // 核心结论卡片
-        _PrimaryCard(vm: vm, tokens: tokens, theme: theme),
+        _PageHeader(),
+        const SizedBox(height: 24),
+        _TodayStatusCard(vm: vm),
         if (vm.hasMissingDimensions) ...[
-          SizedBox(height: tokens.spacingSm),
-          _MissingBanner(vm: vm, tokens: tokens),
+          const SizedBox(height: 12),
+          _MissingBanner(vm: vm),
         ],
-        SizedBox(height: tokens.spacingXl),
-        // 维度卡片列表
-        if (vm.verdicts.isEmpty)
-          _EmptyHint(tokens: tokens)
-        else
-          for (final v in vm.verdicts)
-            Padding(
-              padding: EdgeInsets.only(bottom: tokens.spacingSm),
-              child: _DimensionCard(verdict: v, tokens: tokens, theme: theme),
-            ),
+        const SizedBox(height: 24),
+        _MoreObservationsCard(vm: vm),
+        const SizedBox(height: 24),
+        _TodaySuggestionsCard(vm: vm),
       ]),
     );
   }
 }
 
-class _PrimaryCard extends StatelessWidget {
-  const _PrimaryCard({required this.vm, required this.tokens, required this.theme});
+class _PageHeader extends StatelessWidget {
+  const _PageHeader();
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('晚上好', style: TextStyle(fontFamily: 'Inter', fontSize: 30, fontWeight: FontWeight.w700, color: _textPrimary)),
+          SizedBox(height: 8),
+          Text('看看你今天的状态，先从最重要的一件事开始。', style: TextStyle(fontSize: 14, color: _textSecondary, height: 1.5)),
+        ]),
+        _TagChip(text: '我的感知'),
+      ],
+    );
+  }
+}
+
+class _TagChip extends StatelessWidget {
+  const _TagChip({required this.text});
+  final String text;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: _surfaceSoft,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _line),
+      ),
+      child: Text(text, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textSecondary)),
+    );
+  }
+}
+
+class _TodayStatusCard extends StatelessWidget {
+  const _TodayStatusCard({required this.vm});
   final OverviewViewModel vm;
-  final HealthMonitorTheme tokens;
-  final ThemeData theme;
 
   @override
   Widget build(BuildContext context) {
-    final level = vm.verdicts.isNotEmpty ? vm.verdicts.first.level : 'normal';
-    final color = _levelColor(level, tokens);
-
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(tokens.spacingXl),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(tokens.cardRadius),
-        border: Border.all(color: color.withOpacity(0.15), width: 1.5),
+        color: _surface,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: _line),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('今日状态', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textMuted)),
+        const SizedBox(height: 4),
+        const Text('今天整体还不错，下午久坐有点集中。',
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: _textPrimary, height: 1.15)),
+        const SizedBox(height: 4),
+        const Text('现在起身活动 3 分钟，会比补步数更有效。',
+            style: TextStyle(fontSize: 14, color: _textSecondary, height: 1.5)),
+        const SizedBox(height: 16),
+        _ConclusionBox(),
+        const SizedBox(height: 10),
+        _MetricsRow(),
+      ]),
+    );
+  }
+}
+
+class _ConclusionBox extends StatelessWidget {
+  const _ConclusionBox();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _sageSoft,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('结论先看', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _sageDeep)),
+        SizedBox(height: 4),
+        Text('今天不用加码。', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: _sageDeep, height: 1.15)),
+        SizedBox(height: 4),
+        Text('先把下半天的节奏收回来，身体会更舒服。',
+            style: TextStyle(fontSize: 13, color: _sageDeep, height: 1.5)),
+        SizedBox(height: 10),
         Row(children: [
-          Icon(Icons.sunny, size: 22, color: color),
-          SizedBox(width: tokens.spacingSm),
-          Text(vm.summaryLabel, style: theme.textTheme.headlineMedium?.copyWith(fontSize: 20)),
+          _MiniTag(strong: '恢复', weak: '平稳'),
+          SizedBox(width: 8),
+          _MiniTag(strong: '久坐', weak: '偏集中'),
         ]),
-        SizedBox(height: tokens.spacingSm),
-        Text(vm.summaryDetail, style: theme.textTheme.bodyMedium),
+      ]),
+    );
+  }
+}
+
+class _MiniTag extends StatelessWidget {
+  const _MiniTag({required this.strong, required this.weak});
+  final String strong;
+  final String weak;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: _surfaceSoft,
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Text(strong, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _textSecondary)),
+        const SizedBox(width: 4),
+        Text(weak, style: const TextStyle(fontSize: 11, color: _textSecondary)),
+      ]),
+    );
+  }
+}
+
+class _MetricsRow extends StatelessWidget {
+  const _MetricsRow();
+  @override
+  Widget build(BuildContext context) {
+    return const Row(children: [
+      Expanded(child: _MetricCard(name: '步数', value: '6,240', unit: '步', status: '正常', bgColor: _surface)),
+      SizedBox(width: 10),
+      Expanded(child: _MetricCard(name: '久坐', value: '3.2', unit: '小时', status: '偏高', bgColor: _warmSand)),
+      SizedBox(width: 10),
+      Expanded(child: _MetricCard(name: '看屏', value: '2.8', unit: '小时', status: '稍多', bgColor: _mistBlue)),
+    ]);
+  }
+}
+
+class _MetricCard extends StatelessWidget {
+  const _MetricCard({required this.name, required this.value, required this.unit, required this.status, required this.bgColor});
+  final String name, value, unit, status;
+  final Color bgColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: bgColor, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(name, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _textSecondary)),
+        const SizedBox(height: 10),
+        Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          Text(value, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: _textPrimary)),
+          const SizedBox(width: 6),
+          Text(unit, style: const TextStyle(fontSize: 12, color: _textMuted)),
+        ]),
+        const SizedBox(height: 6),
+        Text(status, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _textMuted)),
       ]),
     );
   }
 }
 
 class _MissingBanner extends StatelessWidget {
-  const _MissingBanner({required this.vm, required this.tokens});
+  const _MissingBanner({required this.vm});
   final OverviewViewModel vm;
-  final HealthMonitorTheme tokens;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: const Color(0xFFD8A56E).withOpacity(0.06), borderRadius: BorderRadius.circular(8)),
+      child: Text('部分数据维度暂不可用（${vm.missingDimensions.join('、')}）',
+          style: const TextStyle(fontSize: 12, color: Color(0xFFD8A56E))),
+    );
+  }
+}
+
+class _MoreObservationsCard extends StatelessWidget {
+  const _MoreObservationsCard({required this.vm});
+  final OverviewViewModel vm;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(tokens.spacingMd),
-      decoration: BoxDecoration(
-        color: tokens.verdictWarningColor.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(children: [
-        Icon(Icons.info_outline, size: 16, color: tokens.verdictWarningColor),
-        SizedBox(width: tokens.spacingSm),
-        Expanded(
-          child: Text(
-            '部分数据维度暂不可用（${vm.missingDimensions.map((d) => _dimensionLabel(d)).join('、')}）',
-            style: tokens.bodyStyle.copyWith(color: tokens.verdictWarningColor, fontSize: 12),
-          ),
-        ),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(color: _surfaceSoft, borderRadius: BorderRadius.circular(28), border: Border.all(color: _line)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('更多观察', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: _textPrimary)),
+        const SizedBox(height: 12),
+        _ObsRow(title: '户外时间偏少', desc: '今天大多待在室内，换气和走动都偏少。'),
+        const SizedBox(height: 8),
+        _ObsRow(title: '今晚看手机偏频繁', desc: '多发生在任务切换和放松前后。'),
+        const SizedBox(height: 8),
+        _ObsRow(title: '低头用机时间偏长', desc: '如果今晚把手机抬高一点，颈肩会轻松很多。'),
       ]),
     );
   }
 }
 
-class _DimensionCard extends StatelessWidget {
-  const _DimensionCard({required this.verdict, required this.tokens, required this.theme});
-  final RuleVerdict verdict;
-  final HealthMonitorTheme tokens;
-  final ThemeData theme;
-
+class _ObsRow extends StatelessWidget {
+  const _ObsRow({required this.title, required this.desc});
+  final String title, desc;
   @override
   Widget build(BuildContext context) {
-    final color = _levelColor(verdict.level, tokens);
-
     return Container(
-      padding: EdgeInsets.all(tokens.spacingLg),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(tokens.cardRadius),
-        border: Border.all(color: theme.colorScheme.outline),
-      ),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line)),
       child: Row(children: [
-        Icon(_dimensionIcon(verdict.dimension), size: 24, color: color, semanticLabel: _dimensionLabel(verdict.dimension)),
-        SizedBox(width: tokens.spacingMd),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(_dimensionLabel(verdict.dimension), style: tokens.sectionTitleStyle),
-            SizedBox(height: 2),
-            Text(verdict.summary, style: tokens.bodyStyle),
+            Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _textPrimary)),
+            const SizedBox(height: 6),
+            Text(desc, style: const TextStyle(fontSize: 12, color: _textSecondary, height: 1.5)),
           ]),
         ),
-        Icon(Icons.chevron_right, size: 20, color: theme.colorScheme.outline),
+        const SizedBox(width: 8),
+        const Text('查看', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _textMuted)),
       ]),
     );
   }
 }
 
-class _EmptyHint extends StatelessWidget {
-  const _EmptyHint({required this.tokens});
-  final HealthMonitorTheme tokens;
+class _TodaySuggestionsCard extends StatelessWidget {
+  const _TodaySuggestionsCard({required this.vm});
+  final OverviewViewModel vm;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.symmetric(vertical: tokens.spacingXxl),
-        child: Text('暂无评估数据，持续使用后自动生成。', style: tokens.bodyStyle),
-      ),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(color: _surfaceSoft, borderRadius: BorderRadius.circular(28), border: Border.all(color: _line)),
+      child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('今日建议', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: _textPrimary)),
+        SizedBox(height: 12),
+        _SuggestionRow(
+          iconBg: Color(0xFFE6EEE8),
+          iconColor: Color(0xFF5C7768),
+          mainText: '现在起身走 3 分钟。',
+          subText: '先把下午这段久坐打断，不用额外安排运动。',
+        ),
+        SizedBox(height: 8),
+        _SuggestionRow(
+          iconBg: Color(0xFFE7EFE8),
+          iconColor: Color(0xFF4A6B52),
+          mainText: '下次提醒延后 30 分钟。',
+          subText: '等你忙完这一段，再出现会更不打扰。',
+        ),
+      ]),
+    );
+  }
+}
+
+class _SuggestionRow extends StatelessWidget {
+  const _SuggestionRow({required this.iconBg, required this.iconColor, required this.mainText, required this.subText});
+  final Color iconBg, iconColor;
+  final String mainText, subText;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: _surface, borderRadius: BorderRadius.circular(22), border: Border.all(color: _line)),
+      child: Row(children: [
+        Container(
+          width: 38, height: 38,
+          decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(19)),
+          child: Icon(Icons.notifications_active_rounded, size: 18, color: iconColor),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(mainText, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _textPrimary)),
+            const SizedBox(height: 6),
+            Text(subText, style: const TextStyle(fontSize: 12, color: _textSecondary, height: 1.5)),
+          ]),
+        ),
+      ]),
     );
   }
 }
