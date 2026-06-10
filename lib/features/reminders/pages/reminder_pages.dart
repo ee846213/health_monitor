@@ -4,13 +4,11 @@ import 'package:health_monitor/app/theme/app_theme_extension.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/storage/repositories/reminder_repository.dart';
 
-/// 提醒记录提供者。
 final reminderListProvider = FutureProvider<List<ReminderRecord>>((Ref ref) async {
   final repo = InMemoryReminderRepository(records: const []);
   return repo.listRecentDays(7, referenceDate: DateTime.now());
 });
 
-/// 提醒记录页 —— 展示历史提醒列表。
 class ReminderListPage extends ConsumerWidget {
   const ReminderListPage({super.key});
 
@@ -21,32 +19,24 @@ class ReminderListPage extends ConsumerWidget {
     final asyncRecords = ref.watch(reminderListProvider);
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(title: const Text('提醒记录'), backgroundColor: theme.colorScheme.surface),
       body: asyncRecords.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('加载失败')),
+        error: (e, _) => Center(child: Text('加载失败', style: tokens.bodyStyle)),
         data: (records) => records.isEmpty
-            ? Center(
-                child: Padding(
-                  padding: EdgeInsets.all(tokens.spacingXxl),
-                  child: Text('暂无提醒记录，持续使用后自动生成。', style: tokens.bodyStyle),
-                ),
-              )
+            ? Center(child: Text('暂无提醒记录', style: tokens.bodyStyle))
             : ListView.builder(
                 padding: EdgeInsets.all(tokens.spacingXl),
                 itemCount: records.length,
-                itemBuilder: (_, index) {
-                  final r = records[index];
+                itemBuilder: (_, i) {
+                  final r = records[i];
                   return Card(
                     margin: EdgeInsets.only(bottom: tokens.spacingSm),
                     child: ListTile(
                       title: Text(r.title, style: tokens.sectionTitleStyle),
                       subtitle: Text(r.reasonSummary, style: tokens.bodyStyle),
-                      trailing: Text(
-                        r.response.name,
-                        style: tokens.bodyStyle.copyWith(fontSize: 12),
-                      ),
+                      trailing: Text(r.response.name, style: tokens.bodyStyle.copyWith(fontSize: 12)),
                     ),
                   );
                 },
@@ -56,10 +46,8 @@ class ReminderListPage extends ConsumerWidget {
   }
 }
 
-/// 提醒详情页 —— 展示单条提醒的完整解释。
 class ReminderDetailPage extends StatelessWidget {
   const ReminderDetailPage({super.key, required this.record});
-
   final ReminderRecord record;
 
   @override
@@ -68,34 +56,26 @@ class ReminderDetailPage extends StatelessWidget {
     final tokens = theme.extension<HealthMonitorTheme>() ?? HealthMonitorTheme.fallback();
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(title: Text(record.title), backgroundColor: theme.colorScheme.surface),
       body: Padding(
         padding: EdgeInsets.all(tokens.spacingXl),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('消息', style: tokens.sectionTitleStyle),
-            SizedBox(height: tokens.spacingSm),
-            Text(record.message, style: tokens.bodyStyle),
-            SizedBox(height: tokens.spacingXl),
-            Text('原因', style: tokens.sectionTitleStyle),
-            SizedBox(height: tokens.spacingSm),
-            Text(record.reasonSummary, style: tokens.bodyStyle),
-            SizedBox(height: tokens.spacingXl),
-            Text('建议', style: tokens.sectionTitleStyle),
-            SizedBox(height: tokens.spacingSm),
-            Text(record.actionSuggestion, style: tokens.bodyStyle),
-            SizedBox(height: tokens.spacingXl),
-            Row(
-              children: [
-                Text('状态: ', style: tokens.sectionTitleStyle),
-                Text(record.response.name, style: tokens.bodyStyle),
-              ],
-            ),
-          ],
-        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _section('消息', record.message, tokens),
+          _section('原因', record.reasonSummary, tokens),
+          _section('建议', record.actionSuggestion, tokens),
+          Text('状态: ${record.response.name}', style: tokens.sectionTitleStyle),
+        ]),
       ),
     );
   }
+
+  Widget _section(String label, String content, HealthMonitorTheme tokens) => Padding(
+        padding: EdgeInsets.only(bottom: tokens.spacingXl),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(label, style: tokens.sectionTitleStyle),
+          SizedBox(height: tokens.spacingSm),
+          Text(content, style: tokens.bodyStyle),
+        ]),
+      );
 }
