@@ -483,10 +483,10 @@
 - Create: `C:\Users\13692\Documents\health_monitor\lib\core\logging\...`
 - Create: `C:\Users\13692\Documents\health_monitor\lib\features\diagnostics\...`
 
-- [ ] 记录采集状态
-- [ ] 记录后台链路状态
-- [ ] 记录规则输出状态
-- [ ] 记录权限变化事件
+- [x] 记录采集状态
+- [x] 记录后台链路状态
+- [x] 记录规则输出状态
+- [x] 记录权限变化事件
 
 #### 任务 5.2：多天连续使用验收
 
