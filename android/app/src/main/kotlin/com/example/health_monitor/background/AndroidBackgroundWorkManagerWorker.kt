@@ -18,8 +18,15 @@ class AndroidBackgroundWorkManagerWorker(
             executor = AndroidBackgroundCaptureExecutor(controller),
             stateStore = stateStore,
         )
-        val snapshot = AndroidBackgroundCaptureWorker(scheduler).runOnce()
-        return Result.success()
+        return try {
+            AndroidBackgroundWorkManagerJob(scheduler).runOnce()
+            // 正常路径下只要把状态刷新回共享仓即可，交给调试页和下一次调度读取。
+            Result.success()
+        } catch (error: Throwable) {
+            // Worker 层发生异常时，先把异常写回共享状态，再让 WorkManager 决定是否重试。
+            scheduler.markError(error.message ?: "Android 后台 WorkManager 执行失败。")
+            Result.retry()
+        }
     }
 
     companion object {

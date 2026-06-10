@@ -8,6 +8,7 @@ import com.example.health_monitor.background.AndroidBackgroundCaptureRuntime
 import com.example.health_monitor.background.SharedPreferencesAndroidBackgroundCaptureStateStore
 import com.example.health_monitor.background.AndroidForegroundServiceOrchestrator
 import com.example.health_monitor.background.AndroidBackgroundForegroundServiceIntentFactory
+import com.example.health_monitor.background.AndroidBackgroundWorkScheduler
 import android.content.Intent
 import androidx.core.content.ContextCompat
 import android.content.Context
@@ -33,6 +34,9 @@ class MainActivity : FlutterActivity() {
     )
     private val foregroundServiceOrchestrator = AndroidForegroundServiceOrchestrator(
         backgroundCaptureScheduler,
+    )
+    private val backgroundWorkScheduler = AndroidBackgroundWorkScheduler(
+        com.example.health_monitor.background.AndroidBackgroundCaptureWorker(backgroundCaptureScheduler),
     )
     private val backgroundCaptureRuntime = AndroidBackgroundCaptureRuntime(
         foregroundServiceOrchestrator,
@@ -68,6 +72,7 @@ class MainActivity : FlutterActivity() {
                 return
             }
         ContextCompat.startForegroundService(this, foregroundServiceIntentFactory.createStartIntent(this, request))
+        backgroundWorkScheduler.enqueuePeriodic(this, request.sampleIntervalMinutes.toLong())
         val snapshot = backgroundCaptureRuntime.start(request)
         result.success(
             mapOf(
@@ -80,6 +85,7 @@ class MainActivity : FlutterActivity() {
 
     private fun handleStopBackgroundCapture(result: MethodChannel.Result) {
         startService(foregroundServiceIntentFactory.createStopIntent(this))
+        backgroundWorkScheduler.cancelAll(this)
         val snapshot = backgroundCaptureRuntime.stop()
         result.success(
             mapOf(
@@ -116,6 +122,7 @@ class MainActivity : FlutterActivity() {
 
     private fun handleRefreshBackgroundCapture(result: MethodChannel.Result) {
         ContextCompat.startForegroundService(this, foregroundServiceIntentFactory.createRefreshIntent(this))
+        backgroundWorkScheduler.enqueueRefresh(this)
         val snapshot = backgroundCaptureRuntime.refresh()
         result.success(
             mapOf(

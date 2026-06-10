@@ -123,4 +123,104 @@ void main() {
       ),
     );
   });
+
+  test('上报 Android 后台异常时应调用错误通道', () async {
+    MethodCall? capturedCall;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(methodChannel, (MethodCall call) async {
+          capturedCall = call;
+          return null;
+        });
+
+    final bridge = AndroidBackgroundCaptureBridge(
+      platformBridgeService: PlatformBridgeService(
+        methodChannel: methodChannel,
+        eventChannel: eventChannel,
+      ),
+    );
+
+    await bridge.markBackgroundCaptureError('后台服务启动失败');
+
+    expect(capturedCall?.method, 'android.background.error');
+    expect(capturedCall?.arguments['message'], '后台服务启动失败');
+  });
+
+  test('刷新 Android 后台调度时应调用刷新通道', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(methodChannel, (MethodCall call) async {
+          return <String, Object?>{
+            'isRunning': true,
+            'summary': 'Android 后台采集已刷新。',
+            'notificationTitle': '健康监测正在后台运行',
+            'notificationBody': '用于持续积累活动、位置与用机样本。 当前调度能力：motion、location、digital_usage；周期 15 分钟。',
+            'notificationChannelId': 'health_monitor_background',
+          };
+        });
+
+    final bridge = AndroidBackgroundCaptureBridge(
+      platformBridgeService: PlatformBridgeService(
+        methodChannel: methodChannel,
+        eventChannel: eventChannel,
+      ),
+    );
+
+    final status = await bridge.refreshBackgroundCapture();
+
+    expect(status.isRunning, isTrue);
+    expect(status.summary, 'Android 后台采集已刷新。');
+    expect(
+      status.notificationBody,
+      contains('周期 15 分钟'),
+    );
+  });
+
+  test('查询 Android 宿主状态时应解析通知字段', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(methodChannel, (MethodCall call) async {
+          return <String, Object?>{
+            'isRunning': true,
+            'summary': 'Android 后台采集已刷新。',
+            'lastErrorMessage': '前台服务启动失败',
+            'notificationBody': '用于持续积累活动、位置与用机样本。 当前调度能力：motion、location、digital_usage；周期 15 分钟。',
+          };
+        });
+
+    final bridge = AndroidBackgroundCaptureBridge(
+      platformBridgeService: PlatformBridgeService(
+        methodChannel: methodChannel,
+        eventChannel: eventChannel,
+      ),
+    );
+
+    final status = await bridge.getHostStatus();
+
+    expect(status.lastErrorMessage, '前台服务启动失败');
+    expect(status.notificationBody, contains('周期 15 分钟'));
+  });
+
+  test('刷新 Android 后台调度时应解析通知标题与渠道', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(methodChannel, (MethodCall call) async {
+          return <String, Object?>{
+            'isRunning': true,
+            'summary': 'Android 后台采集已刷新。',
+            'notificationTitle': '健康监测正在后台运行',
+            'notificationBody': '用于持续积累活动、位置与用机样本。 当前调度能力：motion、location、digital_usage；周期 15 分钟。',
+            'notificationChannelId': 'health_monitor_background',
+          };
+        });
+
+    final bridge = AndroidBackgroundCaptureBridge(
+      platformBridgeService: PlatformBridgeService(
+        methodChannel: methodChannel,
+        eventChannel: eventChannel,
+      ),
+    );
+
+    final status = await bridge.refreshBackgroundCapture();
+
+    expect(status.isRunning, isTrue);
+    expect(status.summary, 'Android 后台采集已刷新。');
+    expect(status.notificationBody, contains('周期 15 分钟'));
+  });
 }

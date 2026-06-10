@@ -1,5 +1,5 @@
-class AndroidBackgroundCaptureHostStatus {
-  const AndroidBackgroundCaptureHostStatus({
+class IosBackgroundCaptureHostStatus {
+  const IosBackgroundCaptureHostStatus({
     required this.isRunning,
     required this.summary,
     this.lastErrorMessage,
@@ -11,12 +11,12 @@ class AndroidBackgroundCaptureHostStatus {
   final String? lastErrorMessage;
   final String? notificationBody;
 
-  factory AndroidBackgroundCaptureHostStatus.fromChannelPayload(
+  factory IosBackgroundCaptureHostStatus.fromChannelPayload(
     Map<Object?, Object?> payload,
   ) {
-    return AndroidBackgroundCaptureHostStatus(
+    return IosBackgroundCaptureHostStatus(
       isRunning: payload['isRunning'] as bool? ?? false,
-      summary: payload['summary'] as String? ?? 'Android 宿主尚未返回后台状态摘要。',
+      summary: payload['summary'] as String? ?? 'iPhone 宿主尚未返回后台状态摘要。',
       lastErrorMessage: payload['lastErrorMessage'] as String?,
       notificationBody: payload['notificationBody'] as String?,
     );
@@ -27,7 +27,7 @@ class AndroidBackgroundCaptureHostStatus {
     if (identical(this, other)) {
       return true;
     }
-    return other is AndroidBackgroundCaptureHostStatus &&
+    return other is IosBackgroundCaptureHostStatus &&
         other.isRunning == isRunning &&
         other.summary == summary &&
         other.lastErrorMessage == lastErrorMessage &&

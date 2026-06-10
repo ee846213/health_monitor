@@ -8,6 +8,9 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+    // flutter_local_notifications 以及部分后台相关插件会用到 desugaring 提供的 Java API。
+    // 这里按 Android 官方建议在 app 级别打开，避免依赖模块在 AGP 9 下直接卡在 AAR 校验阶段。
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
 }
 
 android {
@@ -18,6 +21,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
 
     defaultConfig {

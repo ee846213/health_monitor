@@ -30,7 +30,7 @@ class AndroidBackgroundWorkScheduler(
             .build()
         manager.enqueueUniqueWork(
             UNIQUE_REFRESH_WORK_NAME,
-            ExistingWorkPolicy.REPLACE,
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
             request,
         )
     }
@@ -49,7 +49,7 @@ class AndroidBackgroundWorkScheduler(
             .build()
         manager.enqueueUniquePeriodicWork(
             UNIQUE_PERIODIC_WORK_NAME,
-            ExistingPeriodicWorkPolicy.REPLACE,
+            ExistingPeriodicWorkPolicy.UPDATE,
             request,
         )
     }

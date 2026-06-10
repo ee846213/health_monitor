@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_monitor/domain/background/android_background_capture_host_status.dart';
 import 'package:health_monitor/domain/background/android_foreground_service_strategy.dart';
 import 'package:health_monitor/domain/background/background_capture_state.dart';
+import 'package:health_monitor/domain/background/ios_background_capture_host_status.dart';
+import 'package:health_monitor/domain/background/ios_background_capture_strategy.dart';
 import 'package:health_monitor/domain/environment/noise_sample.dart';
 import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/motion/activity_sample.dart';
@@ -64,10 +66,22 @@ class SensorDebugPage extends ConsumerWidget {
                 child: Text(_androidHostSummary(snapshot.androidHostStatus)),
               ),
               _SectionCard(
+                title: 'iPhone 宿主状态',
+                child: Text(_iosHostSummary(snapshot.iosHostStatus)),
+              ),
+              _SectionCard(
                 title: 'Android 前台服务策略',
                 child: Text(
                   _foregroundServiceSummary(
                     snapshot.androidForegroundServiceStrategy,
+                  ),
+                ),
+              ),
+              _SectionCard(
+                title: 'iPhone 后台刷新策略',
+                child: Text(
+                  _iosBackgroundStrategySummary(
+                    snapshot.iosBackgroundCaptureStrategy,
                   ),
                 ),
               ),
@@ -135,7 +149,26 @@ class SensorDebugPage extends ConsumerWidget {
     if (status == null) {
       return 'Android 宿主状态暂不可读，说明原生后台桥接尚未返回状态摘要。';
     }
-    return '${status.isRunning ? '运行中' : '未运行'} · ${status.summary}';
+    final errorSuffix = status.lastErrorMessage == null
+        ? ''
+        : ' · 最近异常：${status.lastErrorMessage}';
+    final notificationSuffix = status.notificationBody == null
+        ? ''
+        : ' · 通知：${status.notificationBody}';
+    return '${status.isRunning ? '运行中' : '未运行'} · ${status.summary}$errorSuffix$notificationSuffix';
+  }
+
+  String _iosHostSummary(IosBackgroundCaptureHostStatus? status) {
+    if (status == null) {
+      return 'iPhone 宿主状态暂不可读，说明原生后台桥接尚未返回状态摘要。';
+    }
+    final errorSuffix = status.lastErrorMessage == null
+        ? ''
+        : ' · 最近异常：${status.lastErrorMessage}';
+    final notificationSuffix = status.notificationBody == null
+        ? ''
+        : ' · 通知：${status.notificationBody}';
+    return '${status.isRunning ? '运行中' : '未运行'} · ${status.summary}$errorSuffix$notificationSuffix';
   }
 
   String _foregroundServiceSummary(AndroidForegroundServiceStrategy strategy) {
@@ -144,6 +177,18 @@ class SensorDebugPage extends ConsumerWidget {
       return '$stateLabel · ${strategy.title} · ${strategy.body}';
     }
     return '$stateLabel · ${strategy.reasons.join('；')}';
+  }
+
+  String _iosBackgroundStrategySummary(IosBackgroundCaptureStrategy strategy) {
+    final stateLabel = strategy.isEnabled ? '已启用' : '已降级';
+    final restrictedLabel = strategy.isRestricted ? '受限' : '完整';
+    final modeLabel = strategy.supportedModes.isEmpty
+        ? '无可用模式'
+        : strategy.supportedModes.join('、');
+    if (strategy.reasons.isEmpty) {
+      return '$stateLabel · $restrictedLabel · $modeLabel · ${strategy.title} · ${strategy.body}';
+    }
+    return '$stateLabel · $restrictedLabel · $modeLabel · ${strategy.reasons.join('；')}';
   }
 }
 

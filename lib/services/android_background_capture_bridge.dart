@@ -65,6 +65,41 @@ class AndroidBackgroundCaptureBridge
       );
     }
   }
+
+  Future<AndroidBackgroundCaptureHostStatus> markBackgroundCaptureError(
+    String message,
+  ) async {
+    try {
+      final payload =
+          await _platformBridgeService.methodChannel.invokeMapMethod<Object?, Object?>(
+            'android.background.error',
+            <String, Object>{
+              'message': message,
+            },
+          ) ??
+          const <Object?, Object?>{};
+      return AndroidBackgroundCaptureHostStatus.fromChannelPayload(payload);
+    } on PlatformException catch (error) {
+      throw AndroidBackgroundCaptureException(
+        '上报 Android 宿主后台异常失败: ${error.message ?? error.code}',
+      );
+    }
+  }
+
+  Future<AndroidBackgroundCaptureHostStatus> refreshBackgroundCapture() async {
+    try {
+      final payload =
+          await _platformBridgeService.methodChannel.invokeMapMethod<Object?, Object?>(
+            'android.background.refresh',
+          ) ??
+          const <Object?, Object?>{};
+      return AndroidBackgroundCaptureHostStatus.fromChannelPayload(payload);
+    } on PlatformException catch (error) {
+      throw AndroidBackgroundCaptureException(
+        '刷新 Android 宿主后台调度失败: ${error.message ?? error.code}',
+      );
+    }
+  }
 }
 
 class FakeAndroidBackgroundCaptureHostStatusService

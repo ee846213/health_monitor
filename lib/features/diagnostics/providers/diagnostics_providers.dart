@@ -2,6 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_monitor/domain/background/android_background_capture_host_status.dart';
 import 'package:health_monitor/domain/background/android_background_capture_config.dart';
 import 'package:health_monitor/domain/background/background_capture_state.dart';
+import 'package:health_monitor/domain/background/ios_background_capture_host_status.dart';
+import 'package:health_monitor/domain/background/ios_background_capture_config.dart';
+import 'package:health_monitor/domain/background/ios_background_capture_strategy.dart';
 import 'package:health_monitor/domain/background/android_foreground_service_strategy.dart';
 import 'package:health_monitor/domain/capability_matrix.dart';
 import 'package:health_monitor/domain/environment/noise_sample.dart';
@@ -11,6 +14,7 @@ import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
 import 'package:health_monitor/services/android_background_capture_bridge.dart';
 import 'package:health_monitor/services/background_capture_service.dart';
+import 'package:health_monitor/services/ios_background_capture_bridge.dart';
 import 'package:health_monitor/services/digital_usage_capture_service.dart';
 import 'package:health_monitor/services/location_capture_service.dart';
 import 'package:health_monitor/services/motion_capture_service.dart';
@@ -72,9 +76,21 @@ final androidForegroundServiceStrategyResolverProvider =
       return const AndroidForegroundServiceStrategyResolver();
     });
 
+final iosBackgroundServiceStrategyResolverProvider =
+    Provider<IosBackgroundCaptureStrategyResolver>((Ref ref) {
+      return const IosBackgroundCaptureStrategyResolver();
+    });
+
 final androidBackgroundHostStatusServiceProvider =
     Provider<AndroidBackgroundCaptureHostStatusService>((Ref ref) {
       return AndroidBackgroundCaptureBridge(
+        platformBridgeService: PlatformBridgeService(),
+      );
+    });
+
+final iosBackgroundHostStatusServiceProvider =
+    Provider<IosBackgroundCaptureHostStatusService>((Ref ref) {
+      return IosBackgroundCaptureBridge(
         platformBridgeService: PlatformBridgeService(),
       );
     });
@@ -105,7 +121,9 @@ class DiagnosticsSnapshot {
     required this.latestUsageSummary,
     required this.backgroundCaptureState,
     required this.androidHostStatus,
+    required this.iosHostStatus,
     required this.androidForegroundServiceStrategy,
+    required this.iosBackgroundCaptureStrategy,
     required this.storageStatus,
   });
 
@@ -118,7 +136,9 @@ class DiagnosticsSnapshot {
   final DigitalUsageSummary? latestUsageSummary;
   final BackgroundCaptureState backgroundCaptureState;
   final AndroidBackgroundCaptureHostStatus? androidHostStatus;
+  final IosBackgroundCaptureHostStatus? iosHostStatus;
   final AndroidForegroundServiceStrategy androidForegroundServiceStrategy;
+  final IosBackgroundCaptureStrategy iosBackgroundCaptureStrategy;
   final DiagnosticsStorageStatus storageStatus;
 }
 
@@ -137,8 +157,14 @@ final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref
   final androidForegroundServiceStrategyResolver = ref.watch(
     androidForegroundServiceStrategyResolverProvider,
   );
+  final iosBackgroundServiceStrategyResolver = ref.watch(
+    iosBackgroundServiceStrategyResolverProvider,
+  );
   final androidBackgroundHostStatusService = ref.watch(
     androidBackgroundHostStatusServiceProvider,
+  );
+  final iosBackgroundHostStatusService = ref.watch(
+    iosBackgroundHostStatusServiceProvider,
   );
 
   final referenceTime = DateTime(2026, 6, 9, 23, 59);
@@ -171,11 +197,29 @@ final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref
       sampleIntervalMinutes: 15,
     ),
   );
+  final iosBackgroundCaptureStrategy = iosBackgroundServiceStrategyResolver.resolve(
+    capabilitySet: capabilityMatrix.ios,
+    permissionStatuses: permissionStatuses,
+    config: const IosBackgroundCaptureConfig(
+      statusTitle: '健康监测正在后台刷新',
+      statusBody: '用于在系统允许范围内刷新活动、位置与数字生活替代指标。',
+      enableMotion: true,
+      enableLocation: true,
+      enableDigitalUsage: true,
+      backgroundRefreshIntervalMinutes: 15,
+    ),
+  );
   AndroidBackgroundCaptureHostStatus? androidHostStatus;
   try {
     androidHostStatus = await androidBackgroundHostStatusService.getHostStatus();
   } on AndroidBackgroundCaptureException {
     androidHostStatus = null;
+  }
+  IosBackgroundCaptureHostStatus? iosHostStatus;
+  try {
+    iosHostStatus = await iosBackgroundHostStatusService.getHostStatus();
+  } on IosBackgroundCaptureException {
+    iosHostStatus = null;
   }
   ActivitySample? liveActivity;
   try {
@@ -228,7 +272,9 @@ final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref
     latestUsageSummary: usageSummary ?? liveUsageSummary,
     backgroundCaptureState: backgroundCaptureState,
     androidHostStatus: androidHostStatus,
+    iosHostStatus: iosHostStatus,
     androidForegroundServiceStrategy: androidForegroundServiceStrategy,
+    iosBackgroundCaptureStrategy: iosBackgroundCaptureStrategy,
     storageStatus: DiagnosticsStorageStatus(
       kind: hasRecentWrites
           ? DiagnosticsStorageStatusKind.hasRecentWrites
