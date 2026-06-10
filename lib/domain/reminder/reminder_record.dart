@@ -1,3 +1,5 @@
+﻿import 'package:health_monitor/rules/engine/rule_verdict.dart';
+
 enum ReminderType {
   sedentaryBreak,
   postureRisk,
@@ -22,6 +24,8 @@ class ReminderRecord {
     required this.reasonSummary,
     required this.actionSuggestion,
     required this.response,
+    this.reminderTypeKey,
+    this.sourceDimension,
   });
 
   final DateTime triggeredAt;
@@ -31,10 +35,49 @@ class ReminderRecord {
   final String reasonSummary;
   final String actionSuggestion;
   final ReminderResponse response;
+  final String? reminderTypeKey;
+  final String? sourceDimension;
 
   bool get hasActioned => response == ReminderResponse.taken;
-
   bool get isIgnored =>
       response == ReminderResponse.ignored ||
       response == ReminderResponse.dismissed;
+
+  /// 从规则引擎的 [RuleVerdict] 创建提醒记录。
+  ///
+  /// [response] 默认为 [ReminderResponse.pending]。
+  factory ReminderRecord.fromVerdict({
+    required RuleVerdict verdict,
+    required DateTime now,
+    ReminderResponse response = ReminderResponse.pending,
+  }) {
+    return ReminderRecord(
+      triggeredAt: now,
+      type: _mapReminderType(verdict.reminderType),
+      title: verdict.reminderTitle ?? verdict.summary,
+      message: verdict.reminderMessage ?? verdict.detail,
+      reasonSummary: verdict.summary,
+      actionSuggestion: verdict.detail,
+      response: response,
+      reminderTypeKey: verdict.reminderType,
+      sourceDimension: verdict.dimension,
+    );
+  }
+
+  static ReminderType _mapReminderType(String? key) {
+    switch (key) {
+      case 'sedentaryBreak':
+        return ReminderType.sedentaryBreak;
+      case 'postureRisk':
+        return ReminderType.postureRisk;
+      case 'walkingScreenRisk':
+        return ReminderType.walkingScreenRisk;
+      case 'nightUsage':
+        return ReminderType.nightUsage;
+      case 'noisyEnvironment':
+        return ReminderType.noisyEnvironment;
+      default:
+        return ReminderType.sedentaryBreak;
+    }
+  }
 }
