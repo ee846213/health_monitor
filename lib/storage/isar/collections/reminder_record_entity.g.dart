@@ -38,23 +38,38 @@ const ReminderRecordEntitySchema = CollectionSchema(
       name: r'reasonSummary',
       type: IsarType.string,
     ),
-    r'responseKey': PropertySchema(
+    r'reminderTypeKey': PropertySchema(
       id: 4,
+      name: r'reminderTypeKey',
+      type: IsarType.string,
+    ),
+    r'responseKey': PropertySchema(
+      id: 5,
       name: r'responseKey',
       type: IsarType.string,
     ),
+    r'sourceDimension': PropertySchema(
+      id: 6,
+      name: r'sourceDimension',
+      type: IsarType.string,
+    ),
+    r'sourceEventId': PropertySchema(
+      id: 7,
+      name: r'sourceEventId',
+      type: IsarType.string,
+    ),
     r'title': PropertySchema(
-      id: 5,
+      id: 8,
       name: r'title',
       type: IsarType.string,
     ),
     r'triggeredAt': PropertySchema(
-      id: 6,
+      id: 9,
       name: r'triggeredAt',
       type: IsarType.dateTime,
     ),
     r'typeKey': PropertySchema(
-      id: 7,
+      id: 10,
       name: r'typeKey',
       type: IsarType.string,
     )
@@ -83,7 +98,25 @@ int _reminderRecordEntityEstimateSize(
   bytesCount += 3 + object.dateKey.length * 3;
   bytesCount += 3 + object.message.length * 3;
   bytesCount += 3 + object.reasonSummary.length * 3;
+  {
+    final value = object.reminderTypeKey;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.responseKey.length * 3;
+  {
+    final value = object.sourceDimension;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
+  {
+    final value = object.sourceEventId;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.title.length * 3;
   bytesCount += 3 + object.typeKey.length * 3;
   return bytesCount;
@@ -99,10 +132,13 @@ void _reminderRecordEntitySerialize(
   writer.writeString(offsets[1], object.dateKey);
   writer.writeString(offsets[2], object.message);
   writer.writeString(offsets[3], object.reasonSummary);
-  writer.writeString(offsets[4], object.responseKey);
-  writer.writeString(offsets[5], object.title);
-  writer.writeDateTime(offsets[6], object.triggeredAt);
-  writer.writeString(offsets[7], object.typeKey);
+  writer.writeString(offsets[4], object.reminderTypeKey);
+  writer.writeString(offsets[5], object.responseKey);
+  writer.writeString(offsets[6], object.sourceDimension);
+  writer.writeString(offsets[7], object.sourceEventId);
+  writer.writeString(offsets[8], object.title);
+  writer.writeDateTime(offsets[9], object.triggeredAt);
+  writer.writeString(offsets[10], object.typeKey);
 }
 
 ReminderRecordEntity _reminderRecordEntityDeserialize(
@@ -117,10 +153,13 @@ ReminderRecordEntity _reminderRecordEntityDeserialize(
   object.id = id;
   object.message = reader.readString(offsets[2]);
   object.reasonSummary = reader.readString(offsets[3]);
-  object.responseKey = reader.readString(offsets[4]);
-  object.title = reader.readString(offsets[5]);
-  object.triggeredAt = reader.readDateTime(offsets[6]);
-  object.typeKey = reader.readString(offsets[7]);
+  object.reminderTypeKey = reader.readStringOrNull(offsets[4]);
+  object.responseKey = reader.readString(offsets[5]);
+  object.sourceDimension = reader.readStringOrNull(offsets[6]);
+  object.sourceEventId = reader.readStringOrNull(offsets[7]);
+  object.title = reader.readString(offsets[8]);
+  object.triggeredAt = reader.readDateTime(offsets[9]);
+  object.typeKey = reader.readString(offsets[10]);
   return object;
 }
 
@@ -140,12 +179,18 @@ P _reminderRecordEntityDeserializeProp<P>(
     case 3:
       return (reader.readString(offset)) as P;
     case 4:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 5:
       return (reader.readString(offset)) as P;
     case 6:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 7:
+      return (reader.readStringOrNull(offset)) as P;
+    case 8:
+      return (reader.readString(offset)) as P;
+    case 9:
+      return (reader.readDateTime(offset)) as P;
+    case 10:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -858,6 +903,162 @@ extension ReminderRecordEntityQueryFilter on QueryBuilder<ReminderRecordEntity,
   }
 
   QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> reminderTypeKeyIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'reminderTypeKey',
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> reminderTypeKeyIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'reminderTypeKey',
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> reminderTypeKeyEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'reminderTypeKey',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> reminderTypeKeyGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'reminderTypeKey',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> reminderTypeKeyLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'reminderTypeKey',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> reminderTypeKeyBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'reminderTypeKey',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> reminderTypeKeyStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'reminderTypeKey',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> reminderTypeKeyEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'reminderTypeKey',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+          QAfterFilterCondition>
+      reminderTypeKeyContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'reminderTypeKey',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+          QAfterFilterCondition>
+      reminderTypeKeyMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'reminderTypeKey',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> reminderTypeKeyIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'reminderTypeKey',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> reminderTypeKeyIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'reminderTypeKey',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
       QAfterFilterCondition> responseKeyEqualTo(
     String value, {
     bool caseSensitive = true,
@@ -990,6 +1191,318 @@ extension ReminderRecordEntityQueryFilter on QueryBuilder<ReminderRecordEntity,
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.greaterThan(
         property: r'responseKey',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> sourceDimensionIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'sourceDimension',
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> sourceDimensionIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'sourceDimension',
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> sourceDimensionEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'sourceDimension',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> sourceDimensionGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'sourceDimension',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> sourceDimensionLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'sourceDimension',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> sourceDimensionBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'sourceDimension',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> sourceDimensionStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'sourceDimension',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> sourceDimensionEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'sourceDimension',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+          QAfterFilterCondition>
+      sourceDimensionContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'sourceDimension',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+          QAfterFilterCondition>
+      sourceDimensionMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'sourceDimension',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> sourceDimensionIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'sourceDimension',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> sourceDimensionIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'sourceDimension',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> sourceEventIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'sourceEventId',
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> sourceEventIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'sourceEventId',
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> sourceEventIdEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'sourceEventId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> sourceEventIdGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'sourceEventId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> sourceEventIdLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'sourceEventId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> sourceEventIdBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'sourceEventId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> sourceEventIdStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'sourceEventId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> sourceEventIdEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'sourceEventId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+          QAfterFilterCondition>
+      sourceEventIdContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'sourceEventId',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+          QAfterFilterCondition>
+      sourceEventIdMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'sourceEventId',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> sourceEventIdIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'sourceEventId',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> sourceEventIdIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'sourceEventId',
         value: '',
       ));
     });
@@ -1393,6 +1906,20 @@ extension ReminderRecordEntityQuerySortBy
   }
 
   QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QAfterSortBy>
+      sortByReminderTypeKey() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'reminderTypeKey', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QAfterSortBy>
+      sortByReminderTypeKeyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'reminderTypeKey', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QAfterSortBy>
       sortByResponseKey() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'responseKey', Sort.asc);
@@ -1403,6 +1930,34 @@ extension ReminderRecordEntityQuerySortBy
       sortByResponseKeyDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'responseKey', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QAfterSortBy>
+      sortBySourceDimension() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sourceDimension', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QAfterSortBy>
+      sortBySourceDimensionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sourceDimension', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QAfterSortBy>
+      sortBySourceEventId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sourceEventId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QAfterSortBy>
+      sortBySourceEventIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sourceEventId', Sort.desc);
     });
   }
 
@@ -1522,6 +2077,20 @@ extension ReminderRecordEntityQuerySortThenBy
   }
 
   QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QAfterSortBy>
+      thenByReminderTypeKey() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'reminderTypeKey', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QAfterSortBy>
+      thenByReminderTypeKeyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'reminderTypeKey', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QAfterSortBy>
       thenByResponseKey() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'responseKey', Sort.asc);
@@ -1532,6 +2101,34 @@ extension ReminderRecordEntityQuerySortThenBy
       thenByResponseKeyDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'responseKey', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QAfterSortBy>
+      thenBySourceDimension() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sourceDimension', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QAfterSortBy>
+      thenBySourceDimensionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sourceDimension', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QAfterSortBy>
+      thenBySourceEventId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sourceEventId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QAfterSortBy>
+      thenBySourceEventIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sourceEventId', Sort.desc);
     });
   }
 
@@ -1611,9 +2208,33 @@ extension ReminderRecordEntityQueryWhereDistinct
   }
 
   QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QDistinct>
+      distinctByReminderTypeKey({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'reminderTypeKey',
+          caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QDistinct>
       distinctByResponseKey({bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'responseKey', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QDistinct>
+      distinctBySourceDimension({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'sourceDimension',
+          caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QDistinct>
+      distinctBySourceEventId({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'sourceEventId',
+          caseSensitive: caseSensitive);
     });
   }
 
@@ -1675,10 +2296,31 @@ extension ReminderRecordEntityQueryProperty on QueryBuilder<
     });
   }
 
+  QueryBuilder<ReminderRecordEntity, String?, QQueryOperations>
+      reminderTypeKeyProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'reminderTypeKey');
+    });
+  }
+
   QueryBuilder<ReminderRecordEntity, String, QQueryOperations>
       responseKeyProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'responseKey');
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, String?, QQueryOperations>
+      sourceDimensionProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'sourceDimension');
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, String?, QQueryOperations>
+      sourceEventIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'sourceEventId');
     });
   }
 

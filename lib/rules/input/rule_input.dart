@@ -37,6 +37,13 @@ class RuleInput {
   /// 活动样本数量。
   int get activityCount => activitySamples.length;
 
+  /// 规则层只消费高置信度活动样本，避免把噪声直接映射成提醒。
+  List<ActivitySample> get confidentActivitySamples {
+    return activitySamples
+        .where((ActivitySample sample) => sample.isConfident)
+        .toList(growable: false);
+  }
+
   /// 静坐样本比例。
   double get stationaryRatio {
     if (activitySamples.isEmpty) return 0;
@@ -46,9 +53,58 @@ class RuleInput {
         activitySamples.length;
   }
 
+  /// 片段化后的有效久坐片段。
+  List<SedentaryActivitySegment> get sedentarySegments {
+    final sorted = confidentActivitySamples.toList()
+      ..sort(
+        (ActivitySample left, ActivitySample right) =>
+            left.capturedAt.compareTo(right.capturedAt),
+      );
+    final segments = <SedentaryActivitySegment>[];
+    SedentaryActivitySegment? current;
+
+    for (final ActivitySample sample in sorted) {
+      if (sample.type != ActivityType.stationary) {
+        if (current != null && current.isEffective) {
+          segments.add(current);
+        }
+        current = null;
+        continue;
+      }
+
+      final candidate = SedentaryActivitySegment.fromSample(sample);
+      if (current == null) {
+        current = candidate;
+        continue;
+      }
+
+      if (current.canMerge(candidate)) {
+        current = current.merge(candidate);
+        continue;
+      }
+
+      if (current.isEffective) {
+        segments.add(current);
+      }
+      current = candidate;
+    }
+
+    if (current != null && current.isEffective) {
+      segments.add(current);
+    }
+    return segments;
+  }
+
   /// 总步数合计。
-  int get totalSteps =>
-      activitySamples.fold(0, (sum, s) => sum + s.stepCount);
+  int get totalSteps {
+    if (dailyMetricsList.isNotEmpty) {
+      return dailyMetricsList.fold<int>(
+        0,
+        (int total, DailyMetrics metrics) => total + metrics.stepCount,
+      );
+    }
+    return activitySamples.fold(0, (sum, s) => sum + s.stepCount);
+  }
 
   /// 噪音平均分贝。
   double get averageNoiseDb {
@@ -69,6 +125,43 @@ class RuleInput {
   int get totalUnlockCount {
     if (usageSummaries.isEmpty) return 0;
     return usageSummaries.fold(0, (sum, s) => sum + s.unlockCount);
+  }
+
+  /// 夜间亮屏时长合计（分钟）。
+  double get totalNightScreenMinutes {
+    if (usageSummaries.isEmpty) return 0;
+    return usageSummaries.fold(
+      0.0,
+      (double sum, DigitalUsageSummary summary) =>
+          sum + summary.nighttimeUsageDuration.inMinutes,
+    );
+  }
+
+  /// 专注中断次数合计。
+  int get totalFocusSessionBreakCount {
+    if (usageSummaries.isEmpty) return 0;
+    return usageSummaries.fold(
+      0,
+      (int sum, DigitalUsageSummary summary) =>
+          sum + summary.focusSessionBreakCount,
+    );
+  }
+
+  /// 是否存在明显碎片化查看。
+  bool get hasFragmentedUsage {
+    return totalUnlockCount >= 40 || totalFocusSessionBreakCount >= 12;
+  }
+
+  /// 步行时长合计（分钟）。
+  double get totalWalkingMinutes {
+    if (confidentActivitySamples.isEmpty) return 0;
+    return confidentActivitySamples
+        .where((ActivitySample sample) => sample.type == ActivityType.walking)
+        .fold<double>(
+          0,
+          (double total, ActivitySample sample) =>
+              total + sample.duration.inMinutes,
+        );
   }
 
   /// 户外时长合计（分钟）。
@@ -106,5 +199,43 @@ class RuleInput {
       default:
         return false;
     }
+  }
+}
+
+class SedentaryActivitySegment {
+  const SedentaryActivitySegment({
+    required this.startedAt,
+    required this.endedAt,
+    required this.duration,
+  });
+
+  factory SedentaryActivitySegment.fromSample(ActivitySample sample) {
+    return SedentaryActivitySegment(
+      startedAt: sample.capturedAt,
+      endedAt: sample.capturedAt.add(sample.duration),
+      duration: sample.duration,
+    );
+  }
+
+  static const Duration minimumDuration = Duration(minutes: 3);
+  static const Duration maxGap = Duration(seconds: 30);
+
+  final DateTime startedAt;
+  final DateTime endedAt;
+  final Duration duration;
+
+  bool get isEffective => duration >= minimumDuration;
+
+  bool canMerge(SedentaryActivitySegment other) {
+    return !other.startedAt.isAfter(endedAt.add(maxGap));
+  }
+
+  SedentaryActivitySegment merge(SedentaryActivitySegment other) {
+    final mergedEnd = other.endedAt.isAfter(endedAt) ? other.endedAt : endedAt;
+    return SedentaryActivitySegment(
+      startedAt: startedAt,
+      endedAt: mergedEnd,
+      duration: mergedEnd.difference(startedAt),
+    );
   }
 }

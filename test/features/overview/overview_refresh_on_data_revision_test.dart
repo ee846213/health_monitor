@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health_monitor/domain/motion/activity_sample.dart';
@@ -86,6 +88,102 @@ void main() {
     final refreshed = await container.read(overviewViewModelProvider.future);
     expect(refreshed.screenState, OverviewScreenState.ready);
     expect(refreshed.hasRealData, isTrue);
+  });
+
+  test('同一天的汇总连续写入相同计算值时不应重复推进版本', () async {
+    var revisionCount = 0;
+    final locationController = StreamController<GeoPositionSample>.broadcast();
+
+    final activityRepository = SharedActivityRepository();
+    final noiseRepository = SharedNoiseRepository();
+    final locationRepository = SharedLocationRepository();
+    final usageRepository = SharedUsageRepository();
+    final metricsRepository = SharedMetricsRepository();
+
+    final collector = DataCollector(
+      activityRepository: activityRepository,
+      noiseRepository: noiseRepository,
+      locationRepository: locationRepository,
+      usageRepository: usageRepository,
+      metricsRepository: metricsRepository,
+      motionCaptureService: MotionCaptureService(
+        sensorStreamFactory: ({
+          Duration samplingPeriod = const Duration(milliseconds: 200),
+        }) =>
+            const Stream<MotionVectorSample>.empty(),
+      ),
+      noiseCaptureService: NoiseCaptureService(
+        noiseStreamFactory: () => const Stream<NoiseReadingSample>.empty(),
+      ),
+      locationCaptureService: LocationCaptureService(
+        positionStreamFactory: ({
+          Duration samplingPeriod = const Duration(seconds: 30),
+        }) =>
+            locationController.stream,
+        isLocationServiceEnabled: () async => true,
+        checkPermission: () async => GeoPermissionStatus.allowed,
+        requestPermission: () async => GeoPermissionStatus.allowed,
+      ),
+      digitalUsageCaptureService: DigitalUsageCaptureService(
+        lifecycleEventStreamFactory: () => const Stream<AppUsageEvent>.empty(),
+      ),
+      onDataChanged: () {
+        revisionCount += 1;
+      },
+    );
+    collector.start();
+    addTearDown(collector.dispose);
+    addTearDown(locationController.close);
+
+    final container = ProviderContainer(
+      overrides: <Override>[
+        sharedActivityRepo.overrideWithValue(activityRepository),
+        sharedNoiseRepo.overrideWithValue(noiseRepository),
+        sharedLocationRepo.overrideWithValue(locationRepository),
+        sharedUsageRepo.overrideWithValue(usageRepository),
+        sharedMetricsRepo.overrideWithValue(metricsRepository),
+        dataCollectorProvider.overrideWithValue(collector),
+        overviewPermissionStatusServiceProvider.overrideWithValue(
+          const _GrantedPermissionStatusService(),
+        ),
+        reminderRepositoryProvider.overrideWith(
+          (Ref ref) async => InMemoryReminderRepository(),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await container.read(overviewViewModelProvider.future);
+    expect(revisionCount, 0);
+
+    final sameDay = DateTime(2026, 6, 11, 8, 0);
+    locationController.add(
+      GeoPositionSample(
+        capturedAt: sameDay,
+        latitude: 30.0,
+        longitude: 120.0,
+        accuracy: 8.0,
+      ),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    container.read(dataCollectorRevisionProvider.notifier).state += 1;
+    await container.read(overviewViewModelProvider.future);
+
+    expect(revisionCount, 1);
+
+    locationController.add(
+      GeoPositionSample(
+        capturedAt: sameDay.add(const Duration(minutes: 5)),
+        latitude: 30.0,
+        longitude: 120.0,
+        accuracy: 8.0,
+      ),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    container.read(dataCollectorRevisionProvider.notifier).state += 1;
+    await container.read(overviewViewModelProvider.future);
+
+    expect(revisionCount, 1);
   });
 }
 

@@ -36,6 +36,7 @@ class ProfilePage extends ConsumerWidget {
         elevation: 0,
       ),
       body: asyncViewModel.when(
+        skipLoadingOnRefresh: true,
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (Object error, StackTrace _) =>
             const Center(child: Text('加载我的页面失败')),

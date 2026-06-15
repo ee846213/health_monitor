@@ -25,6 +25,7 @@ void main() {
 
     expect(sample.type, ActivityType.stationary);
     expect(sample.confidence, greaterThanOrEqualTo(0.7));
+    expect(sample.stepCount, 0);
   });
 
   test('中等强度加速度应映射为步行样本', () async {
@@ -46,6 +47,7 @@ void main() {
     final sample = await service.watchActivitySamples().first;
 
     expect(sample.type, ActivityType.walking);
+    expect(sample.stepCount, 0);
   });
 
   test('高强度加速度应映射为跑步样本', () async {
@@ -67,6 +69,7 @@ void main() {
     final sample = await service.watchActivitySamples().first;
 
     expect(sample.type, ActivityType.running);
+    expect(sample.stepCount, 0);
   });
 
   test('传感器错误应转换为可消费的捕获异常', () async {

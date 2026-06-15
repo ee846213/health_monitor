@@ -26,6 +26,7 @@ class ReminderRecord {
     required this.response,
     this.reminderTypeKey,
     this.sourceDimension,
+    this.sourceEventId,
   });
 
   final DateTime triggeredAt;
@@ -37,6 +38,7 @@ class ReminderRecord {
   final ReminderResponse response;
   final String? reminderTypeKey;
   final String? sourceDimension;
+  final String? sourceEventId;
 
   bool get hasActioned => response == ReminderResponse.taken;
   bool get isIgnored =>
@@ -61,6 +63,25 @@ class ReminderRecord {
       response: response,
       reminderTypeKey: verdict.reminderType,
       sourceDimension: verdict.dimension,
+    );
+  }
+
+  factory ReminderRecord.fromWalkingScreenRiskEvent({
+    required String eventId,
+    required DateTime triggeredAt,
+    ReminderResponse response = ReminderResponse.pending,
+  }) {
+    return ReminderRecord(
+      triggeredAt: triggeredAt,
+      type: ReminderType.walkingScreenRisk,
+      title: '先看路，再看手机',
+      message: '检测到你在移动时持续亮屏超过 8 秒。',
+      reasonSummary: '移动状态下连续亮屏超过 8 秒。',
+      actionSuggestion: '走路时先收起屏幕，等停下后再查看手机。',
+      response: response,
+      reminderTypeKey: 'walkingScreenRisk',
+      sourceDimension: 'android_risk_event',
+      sourceEventId: eventId,
     );
   }
 

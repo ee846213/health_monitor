@@ -26,56 +26,62 @@ class ActivityRule implements HealthRule {
       return verdicts;
     }
 
-    final activeSamples = input.activitySamples
-        .where((s) => s.type == ActivityType.walking || s.type == ActivityType.running);
-    final activeRatio = input.activityCount > 0
-        ? activeSamples.length / input.activityCount
+    final nonStationaryRatio = input.confidentActivitySamples.isNotEmpty
+        ? input.confidentActivitySamples
+                .where((ActivitySample sample) => sample.type != ActivityType.stationary)
+                .length /
+            input.confidentActivitySamples.length
         : 0;
+    final latestSedentarySegment = input.sedentarySegments.isEmpty
+        ? null
+        : input.sedentarySegments.last;
+    final totalSedentaryMinutes = input.totalSedentaryMinutes > 0
+        ? input.totalSedentaryMinutes
+        : input.sedentarySegments.fold<double>(
+            0,
+            (double total, SedentaryActivitySegment segment) =>
+                total + segment.duration.inMinutes,
+          );
 
-    // 久坐判定：活跃样本占比低于 20% 且非静止样本占比低于 30%。
-    // 设计中采用的阈值基于 WHO 建议，每天至少应有一定比例的中等强度活动。
-    final nonStationaryRatio = input.activityCount > 0
-        ? input.activitySamples
-              .where((s) => s.type != ActivityType.stationary)
-              .length /
-            input.activityCount
-        : 0;
-
-    if (nonStationaryRatio < 0.3 && input.activityCount >= 3) {
+    if (latestSedentarySegment != null &&
+        latestSedentarySegment.duration >= const Duration(minutes: 60)) {
       verdicts.add(RuleVerdict(
         dimension: 'activity',
         level: 'concern',
         summary: '活动量偏低',
-        detail: '近期活动样本中静坐占比过高（${((1 - nonStationaryRatio) * 100).round()}%），非静止占比仅${(nonStationaryRatio * 100).round()}%。',
+        detail:
+            '最近一次有效久坐已经持续 ${latestSedentarySegment.duration.inMinutes} 分钟，建议尽快起身活动一下。',
         shouldRemind: true,
         reminderTitle: '该起来活动一下了',
         reminderMessage: '你已经连续静坐较长时间，起身走动 5 分钟有助于减轻久坐风险。',
         reminderType: 'sedentaryBreak',
       ));
-    } else if (nonStationaryRatio < 0.3) {
-      // 样本量不够做判定，不做提醒。
+    } else if (input.confidentActivitySamples.length < 3 &&
+        input.totalSedentaryMinutes <= 0) {
       verdicts.add(RuleVerdict(
         dimension: 'activity',
         level: 'normal',
         summary: '活动数据不足',
-        detail: '活动样本数不足（${input.activityCount}），尚无法可靠判断久坐风险。',
+        detail:
+            '活动样本数不足（${input.confidentActivitySamples.length}），尚无法可靠判断连续久坐风险。',
       ));
     } else {
       verdicts.add(RuleVerdict(
         dimension: 'activity',
         level: 'normal',
         summary: '活动水平正常',
-        detail: '近期非静止样本占比${(nonStationaryRatio * 100).round()}%，活动水平在正常范围。',
+        detail:
+            '当前累计久坐约 ${totalSedentaryMinutes.round()} 分钟，非静止样本占比 ${(nonStationaryRatio * 100).round()}%，活动水平暂时稳定。',
       ));
     }
 
     // 步数不足判定。
-    if (input.totalSteps > 0 && input.totalSteps < 3000) {
+    if (input.totalSteps > 0 && input.totalSteps < 5000) {
       verdicts.add(RuleVerdict(
         dimension: 'activity',
         level: 'warning',
         summary: '步数不足',
-        detail: '窗口内累计步数 ${input.totalSteps} 步，低于每日建议最低 5000 步。',
+        detail: '窗口内累计步数 ${input.totalSteps} 步，低于每日建议的 5000 步。',
       ));
     }
 

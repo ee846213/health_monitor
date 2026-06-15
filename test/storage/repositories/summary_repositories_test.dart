@@ -126,4 +126,37 @@ void main() {
     expect(latest?.triggeredAt.day, 9);
     expect(latest?.type, ReminderType.nightUsage);
   });
+
+  test('提醒仓储应返回最新在前的最近提醒历史', () async {
+    final repository = InMemoryReminderRepository(
+      records: <ReminderRecord>[
+        ReminderRecord(
+          triggeredAt: DateTime(2026, 6, 8, 9),
+          type: ReminderType.postureRisk,
+          title: '把手机抬高一点',
+          message: '低头时间有点久。',
+          reasonSummary: '连续低头持机超过阈值。',
+          actionSuggestion: '把手肘垫高一点。',
+          response: ReminderResponse.pending,
+        ),
+        ReminderRecord(
+          triggeredAt: DateTime(2026, 6, 9, 21),
+          type: ReminderType.nightUsage,
+          title: '今晚早点放下手机',
+          message: '再看一会儿可能会更晚睡。',
+          reasonSummary: '夜间亮屏时长已经偏高。',
+          actionSuggestion: '把最后十分钟留给放松。',
+          response: ReminderResponse.dismissed,
+        ),
+      ],
+    );
+
+    final result = await repository.listRecentDays(
+      7,
+      referenceDate: DateTime(2026, 6, 9),
+    );
+
+    expect(result.first.triggeredAt.day, 9);
+    expect(result.last.triggeredAt.day, 8);
+  });
 }

@@ -25,4 +25,29 @@ class ActivitySampleRecord {
       ..stepCount = sample.stepCount
       ..sourceKey = sample.source.name;
   }
+
+  ActivitySample toDomain() {
+    return ActivitySample(
+      capturedAt: capturedAt,
+      duration: Duration(seconds: durationSeconds),
+      type: _mapActivityType(typeKey),
+      confidence: confidence,
+      stepCount: stepCount,
+      source: _mapMotionSampleSource(sourceKey),
+    );
+  }
+
+  ActivityType _mapActivityType(String value) {
+    return ActivityType.values.firstWhere(
+      (ActivityType item) => item.name == value,
+      orElse: () => ActivityType.unknown,
+    );
+  }
+
+  MotionSampleSource _mapMotionSampleSource(String value) {
+    return MotionSampleSource.values.firstWhere(
+      (MotionSampleSource item) => item.name == value,
+      orElse: () => MotionSampleSource.sensorFusion,
+    );
+  }
 }

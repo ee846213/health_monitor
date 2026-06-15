@@ -45,7 +45,11 @@ class NoiseCaptureService {
             ),
           );
         },
-        handleError: (Object error, StackTrace stackTrace, EventSink<NoiseSample> sink) {
+        handleError: (
+          Object error,
+          StackTrace stackTrace,
+          EventSink<NoiseSample> sink,
+        ) {
           sink.addError(
             NoiseCaptureException('实时噪音采集失败: $error'),
             stackTrace,

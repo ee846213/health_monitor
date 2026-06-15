@@ -29,6 +29,19 @@ class QueryWindow {
     );
   }
 
+  factory QueryWindow.calendarDay({required DateTime referenceDate}) {
+    final startAt = DateTime(
+      referenceDate.year,
+      referenceDate.month,
+      referenceDate.day,
+    );
+    return QueryWindow._(
+      startAt: startAt,
+      endAt: startAt.add(const Duration(days: 1)),
+      label: '今日',
+    );
+  }
+
   factory QueryWindow.recentDays(int days, {required DateTime referenceTime}) {
     if (days <= 0) {
       throw ArgumentError.value(days, 'days', '时间窗口必须是正数');
@@ -41,14 +54,39 @@ class QueryWindow {
     );
   }
 
- bool contains(DateTime value) {
-   return !value.isBefore(startAt) && !value.isAfter(endAt);
- }
- 
+  factory QueryWindow.recentCalendarDays(
+    int days, {
+    required DateTime referenceDate,
+  }) {
+    if (days <= 0) {
+      throw ArgumentError.value(days, 'days', '时间窗口必须是正数');
+    }
+
+    final endAt = DateTime(
+      referenceDate.year,
+      referenceDate.month,
+      referenceDate.day,
+    ).add(const Duration(days: 1));
+    return QueryWindow._(
+      startAt: endAt.subtract(Duration(days: days)),
+      endAt: endAt,
+      label: '最近$days天',
+    );
+  }
+
+  bool contains(DateTime value) {
+    return !value.isBefore(startAt) && value.isBefore(endAt);
+  }
+
   List<DateTime> dailyDates() {
     final dates = <DateTime>[];
     var current = DateTime(startAt.year, startAt.month, startAt.day);
-    final endDay = DateTime(endAt.year, endAt.month, endAt.day);
+    final inclusiveEnd = endAt.subtract(const Duration(microseconds: 1));
+    final endDay = DateTime(
+      inclusiveEnd.year,
+      inclusiveEnd.month,
+      inclusiveEnd.day,
+    );
     while (!current.isAfter(endDay)) {
       dates.add(current);
       current = current.add(const Duration(days: 1));

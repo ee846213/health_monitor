@@ -13,7 +13,10 @@ class UsageRule implements HealthRule {
   static const double screenTimeWarningMinutes = 240;
 
   /// 单日解锁次数阈值，超过此值视为碎片化使用。
-  static const int unlockCountWarningThreshold = 60;
+  static const int unlockCountWarningThreshold = 40;
+
+  /// 单日专注中断次数阈值。
+  static const int focusSessionBreakWarningThreshold = 12;
 
   @override
   String get name => '数字生活规则';
@@ -29,17 +32,12 @@ class UsageRule implements HealthRule {
       return verdicts;
     }
 
-    // 屏幕时长判定。
     if (input.totalScreenMinutes >= screenTimeWarningMinutes) {
       verdicts.add(RuleVerdict(
         dimension: 'usage',
         level: 'concern',
         summary: '屏幕使用时间过长',
         detail: '窗口内累计屏幕使用 ${input.totalScreenMinutes.round()} 分钟，超过建议的 ${screenTimeWarningMinutes.round()} 分钟。',
-        shouldRemind: true,
-        reminderTitle: '该放下手机了',
-        reminderMessage: '你今天的屏幕使用时间较长，让眼睛休息 10 分钟吧。',
-        reminderType: 'nightUsage',
       ));
     } else {
       verdicts.add(RuleVerdict(
@@ -50,13 +48,28 @@ class UsageRule implements HealthRule {
       ));
     }
 
-    // 解锁次数判定。
-    if (input.totalUnlockCount >= unlockCountWarningThreshold) {
+    if (input.totalNightScreenMinutes >= 60) {
+      verdicts.add(RuleVerdict(
+        dimension: 'usage',
+        level: 'concern',
+        summary: '夜间看屏偏多',
+        detail:
+            '22 点后的累计亮屏时间已经达到 ${input.totalNightScreenMinutes.round()} 分钟，建议尽早进入低刺激状态。',
+        shouldRemind: true,
+        reminderTitle: '该放下手机了',
+        reminderMessage: '你今晚看屏时间有点久，先让眼睛休息一下吧。',
+        reminderType: 'nightUsage',
+      ));
+    }
+
+    if (input.totalUnlockCount >= unlockCountWarningThreshold ||
+        input.totalFocusSessionBreakCount >= focusSessionBreakWarningThreshold) {
       verdicts.add(RuleVerdict(
         dimension: 'usage',
         level: 'warning',
         summary: '解锁频繁',
-        detail: '窗口内解锁 ${input.totalUnlockCount} 次，超过 ${unlockCountWarningThreshold} 次阈值，碎片化关注可能影响专注力。',
+        detail:
+            '窗口内解锁 ${input.totalUnlockCount} 次、专注中断 ${input.totalFocusSessionBreakCount} 次，碎片化查看可能影响专注力。',
       ));
     }
 

@@ -26,10 +26,40 @@ class UsageSummaryRecord {
       ..topCategoryKey = summary.topCategory.name;
   }
 
+  DigitalUsageSummary toDomain() {
+    return DigitalUsageSummary(
+      date: _dateFromKey(dateKey),
+      screenOnDuration: Duration(seconds: screenOnSeconds),
+      unlockCount: unlockCount,
+      nighttimeUsageDuration: Duration(seconds: nighttimeUsageSeconds),
+      focusSessionBreakCount: focusSessionBreakCount,
+      topCategory: _mapUsageCategory(topCategoryKey),
+    );
+  }
+
   static String _dateKey(DateTime value) {
     final year = value.year.toString().padLeft(4, '0');
     final month = value.month.toString().padLeft(2, '0');
     final day = value.day.toString().padLeft(2, '0');
     return '$year-$month-$day';
+  }
+
+  static DateTime _dateFromKey(String value) {
+    final parts = value.split('-');
+    if (parts.length != 3) {
+      return DateTime.now();
+    }
+    return DateTime(
+      int.tryParse(parts[0]) ?? DateTime.now().year,
+      int.tryParse(parts[1]) ?? DateTime.now().month,
+      int.tryParse(parts[2]) ?? DateTime.now().day,
+    );
+  }
+
+  static UsageCategory _mapUsageCategory(String value) {
+    return UsageCategory.values.firstWhere(
+      (UsageCategory item) => item.name == value,
+      orElse: () => UsageCategory.unknown,
+    );
   }
 }

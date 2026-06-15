@@ -63,6 +63,18 @@ void main() {
       expect(record.type, ReminderType.walkingScreenRisk);
     });
 
+    test('fromWalkingScreenRiskEvent 应生成精确事件语义提醒', () {
+      final record = ReminderRecord.fromWalkingScreenRiskEvent(
+        eventId: 'risk-1',
+        triggeredAt: DateTime(2026, 6, 10, 8, 0),
+      );
+
+      expect(record.type, ReminderType.walkingScreenRisk);
+      expect(record.reasonSummary, '移动状态下连续亮屏超过 8 秒。');
+      expect(record.actionSuggestion, '走路时先收起屏幕，等停下后再查看手机。');
+      expect(record.sourceEventId, 'risk-1');
+    });
+
     test('fromVerdict 应正确映射 noisyEnvironment 类型', () {
       final record = ReminderRecord.fromVerdict(
         verdict: const RuleVerdict(

@@ -16,6 +16,9 @@ class ReminderRecordEntity {
   late String reasonSummary;
   late String actionSuggestion;
   late String responseKey;
+  String? sourceEventId;
+  String? reminderTypeKey;
+  String? sourceDimension;
 
   ReminderRecordEntity();
 
@@ -28,6 +31,38 @@ class ReminderRecordEntity {
       ..message = record.message
       ..reasonSummary = record.reasonSummary
       ..actionSuggestion = record.actionSuggestion
-      ..responseKey = record.response.name;
+      ..responseKey = record.response.name
+      ..sourceEventId = record.sourceEventId
+      ..reminderTypeKey = record.reminderTypeKey
+      ..sourceDimension = record.sourceDimension;
+  }
+
+  ReminderRecord toDomain() {
+    return ReminderRecord(
+      triggeredAt: triggeredAt,
+      type: _mapReminderType(typeKey),
+      title: title,
+      message: message,
+      reasonSummary: reasonSummary,
+      actionSuggestion: actionSuggestion,
+      response: _mapReminderResponse(responseKey),
+      sourceEventId: sourceEventId,
+      reminderTypeKey: reminderTypeKey,
+      sourceDimension: sourceDimension,
+    );
+  }
+
+  ReminderType _mapReminderType(String value) {
+    return ReminderType.values.firstWhere(
+      (ReminderType item) => item.name == value,
+      orElse: () => ReminderType.sedentaryBreak,
+    );
+  }
+
+  ReminderResponse _mapReminderResponse(String value) {
+    return ReminderResponse.values.firstWhere(
+      (ReminderResponse item) => item.name == value,
+      orElse: () => ReminderResponse.pending,
+    );
   }
 }

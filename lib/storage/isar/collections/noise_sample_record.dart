@@ -21,4 +21,20 @@ class NoiseSampleRecord {
       ..decibel = sample.decibel
       ..levelKey = sample.level.name;
   }
+
+  NoiseSample toDomain() {
+    return NoiseSample(
+      capturedAt: capturedAt,
+      duration: Duration(seconds: durationSeconds),
+      decibel: decibel,
+      level: _mapNoiseLevel(levelKey),
+    );
+  }
+
+  NoiseLevel _mapNoiseLevel(String value) {
+    return NoiseLevel.values.firstWhere(
+      (NoiseLevel item) => item.name == value,
+      orElse: () => NoiseLevel.quiet,
+    );
+  }
 }

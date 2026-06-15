@@ -91,6 +91,28 @@ void main() {
       );
       expect(input.totalScreenMinutes, 200);
       expect(input.totalUnlockCount, 75);
+      expect(input.totalNightScreenMinutes, 0);
+      expect(input.hasFragmentedUsage, isTrue);
+    });
+
+    test('stationary 片段应按 30 秒间隔合并并过滤 3 分钟以下片段', () {
+      final now = DateTime(2026, 6, 10, 9, 0);
+      final input = RuleInput(
+        window: QueryWindow.recentDay(referenceTime: now),
+        activitySamples: <ActivitySample>[
+          ActivitySample(capturedAt: now, duration: const Duration(minutes: 2), type: ActivityType.stationary, confidence: 0.9, stepCount: 0, source: MotionSampleSource.sensorFusion),
+          ActivitySample(capturedAt: now.add(const Duration(minutes: 2, seconds: 20)), duration: const Duration(minutes: 2), type: ActivityType.stationary, confidence: 0.9, stepCount: 0, source: MotionSampleSource.sensorFusion),
+          ActivitySample(capturedAt: now.add(const Duration(minutes: 10)), duration: const Duration(minutes: 2), type: ActivityType.stationary, confidence: 0.9, stepCount: 0, source: MotionSampleSource.sensorFusion),
+        ],
+        locationSummaries: const <LocationSummary>[],
+        noiseSamples: const <NoiseSample>[],
+        usageSummaries: const <DigitalUsageSummary>[],
+        dailyMetricsList: const <DailyMetrics>[],
+        missingDimensions: const <String>[],
+      );
+
+      expect(input.sedentarySegments, hasLength(1));
+      expect(input.sedentarySegments.single.duration.inMinutes, 4);
     });
 
     test('isDimensionAvailable 判断维度可用性', () {

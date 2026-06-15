@@ -57,7 +57,10 @@ class RuleInputService {
     // 位置摘要（天级查询）
     final locationSummaries = disabledDimensions.contains('location')
         ? <LocationSummary>[]
-        : await _locationRepository.listRecentDays(7, referenceDate: window.endAt);
+        : await _locationRepository.listRecentDays(
+            _daysForWindow(window),
+            referenceDate: _referenceDateForWindow(window),
+          );
     if (locationSummaries.isEmpty && !disabledDimensions.contains('location')) {
       missingDimensions.add('location');
     }
@@ -75,7 +78,8 @@ class RuleInputService {
     if (disabledDimensions.contains('digital_usage')) {
       // 跳过
     } else {
-      for (final date in window.dailyDates()) {
+      final dates = _datesForUsage(window);
+      for (final date in dates) {
         final summary = await _usageRepository.getByDate(date);
         if (summary != null) usageSummaries.add(summary);
       }
@@ -87,7 +91,10 @@ class RuleInputService {
     // 每日指标
     final dailyMetricsList = disabledDimensions.contains('daily_metrics')
         ? <DailyMetrics>[]
-        : await _metricsRepository.listRecentDays(7, referenceDate: window.endAt);
+        : await _metricsRepository.listRecentDays(
+            _daysForWindow(window),
+            referenceDate: _referenceDateForWindow(window),
+          );
     if (dailyMetricsList.isEmpty && !disabledDimensions.contains('daily_metrics')) {
       missingDimensions.add('daily_metrics');
     }
@@ -102,5 +109,23 @@ class RuleInputService {
       missingDimensions: missingDimensions,
     );
   }
+}
+
+int _daysForWindow(QueryWindow window) {
+  return window.label == '最近7天' ? 7 : 1;
+}
+
+DateTime _referenceDateForWindow(QueryWindow window) {
+  final endExclusive = window.endAt.subtract(const Duration(microseconds: 1));
+  return DateTime(endExclusive.year, endExclusive.month, endExclusive.day);
+}
+
+List<DateTime> _datesForUsage(QueryWindow window) {
+  if (window.label == '最近7天') {
+    return window.dailyDates();
+  }
+
+  final date = _referenceDateForWindow(window);
+  return <DateTime>[date];
 }
 

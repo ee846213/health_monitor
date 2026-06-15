@@ -1,15 +1,14 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
-import 'package:health_monitor/rules/engine/activity_rules.dart';
-import 'package:health_monitor/rules/engine/environment_rules.dart';
-import 'package:health_monitor/rules/engine/posture_rules.dart';
 import 'package:health_monitor/rules/engine/rule_verdict.dart';
-import 'package:health_monitor/rules/engine/usage_rules.dart';
-import 'package:health_monitor/rules/input/rule_input.dart';
-import 'package:health_monitor/rules/input/rule_input_service.dart';
+import 'package:health_monitor/services/android_risk_event_bridge.dart';
 import 'package:health_monitor/services/data_collector.dart';
+import 'package:health_monitor/services/health_insight_service.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
+import 'package:health_monitor/services/platform_bridge_service.dart';
 import 'package:health_monitor/storage/isar/app_isar.dart';
 import 'package:health_monitor/storage/repositories/query_window.dart';
 import 'package:health_monitor/storage/repositories/reminder_repository.dart';
@@ -31,6 +30,20 @@ final reminderRepositoryProvider = FutureProvider<ReminderRepository>(
     return IsarReminderRepository(isar);
   },
 );
+
+final healthInsightServiceProvider = Provider<HealthInsightService>((Ref ref) {
+  return HealthInsightService(
+    activityRepository: ref.watch(sharedActivityRepo),
+    locationRepository: ref.watch(sharedLocationRepo),
+    noiseRepository: ref.watch(sharedNoiseRepo),
+    usageRepository: ref.watch(sharedUsageRepo),
+    metricsRepository: ref.watch(sharedMetricsRepo),
+    reminderRepositoryLoader: () => ref.read(reminderRepositoryProvider.future),
+    androidRiskEventBridge: AndroidRiskEventBridge(
+      platformBridgeService: PlatformBridgeService(),
+    ),
+  );
+});
 
 enum OverviewScreenState {
   ready,
@@ -61,6 +74,11 @@ class OverviewViewModel {
     required this.metrics,
     required this.reminders,
     required this.permissionStatuses,
+    this.todayStatusLabel,
+    this.todayStatusDetail,
+    this.conclusionLabel,
+    this.conclusionDetail,
+    this.preciseDetectionNotice,
     this.missingDimensions = const <String>[],
     this.hasRealData = false,
     this.isLoading = false,
@@ -71,13 +89,25 @@ class OverviewViewModel {
   final List<RuleVerdict> verdicts;
   final String summaryLabel;
   final String summaryDetail;
+  final String? todayStatusLabel;
+  final String? todayStatusDetail;
+  final String? conclusionLabel;
+  final String? conclusionDetail;
+  final String? preciseDetectionNotice;
   final OverviewMetricSnapshot metrics;
   final List<ReminderRecord> reminders;
   final Map<PermissionType, PermissionGrantStatus> permissionStatuses;
   final List<String> missingDimensions;
   final bool hasRealData;
 
+  String get resolvedTodayStatusLabel => todayStatusLabel ?? summaryLabel;
+  String get resolvedTodayStatusDetail => todayStatusDetail ?? summaryDetail;
+  String get resolvedConclusionLabel => conclusionLabel ?? summaryLabel;
+  String get resolvedConclusionDetail => conclusionDetail ?? summaryDetail;
+
   bool get hasMissingDimensions => missingDimensions.isNotEmpty;
+  bool get hasPreciseDetectionNotice =>
+      preciseDetectionNotice != null && preciseDetectionNotice!.isNotEmpty;
 
   List<RuleVerdict> get secondaryVerdicts {
     if (verdicts.length <= 1) {
@@ -87,89 +117,73 @@ class OverviewViewModel {
   }
 }
 
-final overviewViewModelProvider =
-    FutureProvider<OverviewViewModel>((Ref ref) async {
-  // 数据版本号是一个轻量刷新信号，写入本地样本后会递增。
-  // 首页、简报和提醒页都订阅它，这样真实数据变化后就会重新计算。
+final walkingScreenRiskNoticeProvider = FutureProvider<String?>((Ref ref) async {
+  final permissionStatuses = await ref.watch(permissionStatusProvider.future);
+  return buildWalkingScreenRiskPrecisionNotice(
+    permissionStatuses: permissionStatuses,
+    isAndroid: Platform.isAndroid,
+    isIOS: Platform.isIOS,
+  );
+});
+
+final overviewViewModelProvider = FutureProvider<OverviewViewModel>((Ref ref) async {
   ref.watch(dataCollectorRevisionProvider);
-  // 首页、简报和提醒都依赖同一批采集结果。
-  // 这里主动 watch 采集器，确保这些页面消费的是同一份实时状态，
-  // 避免每个页面各自启动独立采集导致规则结果和提醒历史不一致。
   ref.watch(dataCollectorProvider);
 
-  final activityRepository = ref.watch(sharedActivityRepo);
-  final locationRepository = ref.watch(sharedLocationRepo);
-  final noiseRepository = ref.watch(sharedNoiseRepo);
-  final usageRepository = ref.watch(sharedUsageRepo);
-  final metricsRepository = ref.watch(sharedMetricsRepo);
-  final reminderRepository = await ref.watch(reminderRepositoryProvider.future);
   final permissionStatuses = await ref.watch(permissionStatusProvider.future);
-
-  final now = DateTime.now();
-  final window = QueryWindow.recentDay(referenceTime: now);
-  final inputService = RuleInputService(
-    activityRepository: activityRepository,
-    locationRepository: locationRepository,
-    noiseRepository: noiseRepository,
-    usageRepository: usageRepository,
-    metricsRepository: metricsRepository,
-  );
-  final input = await inputService.buildInput(window: window);
-
-  const rules = <HealthRule>[
-    ActivityRule(),
-    PostureRule(),
-    UsageRule(),
-    EnvironmentRule(),
-  ];
-  final verdicts = <RuleVerdict>[];
-  for (final rule in rules) {
-    verdicts.addAll(rule.evaluate(input));
-  }
-  verdicts.sort(_compareVerdictPriority);
-
-  final generatedReminders = _buildReminderRecords(verdicts, now);
-  await reminderRepository.saveAll(generatedReminders);
-  final historyReminders = await reminderRepository.listRecentDays(
-    7,
-    referenceDate: now,
+  final insightService = ref.watch(healthInsightServiceProvider);
+  final snapshot = await insightService.buildSnapshot(
+    window: QueryWindow.recentDay(referenceTime: DateTime.now()),
   );
 
-  final primary = verdicts.isEmpty ? null : verdicts.first;
-  final hasRealData = input.isDimensionAvailable('activity') ||
-      input.isDimensionAvailable('location') ||
-      input.isDimensionAvailable('noise') ||
-      input.isDimensionAvailable('digital_usage') ||
-      input.isDimensionAvailable('daily_metrics');
+  final metrics = OverviewMetricSnapshot(
+    stepCount: snapshot.metrics.stepCount,
+    sedentaryMinutes: snapshot.metrics.sedentaryMinutes,
+    screenMinutes: snapshot.metrics.screenMinutes,
+    outdoorMinutes: snapshot.metrics.outdoorMinutes,
+  );
+  final primary = snapshot.verdicts.isEmpty ? null : snapshot.verdicts.first;
+  final todayStatusLabel = _buildTodayStatusLabel(
+    metrics: metrics,
+    hasRealData: snapshot.hasRealData,
+  );
+  final todayStatusDetail = _buildTodayStatusDetail(
+    metrics: metrics,
+    hasRealData: snapshot.hasRealData,
+  );
 
   return OverviewViewModel(
-    screenState: _resolveScreenState(
+    screenState: resolveOverviewScreenState(
       permissionStatuses: permissionStatuses,
-      hasRealData: hasRealData,
+      hasRealData: snapshot.hasRealData,
+      hasReminderHistory: snapshot.reminderHistory.isNotEmpty,
     ),
     isLoading: false,
-    verdicts: verdicts,
-    summaryLabel: primary?.summary ?? '等待采集数据',
-    summaryDetail: primary?.detail ?? '应用刚启动，数据还在积累，稍后再回来查看今天的健康概览。',
-    metrics: OverviewMetricSnapshot(
-      stepCount: input.totalSteps,
-      sedentaryMinutes: _estimateSedentaryMinutes(input),
-      screenMinutes: input.totalScreenMinutes.round(),
-      outdoorMinutes: input.totalOutdoorMinutes.round(),
+    verdicts: snapshot.verdicts,
+    summaryLabel: todayStatusLabel,
+    summaryDetail: todayStatusDetail,
+    todayStatusLabel: todayStatusLabel,
+    todayStatusDetail: todayStatusDetail,
+    conclusionLabel: primary?.summary ?? '暂时没风险',
+    conclusionDetail: primary?.detail ?? '当前没有需要优先处理的事项。',
+    preciseDetectionNotice: buildWalkingScreenRiskPrecisionNotice(
+      permissionStatuses: permissionStatuses,
+      isAndroid: Platform.isAndroid,
+      isIOS: Platform.isIOS,
     ),
-    reminders: historyReminders,
+    metrics: metrics,
+    reminders: snapshot.reminderHistory,
     permissionStatuses: permissionStatuses,
-    missingDimensions: input.missingDimensions,
-    hasRealData: hasRealData,
+    missingDimensions: snapshot.input.missingDimensions
+        .map(localizedDimensionLabel)
+        .toList(growable: false),
+    hasRealData: snapshot.hasRealData,
   );
 });
 
 final reminderListProvider = FutureProvider<List<ReminderRecord>>((Ref ref) async {
-  // 提醒记录页读取的是持久化历史，而不是本轮规则刚算出的临时列表。
-  // 这样用户从详情页返回、重进页面或重启应用后，看到的仍然是同一份历史记录。
   ref.watch(dataCollectorRevisionProvider);
   ref.watch(dataCollectorProvider);
-  await ref.watch(overviewViewModelProvider.future);
   final repository = await ref.watch(reminderRepositoryProvider.future);
   return repository.listRecentDays(
     7,
@@ -183,18 +197,10 @@ final latestReminderProvider = FutureProvider<ReminderRecord?>((Ref ref) async {
   return repository.getLatest();
 });
 
-int _compareVerdictPriority(RuleVerdict left, RuleVerdict right) {
-  const priority = <String, int>{
-    'concern': 0,
-    'warning': 1,
-    'normal': 2,
-  };
-  return (priority[left.level] ?? 9).compareTo(priority[right.level] ?? 9);
-}
-
-OverviewScreenState _resolveScreenState({
+OverviewScreenState resolveOverviewScreenState({
   required Map<PermissionType, PermissionGrantStatus> permissionStatuses,
   required bool hasRealData,
+  required bool hasReminderHistory,
 }) {
   final motionStatus = permissionStatuses[PermissionType.motion];
   final locationStatus = permissionStatuses[PermissionType.location];
@@ -205,10 +211,10 @@ OverviewScreenState _resolveScreenState({
     microphoneStatus,
   ].every(_isUnavailablePermission);
 
-  if (corePermissionsDenied) {
+  if (corePermissionsDenied && !hasRealData && !hasReminderHistory) {
     return OverviewScreenState.permissionDenied;
   }
-  if (!hasRealData) {
+  if (!hasRealData && !hasReminderHistory) {
     return OverviewScreenState.dataInsufficient;
   }
   return OverviewScreenState.ready;
@@ -219,36 +225,69 @@ bool _isUnavailablePermission(PermissionGrantStatus? status) {
       status == PermissionGrantStatus.restricted;
 }
 
-List<ReminderRecord> _buildReminderRecords(
-  List<RuleVerdict> verdicts,
-  DateTime referenceTime,
-) {
-  final reminderVerdicts = verdicts
-      .where((RuleVerdict verdict) => verdict.shouldRemind)
-      .toList(growable: false);
-
-  return List<ReminderRecord>.generate(
-    reminderVerdicts.length,
-    (int index) => ReminderRecord.fromVerdict(
-      verdict: reminderVerdicts[index],
-      // 当前规则层还没有独立的提醒事件时间戳，因此这里按固定间隔回推时间。
-      // 这样既能保证同一轮结果的展示顺序稳定，也能在后续接入原生后台提醒事件时
-      // 不必再改页面消费契约，只替换这里的触发时间来源即可。
-      now: referenceTime.subtract(Duration(minutes: index * 5)),
-    ),
-    growable: false,
-  );
+String localizedDimensionLabel(String dimension) {
+  switch (dimension) {
+    case 'activity':
+      return '活动状态';
+    case 'location':
+      return '位置摘要';
+    case 'noise':
+      return '环境噪音';
+    case 'digital_usage':
+      return '数字生活';
+    case 'daily_metrics':
+      return '日指标聚合';
+    default:
+      return dimension;
+  }
 }
 
-int _estimateSedentaryMinutes(RuleInput input) {
-  if (input.totalSedentaryMinutes > 0) {
-    return input.totalSedentaryMinutes.round();
+String? buildWalkingScreenRiskPrecisionNotice({
+  required Map<PermissionType, PermissionGrantStatus> permissionStatuses,
+  required bool isAndroid,
+  required bool isIOS,
+}) {
+  if (isIOS) {
+    return '当前平台仅提供替代指标，不提供走路看屏精确事件识别。';
   }
-  final stationaryMinutes = input.activitySamples
-      .where((sample) => sample.type.name == 'stationary')
-      .fold<int>(
-        0,
-        (int total, sample) => total + sample.duration.inMinutes,
-      );
-  return stationaryMinutes;
+  if (!isAndroid) {
+    return null;
+  }
+
+  final backgroundStatus =
+      permissionStatuses[PermissionType.backgroundCapture] ??
+      PermissionGrantStatus.unknown;
+  if (backgroundStatus != PermissionGrantStatus.granted) {
+    return '移动中看屏风险仅在后台采集开启后可精确识别。';
+  }
+  return null;
+}
+
+String _buildTodayStatusLabel({
+  required OverviewMetricSnapshot metrics,
+  required bool hasRealData,
+}) {
+  if (!hasRealData) {
+    return '数据还在积累';
+  }
+  if (metrics.stepCount < 5000) {
+    return '活动偏少';
+  }
+  if (metrics.sedentaryMinutes >= 180) {
+    return '久坐偏长';
+  }
+  if (metrics.screenMinutes >= 240) {
+    return '看屏偏多';
+  }
+  return '状态平稳';
+}
+
+String _buildTodayStatusDetail({
+  required OverviewMetricSnapshot metrics,
+  required bool hasRealData,
+}) {
+  if (!hasRealData) {
+    return '数据还在积累，稍后再看。';
+  }
+  return '步数 ${metrics.stepCount}，久坐 ${metrics.sedentaryMinutes} 分钟。';
 }

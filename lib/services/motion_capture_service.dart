@@ -93,7 +93,9 @@ class MotionCaptureService {
       duration: const Duration(seconds: 1),
       type: type,
       confidence: _confidenceForMagnitude(magnitude),
-      stepCount: type == ActivityType.stationary ? 0 : 1,
+      // 传感器融合阶段只输出活动类型，不在这里伪造步数。
+      // 步数需要来自系统计步器或更可靠的平台来源，否则手机静置时也会因为轻微抖动持续增长。
+      stepCount: 0,
       source: MotionSampleSource.sensorFusion,
     );
   }

@@ -6,6 +6,7 @@ import android.content.Intent
 import android.app.NotificationManager
 import android.os.IBinder
 import android.os.Build
+import com.example.health_monitor.stepcounter.AndroidStepCounterReader
 
 class AndroidBackgroundForegroundService : Service() {
     private val intentFactory = AndroidBackgroundForegroundServiceIntentFactory()
@@ -37,6 +38,21 @@ class AndroidBackgroundForegroundService : Service() {
             ),
         )
     }
+    private val stepCounterReader by lazy {
+        AndroidStepCounterReader(this)
+    }
+    private val walkingScreenRiskEventStore by lazy {
+        SharedPreferencesAndroidWalkingScreenRiskEventStore(
+            getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
+        )
+    }
+    private val walkingScreenRiskMonitor by lazy {
+        AndroidWalkingScreenRiskMonitor(
+            context = this,
+            stepCounterReader = stepCounterReader,
+            eventStore = walkingScreenRiskEventStore,
+        )
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -49,12 +65,18 @@ class AndroidBackgroundForegroundService : Service() {
                     stopSelf(startId)
                     return START_NOT_STICKY
                 }
+                stepCounterReader.startListening()
+                if (request.enableMotion && request.enableDigitalUsage) {
+                    walkingScreenRiskMonitor.start()
+                }
                 val snapshot = runtime.start(request)
                 runAsForeground(snapshot.notification)
                 return START_STICKY
             }
 
             AndroidBackgroundForegroundServiceIntentFactory.ACTION_STOP -> {
+                walkingScreenRiskMonitor.stop()
+                stepCounterReader.stopListening()
                 runtime.stop()
                 stopForeground(true)
                 stopSelf(startId)
@@ -73,6 +95,12 @@ class AndroidBackgroundForegroundService : Service() {
                 return START_STICKY
             }
         }
+    }
+
+    override fun onDestroy() {
+        walkingScreenRiskMonitor.stop()
+        stepCounterReader.stopListening()
+        super.onDestroy()
     }
 
     private fun runAsForeground(notification: AndroidBackgroundNotification) {
