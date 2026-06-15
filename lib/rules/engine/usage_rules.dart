@@ -1,22 +1,14 @@
-﻿import 'package:health_monitor/rules/engine/rule_verdict.dart';
+import 'package:health_monitor/rules/engine/rule_verdict.dart';
 import 'package:health_monitor/rules/input/rule_input.dart';
 
-/// 数字生活规则：评估屏幕使用时长与解锁频率。
-///
-/// 核心逻辑：
-/// - 总屏幕时长超过阈值 -> 过度使用警告
-/// - 解锁次数异常 -> 碎片化关注警告
+/// 数字生活规则组：更强调“查看节奏”和“夜间使用”。
 class UsageRule implements HealthRule {
   const UsageRule();
 
-  /// 单日屏幕时长阈值（分钟），超过此值视为过度使用。
-  static const double screenTimeWarningMinutes = 240;
-
-  /// 单日解锁次数阈值，超过此值视为碎片化使用。
-  static const int unlockCountWarningThreshold = 40;
-
-  /// 单日专注中断次数阈值。
-  static const int focusSessionBreakWarningThreshold = 12;
+  static const double frequentCheckingWarningThreshold = 40;
+  static const double denseActivationWarningThreshold = 12;
+  static const double lateNightReminderMinutes = 60;
+  static const double lateNightWarningMinutes = 30;
 
   @override
   String get name => '数字生活规则';
@@ -32,44 +24,60 @@ class UsageRule implements HealthRule {
       return verdicts;
     }
 
-    if (input.totalScreenMinutes >= screenTimeWarningMinutes) {
+    if (input.averageDailyNightScreenMinutes >= lateNightReminderMinutes) {
       verdicts.add(RuleVerdict(
         dimension: 'usage',
         level: 'concern',
-        summary: '屏幕使用时间过长',
-        detail: '窗口内累计屏幕使用 ${input.totalScreenMinutes.round()} 分钟，超过建议的 ${screenTimeWarningMinutes.round()} 分钟。',
-      ));
-    } else {
-      verdicts.add(RuleVerdict(
-        dimension: 'usage',
-        level: 'normal',
-        summary: '屏幕使用时间正常',
-        detail: '窗口内屏幕使用 ${input.totalScreenMinutes.round()} 分钟，在健康范围内。',
-      ));
-    }
-
-    if (input.totalNightScreenMinutes >= 60) {
-      verdicts.add(RuleVerdict(
-        dimension: 'usage',
-        level: 'concern',
-        summary: '夜间看屏偏多',
+        summary: '深夜屏幕使用偏长',
         detail:
-            '22 点后的累计亮屏时间已经达到 ${input.totalNightScreenMinutes.round()} 分钟，建议尽早进入低刺激状态。',
+            '最近平均每天夜间使用 ${input.averageDailyNightScreenMinutes.round()} 分钟，已经明显挤占休息窗口。',
         shouldRemind: true,
-        reminderTitle: '该放下手机了',
-        reminderMessage: '你今晚看屏时间有点久，先让眼睛休息一下吧。',
+        reminderTitle: '今晚该慢下来一点',
+        reminderMessage: '夜间看屏有点久了，先把节奏放慢，给睡前留一点缓冲。',
         reminderType: 'nightUsage',
       ));
-    }
-
-    if (input.totalUnlockCount >= unlockCountWarningThreshold ||
-        input.totalFocusSessionBreakCount >= focusSessionBreakWarningThreshold) {
+    } else if (input.averageDailyNightScreenMinutes >=
+        lateNightWarningMinutes) {
       verdicts.add(RuleVerdict(
         dimension: 'usage',
         level: 'warning',
-        summary: '解锁频繁',
+        summary: '夜间看屏开始偏多',
         detail:
-            '窗口内解锁 ${input.totalUnlockCount} 次、专注中断 ${input.totalFocusSessionBreakCount} 次，碎片化查看可能影响专注力。',
+            '最近平均每天夜间使用 ${input.averageDailyNightScreenMinutes.round()} 分钟，可以更早进入低刺激状态。',
+      ));
+    }
+
+    if (input.averageDailyViewCount >= frequentCheckingWarningThreshold) {
+      verdicts.add(RuleVerdict(
+        dimension: 'usage',
+        level: 'warning',
+        summary: '查看频率偏高',
+        detail:
+            '最近平均每天查看 ${input.averageDailyViewCount.round()} 次，节奏有些碎；原始解锁次数约为 ${input.totalUnlockCount} 次。',
+      ));
+    }
+
+    if (input.averageDailyFocusSessionBreakCount >=
+        denseActivationWarningThreshold) {
+      verdicts.add(RuleVerdict(
+        dimension: 'usage',
+        level: 'warning',
+        summary: '时段激活偏密',
+        detail:
+            '最近平均每天出现 ${input.averageDailyFocusSessionBreakCount.round()} 次短间隔再次查看，容易打断连续专注。',
+      ));
+    }
+
+    if (verdicts.isEmpty) {
+      final longestMinutes = input.longestContinuousUsageMinutes;
+      final longestDetail = longestMinutes > 0
+          ? '最长连续使用约 $longestMinutes 分钟。'
+          : '当前未看到明显的高频查看或深夜使用。';
+      verdicts.add(RuleVerdict(
+        dimension: 'usage',
+        level: 'normal',
+        summary: '屏幕使用习惯整体平稳',
+        detail: longestDetail,
       ));
     }
 

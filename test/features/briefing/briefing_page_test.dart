@@ -10,7 +10,6 @@ import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
 import 'package:health_monitor/features/briefing/pages/briefing_page.dart';
 import 'package:health_monitor/features/briefing/providers/briefing_providers.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
-import 'package:health_monitor/rules/engine/rule_verdict.dart';
 import 'package:health_monitor/services/data_collector.dart';
 import 'package:health_monitor/services/digital_usage_capture_service.dart';
 import 'package:health_monitor/services/location_capture_service.dart';
@@ -27,6 +26,7 @@ void main() {
     final weekAgoDay = todayDay.subtract(const Duration(days: 2));
 
     final activityRepository = SharedActivityRepository();
+    final ambientLightRepository = SharedAmbientLightRepository();
     final noiseRepository = SharedNoiseRepository();
     final locationRepository = SharedLocationRepository();
     final usageRepository = SharedUsageRepository();
@@ -103,6 +103,7 @@ void main() {
       ProviderScope(
         overrides: <Override>[
           sharedActivityRepo.overrideWithValue(activityRepository),
+          sharedAmbientLightRepo.overrideWithValue(ambientLightRepository),
           sharedNoiseRepo.overrideWithValue(noiseRepository),
           sharedLocationRepo.overrideWithValue(locationRepository),
           sharedUsageRepo.overrideWithValue(usageRepository),

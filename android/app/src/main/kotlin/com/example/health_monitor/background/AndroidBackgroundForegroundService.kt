@@ -1,12 +1,14 @@
 package com.example.health_monitor.background
 
+import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.app.NotificationManager
-import android.os.IBinder
 import android.os.Build
+import android.os.IBinder
 import com.example.health_monitor.stepcounter.AndroidStepCounterReader
+import com.example.health_monitor.usagestats.AndroidUsageStatsReader
+import com.example.health_monitor.usagestats.SharedPreferencesAndroidUsageSummarySnapshotStore
 
 class AndroidBackgroundForegroundService : Service() {
     private val intentFactory = AndroidBackgroundForegroundServiceIntentFactory()
@@ -53,6 +55,14 @@ class AndroidBackgroundForegroundService : Service() {
             eventStore = walkingScreenRiskEventStore,
         )
     }
+    private val usageStatsReader by lazy {
+        AndroidUsageStatsReader(this)
+    }
+    private val usageSummarySnapshotStore by lazy {
+        SharedPreferencesAndroidUsageSummarySnapshotStore(
+            getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
+        )
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -69,6 +79,9 @@ class AndroidBackgroundForegroundService : Service() {
                 if (request.enableMotion && request.enableDigitalUsage) {
                     walkingScreenRiskMonitor.start()
                 }
+                if (request.enableDigitalUsage) {
+                    usageStatsReader.readDailySummary()?.let(usageSummarySnapshotStore::enqueue)
+                }
                 val snapshot = runtime.start(request)
                 runAsForeground(snapshot.notification)
                 return START_STICKY
@@ -84,12 +97,18 @@ class AndroidBackgroundForegroundService : Service() {
             }
 
             AndroidBackgroundForegroundServiceIntentFactory.ACTION_REFRESH -> {
+                scheduler.currentRequest()?.takeIf { it.enableDigitalUsage }?.let {
+                    usageStatsReader.readDailySummary()?.let(usageSummarySnapshotStore::enqueue)
+                }
                 val snapshot = runtime.refresh()
                 runAsForeground(snapshot.notification)
                 return START_STICKY
             }
 
             else -> {
+                scheduler.currentRequest()?.takeIf { it.enableDigitalUsage }?.let {
+                    usageStatsReader.readDailySummary()?.let(usageSummarySnapshotStore::enqueue)
+                }
                 val snapshot = runtime.refresh()
                 runAsForeground(snapshot.notification)
                 return START_STICKY

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_monitor/app/theme/app_icons.dart';
 import 'package:health_monitor/features/briefing/providers/briefing_providers.dart';
-import 'package:health_monitor/rules/engine/rule_verdict.dart';
 
 const Color _surface = Color(0xFFFFFDF8);
 const Color _surfaceSoft = Color(0xFFF0ECE4);
@@ -281,7 +280,7 @@ class _DailyReportCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            viewModel.summaryLabel,
+            viewModel.briefSnapshot.headline,
             style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.w700,
@@ -291,7 +290,7 @@ class _DailyReportCard extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            viewModel.summaryDetail,
+            viewModel.briefSnapshot.supportingDetail,
             style: const TextStyle(
               fontSize: 13,
               color: _textSecondary,
@@ -301,21 +300,22 @@ class _DailyReportCard extends StatelessWidget {
           const SizedBox(height: 14),
           _MetricGrid(viewModel: viewModel),
           const SizedBox(height: 14),
-          const _SectionHeading(title: '本段观察'),
+          const _SectionHeading(title: '三个核心指标'),
           const SizedBox(height: 10),
-          ...viewModel.verdicts.map(
-            (RuleVerdict verdict) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _SummaryCard(
-                title: _sectionTitleForDimension(verdict.dimension),
-                content: verdict.detail,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          const _SectionHeading(title: '下一步建议'),
+          _MetricHighlights(viewModel: viewModel),
+          const SizedBox(height: 14),
+          const _SectionHeading(title: '建议'),
           const SizedBox(height: 10),
           _SuggestionBanner(viewModel: viewModel),
+          if (viewModel.briefSnapshot.qualityNote != null) ...<Widget>[
+            const SizedBox(height: 14),
+            const _SectionHeading(title: '质量说明'),
+            const SizedBox(height: 10),
+            _SummaryCard(
+              title: '数据质量',
+              content: viewModel.briefSnapshot.qualityNote!,
+            ),
+          ],
         ],
       ),
     );
@@ -329,35 +329,59 @@ class _MetricGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final metrics = viewModel.briefSnapshot.metrics;
     return Row(
       children: <Widget>[
         Expanded(
           child: _MetricTile(
-            title: '步数',
-            value: '${viewModel.metrics.stepCount}',
-            unit: '步',
+            title: metrics[0].label,
+            value: metrics[0].value,
+            unit: metrics[0].unit,
             backgroundColor: _sageSoft,
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: _MetricTile(
-            title: '久坐',
-            value: '${viewModel.metrics.sedentaryMinutes}',
-            unit: '分钟',
+            title: metrics[1].label,
+            value: metrics[1].value,
+            unit: metrics[1].unit,
             backgroundColor: _warmAccent,
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: _MetricTile(
-            title: '看屏',
-            value: '${viewModel.metrics.screenMinutes}',
-            unit: '分钟',
+            title: metrics[2].label,
+            value: metrics[2].value,
+            unit: metrics[2].unit,
             backgroundColor: _mistAccent,
           ),
         ),
       ],
+    );
+  }
+}
+
+class _MetricHighlights extends StatelessWidget {
+  const _MetricHighlights({required this.viewModel});
+
+  final BriefingViewModel viewModel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: viewModel.briefSnapshot.metrics
+          .map(
+            (metric) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _SummaryCard(
+                title: metric.label,
+                content: '本段${metric.label}为 ${metric.value} ${metric.unit}。',
+              ),
+            ),
+          )
+          .toList(growable: false),
     );
   }
 }
@@ -407,9 +431,9 @@ class _MetricTile extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
-          Text(
+          const Text(
             '本段',
-            style: const TextStyle(fontSize: 11, color: _textMuted),
+            style: TextStyle(fontSize: 11, color: _textMuted),
           ),
         ],
       ),
@@ -502,8 +526,8 @@ class _SectionPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(16),
       ),
@@ -526,8 +550,7 @@ class _SuggestionBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final reminder =
-        viewModel.reminders.isEmpty ? null : viewModel.reminders.first;
+    final suggestions = viewModel.briefSnapshot.suggestions;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -552,43 +575,22 @@ class _SuggestionBanner extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  reminder?.title ?? '当前时间段没有新增提醒',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: _textPrimary,
+                for (final suggestion in suggestions) ...<Widget>[
+                  Text(
+                    suggestion,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: _textSecondary,
+                      height: 1.5,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  reminder?.message ?? '继续保持当前节奏，数据会持续进入下一轮简报。',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: _textSecondary,
-                    height: 1.5,
-                  ),
-                ),
+                  if (suggestion != suggestions.last) const SizedBox(height: 8),
+                ],
               ],
             ),
           ),
         ],
       ),
     );
-  }
-}
-
-String _sectionTitleForDimension(String dimension) {
-  switch (dimension) {
-    case 'activity':
-      return '活动节律总结';
-    case 'posture':
-      return '姿势风险总结';
-    case 'usage':
-      return '数字生活摘要';
-    case 'environment':
-      return '环境状态摘要';
-    default:
-      return '本段观察';
   }
 }

@@ -18,34 +18,54 @@ const UsageSummaryRecordSchema = CollectionSchema(
   name: r'UsageSummaryRecord',
   id: 166574982034450162,
   properties: {
-    r'dateKey': PropertySchema(
+    r'completenessKey': PropertySchema(
       id: 0,
+      name: r'completenessKey',
+      type: IsarType.string,
+    ),
+    r'dateKey': PropertySchema(
+      id: 1,
       name: r'dateKey',
       type: IsarType.string,
     ),
     r'focusSessionBreakCount': PropertySchema(
-      id: 1,
+      id: 2,
       name: r'focusSessionBreakCount',
       type: IsarType.long,
     ),
+    r'longestContinuousUsageSeconds': PropertySchema(
+      id: 3,
+      name: r'longestContinuousUsageSeconds',
+      type: IsarType.long,
+    ),
     r'nighttimeUsageSeconds': PropertySchema(
-      id: 2,
+      id: 4,
       name: r'nighttimeUsageSeconds',
       type: IsarType.long,
     ),
     r'screenOnSeconds': PropertySchema(
-      id: 3,
+      id: 5,
       name: r'screenOnSeconds',
       type: IsarType.long,
     ),
+    r'sourceKey': PropertySchema(
+      id: 6,
+      name: r'sourceKey',
+      type: IsarType.string,
+    ),
     r'topCategoryKey': PropertySchema(
-      id: 4,
+      id: 7,
       name: r'topCategoryKey',
       type: IsarType.string,
     ),
     r'unlockCount': PropertySchema(
-      id: 5,
+      id: 8,
       name: r'unlockCount',
+      type: IsarType.long,
+    ),
+    r'viewCount': PropertySchema(
+      id: 9,
+      name: r'viewCount',
       type: IsarType.long,
     )
   },
@@ -69,7 +89,9 @@ int _usageSummaryRecordEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  bytesCount += 3 + object.completenessKey.length * 3;
   bytesCount += 3 + object.dateKey.length * 3;
+  bytesCount += 3 + object.sourceKey.length * 3;
   bytesCount += 3 + object.topCategoryKey.length * 3;
   return bytesCount;
 }
@@ -80,12 +102,16 @@ void _usageSummaryRecordSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeString(offsets[0], object.dateKey);
-  writer.writeLong(offsets[1], object.focusSessionBreakCount);
-  writer.writeLong(offsets[2], object.nighttimeUsageSeconds);
-  writer.writeLong(offsets[3], object.screenOnSeconds);
-  writer.writeString(offsets[4], object.topCategoryKey);
-  writer.writeLong(offsets[5], object.unlockCount);
+  writer.writeString(offsets[0], object.completenessKey);
+  writer.writeString(offsets[1], object.dateKey);
+  writer.writeLong(offsets[2], object.focusSessionBreakCount);
+  writer.writeLong(offsets[3], object.longestContinuousUsageSeconds);
+  writer.writeLong(offsets[4], object.nighttimeUsageSeconds);
+  writer.writeLong(offsets[5], object.screenOnSeconds);
+  writer.writeString(offsets[6], object.sourceKey);
+  writer.writeString(offsets[7], object.topCategoryKey);
+  writer.writeLong(offsets[8], object.unlockCount);
+  writer.writeLong(offsets[9], object.viewCount);
 }
 
 UsageSummaryRecord _usageSummaryRecordDeserialize(
@@ -95,13 +121,17 @@ UsageSummaryRecord _usageSummaryRecordDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = UsageSummaryRecord();
-  object.dateKey = reader.readString(offsets[0]);
-  object.focusSessionBreakCount = reader.readLong(offsets[1]);
+  object.completenessKey = reader.readString(offsets[0]);
+  object.dateKey = reader.readString(offsets[1]);
+  object.focusSessionBreakCount = reader.readLong(offsets[2]);
   object.id = id;
-  object.nighttimeUsageSeconds = reader.readLong(offsets[2]);
-  object.screenOnSeconds = reader.readLong(offsets[3]);
-  object.topCategoryKey = reader.readString(offsets[4]);
-  object.unlockCount = reader.readLong(offsets[5]);
+  object.longestContinuousUsageSeconds = reader.readLong(offsets[3]);
+  object.nighttimeUsageSeconds = reader.readLong(offsets[4]);
+  object.screenOnSeconds = reader.readLong(offsets[5]);
+  object.sourceKey = reader.readString(offsets[6]);
+  object.topCategoryKey = reader.readString(offsets[7]);
+  object.unlockCount = reader.readLong(offsets[8]);
+  object.viewCount = reader.readLong(offsets[9]);
   return object;
 }
 
@@ -115,14 +145,22 @@ P _usageSummaryRecordDeserializeProp<P>(
     case 0:
       return (reader.readString(offset)) as P;
     case 1:
-      return (reader.readLong(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 2:
       return (reader.readLong(offset)) as P;
     case 3:
       return (reader.readLong(offset)) as P;
     case 4:
-      return (reader.readString(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 5:
+      return (reader.readLong(offset)) as P;
+    case 6:
+      return (reader.readString(offset)) as P;
+    case 7:
+      return (reader.readString(offset)) as P;
+    case 8:
+      return (reader.readLong(offset)) as P;
+    case 9:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -225,6 +263,142 @@ extension UsageSummaryRecordQueryWhere
 
 extension UsageSummaryRecordQueryFilter
     on QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QFilterCondition> {
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      completenessKeyEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'completenessKey',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      completenessKeyGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'completenessKey',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      completenessKeyLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'completenessKey',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      completenessKeyBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'completenessKey',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      completenessKeyStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'completenessKey',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      completenessKeyEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'completenessKey',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      completenessKeyContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'completenessKey',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      completenessKeyMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'completenessKey',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      completenessKeyIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'completenessKey',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      completenessKeyIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'completenessKey',
+        value: '',
+      ));
+    });
+  }
+
   QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
       dateKeyEqualTo(
     String value, {
@@ -474,6 +648,62 @@ extension UsageSummaryRecordQueryFilter
   }
 
   QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      longestContinuousUsageSecondsEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'longestContinuousUsageSeconds',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      longestContinuousUsageSecondsGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'longestContinuousUsageSeconds',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      longestContinuousUsageSecondsLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'longestContinuousUsageSeconds',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      longestContinuousUsageSecondsBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'longestContinuousUsageSeconds',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
       nighttimeUsageSecondsEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -581,6 +811,142 @@ extension UsageSummaryRecordQueryFilter
         includeLower: includeLower,
         upper: upper,
         includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      sourceKeyEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'sourceKey',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      sourceKeyGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'sourceKey',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      sourceKeyLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'sourceKey',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      sourceKeyBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'sourceKey',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      sourceKeyStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'sourceKey',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      sourceKeyEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'sourceKey',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      sourceKeyContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'sourceKey',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      sourceKeyMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'sourceKey',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      sourceKeyIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'sourceKey',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      sourceKeyIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'sourceKey',
+        value: '',
       ));
     });
   }
@@ -776,6 +1142,62 @@ extension UsageSummaryRecordQueryFilter
       ));
     });
   }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      viewCountEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'viewCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      viewCountGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'viewCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      viewCountLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'viewCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      viewCountBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'viewCount',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
 }
 
 extension UsageSummaryRecordQueryObject
@@ -786,6 +1208,20 @@ extension UsageSummaryRecordQueryLinks
 
 extension UsageSummaryRecordQuerySortBy
     on QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QSortBy> {
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
+      sortByCompletenessKey() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'completenessKey', Sort.asc);
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
+      sortByCompletenessKeyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'completenessKey', Sort.desc);
+    });
+  }
+
   QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
       sortByDateKey() {
     return QueryBuilder.apply(this, (query) {
@@ -811,6 +1247,20 @@ extension UsageSummaryRecordQuerySortBy
       sortByFocusSessionBreakCountDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'focusSessionBreakCount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
+      sortByLongestContinuousUsageSeconds() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'longestContinuousUsageSeconds', Sort.asc);
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
+      sortByLongestContinuousUsageSecondsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'longestContinuousUsageSeconds', Sort.desc);
     });
   }
 
@@ -843,6 +1293,20 @@ extension UsageSummaryRecordQuerySortBy
   }
 
   QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
+      sortBySourceKey() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sourceKey', Sort.asc);
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
+      sortBySourceKeyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sourceKey', Sort.desc);
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
       sortByTopCategoryKey() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'topCategoryKey', Sort.asc);
@@ -869,10 +1333,38 @@ extension UsageSummaryRecordQuerySortBy
       return query.addSortBy(r'unlockCount', Sort.desc);
     });
   }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
+      sortByViewCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'viewCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
+      sortByViewCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'viewCount', Sort.desc);
+    });
+  }
 }
 
 extension UsageSummaryRecordQuerySortThenBy
     on QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QSortThenBy> {
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
+      thenByCompletenessKey() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'completenessKey', Sort.asc);
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
+      thenByCompletenessKeyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'completenessKey', Sort.desc);
+    });
+  }
+
   QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
       thenByDateKey() {
     return QueryBuilder.apply(this, (query) {
@@ -916,6 +1408,20 @@ extension UsageSummaryRecordQuerySortThenBy
   }
 
   QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
+      thenByLongestContinuousUsageSeconds() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'longestContinuousUsageSeconds', Sort.asc);
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
+      thenByLongestContinuousUsageSecondsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'longestContinuousUsageSeconds', Sort.desc);
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
       thenByNighttimeUsageSeconds() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'nighttimeUsageSeconds', Sort.asc);
@@ -940,6 +1446,20 @@ extension UsageSummaryRecordQuerySortThenBy
       thenByScreenOnSecondsDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'screenOnSeconds', Sort.desc);
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
+      thenBySourceKey() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sourceKey', Sort.asc);
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
+      thenBySourceKeyDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sourceKey', Sort.desc);
     });
   }
 
@@ -970,10 +1490,32 @@ extension UsageSummaryRecordQuerySortThenBy
       return query.addSortBy(r'unlockCount', Sort.desc);
     });
   }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
+      thenByViewCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'viewCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
+      thenByViewCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'viewCount', Sort.desc);
+    });
+  }
 }
 
 extension UsageSummaryRecordQueryWhereDistinct
     on QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QDistinct> {
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QDistinct>
+      distinctByCompletenessKey({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'completenessKey',
+          caseSensitive: caseSensitive);
+    });
+  }
+
   QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QDistinct>
       distinctByDateKey({bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -985,6 +1527,13 @@ extension UsageSummaryRecordQueryWhereDistinct
       distinctByFocusSessionBreakCount() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'focusSessionBreakCount');
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QDistinct>
+      distinctByLongestContinuousUsageSeconds() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'longestContinuousUsageSeconds');
     });
   }
 
@@ -1003,6 +1552,13 @@ extension UsageSummaryRecordQueryWhereDistinct
   }
 
   QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QDistinct>
+      distinctBySourceKey({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'sourceKey', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QDistinct>
       distinctByTopCategoryKey({bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'topCategoryKey',
@@ -1016,6 +1572,13 @@ extension UsageSummaryRecordQueryWhereDistinct
       return query.addDistinctBy(r'unlockCount');
     });
   }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QDistinct>
+      distinctByViewCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'viewCount');
+    });
+  }
 }
 
 extension UsageSummaryRecordQueryProperty
@@ -1023,6 +1586,13 @@ extension UsageSummaryRecordQueryProperty
   QueryBuilder<UsageSummaryRecord, int, QQueryOperations> idProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, String, QQueryOperations>
+      completenessKeyProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'completenessKey');
     });
   }
 
@@ -1036,6 +1606,13 @@ extension UsageSummaryRecordQueryProperty
       focusSessionBreakCountProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'focusSessionBreakCount');
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, int, QQueryOperations>
+      longestContinuousUsageSecondsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'longestContinuousUsageSeconds');
     });
   }
 
@@ -1054,6 +1631,13 @@ extension UsageSummaryRecordQueryProperty
   }
 
   QueryBuilder<UsageSummaryRecord, String, QQueryOperations>
+      sourceKeyProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'sourceKey');
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, String, QQueryOperations>
       topCategoryKeyProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'topCategoryKey');
@@ -1064,6 +1648,12 @@ extension UsageSummaryRecordQueryProperty
       unlockCountProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'unlockCount');
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, int, QQueryOperations> viewCountProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'viewCount');
     });
   }
 }

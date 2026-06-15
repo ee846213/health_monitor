@@ -1,5 +1,7 @@
 import 'package:health_monitor/core/logging/app_logger.dart';
 import 'package:health_monitor/domain/background/background_capture_state.dart';
+import 'package:health_monitor/domain/health/capture_checkpoint.dart';
+import 'package:health_monitor/domain/health/capture_health_event.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/rules/engine/rule_verdict.dart';
 
@@ -17,7 +19,8 @@ class DiagnosticsLogger {
 
   /// 记录后台链路状态（来自宿主平台的状态快照）。
   void logBackgroundLink(String platform, String summary, bool isRunning) {
-    AppLogger.instance.info('background', '[$platform] $summary', <String, Object?>{
+    AppLogger.instance
+        .info('background', '[$platform] $summary', <String, Object?>{
       'platform': platform,
       'isRunning': isRunning,
     });
@@ -27,7 +30,8 @@ class DiagnosticsLogger {
   void logRuleOutput(List<RuleVerdict> verdicts) {
     for (final v in verdicts) {
       final level = v.shouldRemind ? LogLevel.warning : LogLevel.info;
-      AppLogger.instance.log(level, 'rule.$v.dimension', v.summary, <String, Object?>{
+      AppLogger.instance
+          .log(level, 'rule.$v.dimension', v.summary, <String, Object?>{
         'level': v.level,
         'shouldRemind': v.shouldRemind,
         'reminderType': v.reminderType,
@@ -36,11 +40,50 @@ class DiagnosticsLogger {
   }
 
   /// 记录权限变化事件。
-  void logPermissionChange(PermissionType type, String fromStatus, String toStatus) {
-    AppLogger.instance.warning('permission', '${type.name}: $fromStatus -> $toStatus', <String, Object?>{
+  void logPermissionChange(
+      PermissionType type, String fromStatus, String toStatus) {
+    AppLogger.instance.warning('permission',
+        '${type.name}: $fromStatus -> $toStatus', <String, Object?>{
       'type': type.name,
       'from': fromStatus,
       'to': toStatus,
     });
+  }
+
+  /// 记录采集健康事件。
+  void logCaptureHealthEvent(CaptureHealthEvent event) {
+    final level = switch (event.eventType) {
+      CaptureHealthEventType.streamError => LogLevel.error,
+      CaptureHealthEventType.gapDetected => LogLevel.warning,
+      _ => LogLevel.info,
+    };
+    AppLogger.instance.log(
+      level,
+      'capture.health.${event.streamKey}',
+      event.eventType.name,
+      <String, Object?>{
+        'eventId': event.eventId,
+        'detail': event.detail,
+        'sampleCount': event.sampleCount,
+        'gapSeconds': event.gapSeconds,
+        'errorMessage': event.errorMessage,
+      },
+    );
+  }
+
+  /// 记录采集检查点，便于诊断页和日志双重追踪。
+  void logCaptureCheckpoint(CaptureCheckpoint checkpoint) {
+    AppLogger.instance.info(
+      'capture.checkpoint.${checkpoint.streamKey}',
+      checkpoint.state.name,
+      <String, Object?>{
+        'sampleCount': checkpoint.sampleCount,
+        'gapCount': checkpoint.gapCount,
+        'recoveryCount': checkpoint.recoveryCount,
+        'lastEventTypeKey': checkpoint.lastEventTypeKey,
+        'lastErrorMessage': checkpoint.lastErrorMessage,
+        'lastMessage': checkpoint.lastMessage,
+      },
+    );
   }
 }

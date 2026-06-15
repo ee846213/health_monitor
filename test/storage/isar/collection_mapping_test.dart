@@ -1,12 +1,18 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:health_monitor/domain/environment/ambient_light_sample.dart';
 import 'package:health_monitor/domain/environment/noise_sample.dart';
 import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/metrics/daily_metrics.dart';
+import 'package:health_monitor/domain/health/capture_checkpoint.dart';
+import 'package:health_monitor/domain/health/capture_health_event.dart';
 import 'package:health_monitor/domain/motion/activity_sample.dart';
 import 'package:health_monitor/domain/motion/posture_sample.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
 import 'package:health_monitor/storage/isar/collections/activity_sample_record.dart';
+import 'package:health_monitor/storage/isar/collections/capture_checkpoint_record.dart';
+import 'package:health_monitor/storage/isar/collections/capture_health_event_record.dart';
+import 'package:health_monitor/storage/isar/collections/ambient_light_sample_record.dart';
 import 'package:health_monitor/storage/isar/collections/daily_metrics_record.dart';
 import 'package:health_monitor/storage/isar/collections/location_summary_record.dart';
 import 'package:health_monitor/storage/isar/collections/noise_sample_record.dart';
@@ -99,6 +105,20 @@ void main() {
     expect(metricsRecord.highNoiseExposureSeconds, 2100);
   });
 
+  test('光照记录应保留 lux 与等级字段', () {
+    final light = AmbientLightSample.fromLux(
+      capturedAt: DateTime(2026, 6, 9, 10),
+      duration: const Duration(minutes: 5),
+      lux: 8,
+    );
+
+    final record = AmbientLightSampleRecord.fromDomain(light);
+
+    expect(record.levelKey, AmbientLightLevel.dark.name);
+    expect(record.durationSeconds, 300);
+    expect(record.lux, 8);
+  });
+
   test('提醒记录应保留解释与交互回写所需字段', () {
     final reminder = ReminderRecord(
       triggeredAt: DateTime(2026, 6, 9, 15, 30),
@@ -116,5 +136,42 @@ void main() {
     expect(record.typeKey, ReminderType.sedentaryBreak.name);
     expect(record.responseKey, ReminderResponse.taken.name);
     expect(record.reasonSummary, contains('没有活动'));
+  });
+
+  test('采集健康事件与检查点应保留恢复诊断所需字段', () {
+    final event = CaptureHealthEvent(
+      eventId: 'event-1',
+      streamKey: 'digital_usage_android',
+      eventType: CaptureHealthEventType.gapDetected,
+      occurredAt: DateTime(2026, 6, 9, 18),
+      detail: '摘要刷新延迟。',
+      gapSeconds: 900,
+      errorMessage: 'timeout',
+    );
+    final checkpoint = CaptureCheckpoint(
+      streamKey: 'digital_usage_android',
+      state: CaptureHealthState.degraded,
+      sampleCount: 3,
+      gapCount: 1,
+      recoveryCount: 2,
+      lastEventTypeKey: CaptureHealthEventType.gapDetected.name,
+      lastEventAt: DateTime(2026, 6, 9, 18),
+      lastSampleAt: DateTime(2026, 6, 9, 18),
+      lastErrorAt: DateTime(2026, 6, 9, 17, 45),
+      lastRecoveredAt: DateTime(2026, 6, 9, 18, 5),
+      lastStateRebuiltAt: DateTime(2026, 6, 9, 18, 10),
+      lastNativeSummaryDrainedAt: DateTime(2026, 6, 9, 18, 12),
+      lastMessage: '摘要刷新延迟。',
+      lastErrorMessage: 'timeout',
+    );
+
+    final eventRecord = CaptureHealthEventRecord.fromDomain(event);
+    final checkpointRecord = CaptureCheckpointRecord.fromDomain(checkpoint);
+
+    expect(eventRecord.streamKey, 'digital_usage_android');
+    expect(eventRecord.eventTypeKey, CaptureHealthEventType.gapDetected.name);
+    expect(checkpointRecord.streamKey, 'digital_usage_android');
+    expect(checkpointRecord.stateKey, CaptureHealthState.degraded.name);
+    expect(checkpointRecord.recoveryCount, 2);
   });
 }

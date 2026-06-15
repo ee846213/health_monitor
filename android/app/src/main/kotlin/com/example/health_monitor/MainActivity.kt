@@ -1,25 +1,28 @@
 package com.example.health_monitor
 
+import android.app.AppOpsManager
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import android.provider.Settings
+import androidx.core.content.ContextCompat
 import com.example.health_monitor.background.AndroidBackgroundCaptureController
 import com.example.health_monitor.background.AndroidBackgroundCaptureExecutor
 import com.example.health_monitor.background.AndroidBackgroundCaptureRequest
-import com.example.health_monitor.background.AndroidBackgroundCaptureScheduler
 import com.example.health_monitor.background.AndroidBackgroundCaptureRuntime
-import com.example.health_monitor.background.SharedPreferencesAndroidBackgroundCaptureStateStore
-import com.example.health_monitor.background.AndroidForegroundServiceOrchestrator
+import com.example.health_monitor.background.AndroidBackgroundCaptureScheduler
 import com.example.health_monitor.background.AndroidBackgroundForegroundServiceIntentFactory
 import com.example.health_monitor.background.AndroidBackgroundWorkScheduler
+import com.example.health_monitor.background.AndroidForegroundServiceOrchestrator
+import com.example.health_monitor.background.SharedPreferencesAndroidBackgroundCaptureStateStore
+import com.example.health_monitor.light.AndroidAmbientLightStreamHandler
 import com.example.health_monitor.stepcounter.AndroidStepCounterReader
 import com.example.health_monitor.stepcounter.StepCounterPayload
-import android.content.Intent
-import androidx.core.content.ContextCompat
-import android.content.Context
-import android.app.AppOpsManager
-import android.os.Build
-import android.provider.Settings
-import android.net.Uri
+import com.example.health_monitor.usagestats.AndroidUsageStatsReader
+import com.example.health_monitor.usagestats.SharedPreferencesAndroidUsageSummarySnapshotStore
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
@@ -68,9 +71,25 @@ class MainActivity : FlutterActivity() {
             getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
         )
     }
+    private val usageStatsReader by lazy {
+        AndroidUsageStatsReader(this)
+    }
+    private val usageSummarySnapshotStore by lazy {
+        SharedPreferencesAndroidUsageSummarySnapshotStore(
+            getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
+        )
+    }
+    private val ambientLightStreamHandler by lazy {
+        AndroidAmbientLightStreamHandler(this)
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        EventChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            LIGHT_SAMPLES_CHANNEL,
+        ).setStreamHandler(ambientLightStreamHandler)
 
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
@@ -84,6 +103,10 @@ class MainActivity : FlutterActivity() {
                 METHOD_REFRESH_BACKGROUND_CAPTURE -> handleRefreshBackgroundCapture(result)
                 METHOD_HAS_USAGE_ACCESS -> handleHasUsageAccess(result)
                 METHOD_OPEN_USAGE_ACCESS_SETTINGS -> handleOpenUsageAccessSettings(result)
+                METHOD_GET_USAGE_CAPABILITY_STATUS -> handleGetUsageCapabilityStatus(result)
+                METHOD_READ_DAILY_USAGE_SUMMARY -> handleReadDailyUsageSummary(call, result)
+                METHOD_READ_RANGE_USAGE_SUMMARIES -> handleReadRangeUsageSummaries(call, result)
+                METHOD_DRAIN_PENDING_USAGE_SUMMARIES -> handleDrainPendingUsageSummaries(result)
                 METHOD_GET_STEP_COUNTER -> handleGetStepCounter(result)
                 METHOD_DRAIN_WALKING_SCREEN_RISK_EVENTS -> handleDrainWalkingScreenRiskEvents(result)
                 else -> result.notImplemented()
@@ -182,6 +205,39 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    private fun handleGetUsageCapabilityStatus(result: MethodChannel.Result) {
+        result.success(usageStatsReader.getCapabilityStatus().toChannelMap())
+    }
+
+    private fun handleReadDailyUsageSummary(call: MethodCall, result: MethodChannel.Result) {
+        val referenceTimeMillis = call.argument<Long>("referenceTimeMillis")
+            ?: System.currentTimeMillis()
+        result.success(
+            usageStatsReader.readDailySummary(referenceTimeMillis)?.toChannelMap(),
+        )
+    }
+
+    private fun handleReadRangeUsageSummaries(call: MethodCall, result: MethodChannel.Result) {
+        val startMillis = call.argument<Long>("startMillis") ?: run {
+            result.success(emptyList<Map<String, Any>>())
+            return
+        }
+        val endMillis = call.argument<Long>("endMillis") ?: run {
+            result.success(emptyList<Map<String, Any>>())
+            return
+        }
+        result.success(
+            usageStatsReader.readRangeSummaries(startMillis, endMillis)
+                .map { item -> item.toChannelMap() },
+        )
+    }
+
+    private fun handleDrainPendingUsageSummaries(result: MethodChannel.Result) {
+        result.success(
+            usageSummarySnapshotStore.drain().map { item -> item.toChannelMap() },
+        )
+    }
+
     private fun handleGetStepCounter(result: MethodChannel.Result) {
         val payload = if (backgroundCaptureScheduler.snapshot().isRunning) {
             stepCounterReader.startListening()
@@ -244,6 +300,7 @@ class MainActivity : FlutterActivity() {
     companion object {
         private const val PREFS_NAME = "health_monitor_background_state"
         private const val PLATFORM_BRIDGE_CHANNEL = "health_monitor/platform_bridge"
+        private const val LIGHT_SAMPLES_CHANNEL = "health_monitor/light_samples"
         private const val METHOD_START_BACKGROUND_CAPTURE = "android.background.start"
         private const val METHOD_STOP_BACKGROUND_CAPTURE = "android.background.stop"
         private const val METHOD_GET_BACKGROUND_CAPTURE_STATUS = "android.background.status"
@@ -252,6 +309,14 @@ class MainActivity : FlutterActivity() {
         private const val METHOD_HAS_USAGE_ACCESS = "android.permissions.hasUsageAccess"
         private const val METHOD_OPEN_USAGE_ACCESS_SETTINGS =
             "android.permissions.openUsageAccessSettings"
+        private const val METHOD_GET_USAGE_CAPABILITY_STATUS =
+            "android.usage.getCapabilityStatus"
+        private const val METHOD_READ_DAILY_USAGE_SUMMARY =
+            "android.usage.readDailySummary"
+        private const val METHOD_READ_RANGE_USAGE_SUMMARIES =
+            "android.usage.readRangeSummaries"
+        private const val METHOD_DRAIN_PENDING_USAGE_SUMMARIES =
+            "android.usage.drainPendingSummaries"
         private const val METHOD_GET_STEP_COUNTER = "android.steps.current"
         private const val METHOD_DRAIN_WALKING_SCREEN_RISK_EVENTS =
             "android.riskEvents.drainWalkingScreenRisks"

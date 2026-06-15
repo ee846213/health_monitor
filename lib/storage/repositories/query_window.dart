@@ -9,15 +9,18 @@ class QueryWindow {
   final DateTime endAt;
   final String label;
 
-  factory QueryWindow.recentHours(int hours, {required DateTime referenceTime}) {
+  factory QueryWindow.recentHours(
+    int hours, {
+    required DateTime referenceTime,
+  }) {
     if (hours <= 0) {
-      throw ArgumentError.value(hours, 'hours', '时间窗口必须是正数');
+      throw ArgumentError.value(hours, 'hours', '时间窗口必须为正数');
     }
 
     return QueryWindow._(
       startAt: referenceTime.subtract(Duration(hours: hours)),
       endAt: referenceTime,
-      label: '最近$hours小时',
+      label: '最近${hours}小时',
     );
   }
 
@@ -42,15 +45,18 @@ class QueryWindow {
     );
   }
 
-  factory QueryWindow.recentDays(int days, {required DateTime referenceTime}) {
+  factory QueryWindow.recentDays(
+    int days, {
+    required DateTime referenceTime,
+  }) {
     if (days <= 0) {
-      throw ArgumentError.value(days, 'days', '时间窗口必须是正数');
+      throw ArgumentError.value(days, 'days', '时间窗口必须为正数');
     }
 
     return QueryWindow._(
       startAt: referenceTime.subtract(Duration(days: days)),
       endAt: referenceTime,
-      label: '最近$days天',
+      label: '最近${days}天',
     );
   }
 
@@ -59,7 +65,7 @@ class QueryWindow {
     required DateTime referenceDate,
   }) {
     if (days <= 0) {
-      throw ArgumentError.value(days, 'days', '时间窗口必须是正数');
+      throw ArgumentError.value(days, 'days', '时间窗口必须为正数');
     }
 
     final endAt = DateTime(
@@ -70,7 +76,7 @@ class QueryWindow {
     return QueryWindow._(
       startAt: endAt.subtract(Duration(days: days)),
       endAt: endAt,
-      label: '最近$days天',
+      label: '最近${days}天',
     );
   }
 

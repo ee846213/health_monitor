@@ -58,7 +58,9 @@ class _AppLifecycleRefreshScopeState
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    unawaited(ref.read(androidBackgroundCaptureBootstrapServiceProvider).sync());
+    unawaited(
+        ref.read(androidBackgroundCaptureBootstrapServiceProvider).sync());
+    unawaited(ref.read(dataCollectorProvider).syncUsageSummary());
     unawaited(ref.read(dataCollectorProvider).syncNativeRiskEvents());
   }
 
@@ -74,7 +76,9 @@ class _AppLifecycleRefreshScopeState
       return;
     }
 
-    unawaited(ref.read(androidBackgroundCaptureBootstrapServiceProvider).sync());
+    unawaited(
+        ref.read(androidBackgroundCaptureBootstrapServiceProvider).sync());
+    unawaited(ref.read(dataCollectorProvider).syncUsageSummary());
     unawaited(ref.read(dataCollectorProvider).syncNativeRiskEvents());
     ref.invalidate(permissionStatusProvider);
     ref.invalidate(overviewViewModelProvider);

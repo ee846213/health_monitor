@@ -16,6 +16,7 @@ import 'package:health_monitor/storage/repositories/reminder_repository.dart';
 void main() {
   test('数据写入后首页应重新计算并从数据不足切换为可用', () async {
     final activityRepository = SharedActivityRepository();
+    final ambientLightRepository = SharedAmbientLightRepository();
     final noiseRepository = SharedNoiseRepository();
     final locationRepository = SharedLocationRepository();
     final usageRepository = SharedUsageRepository();
@@ -54,6 +55,7 @@ void main() {
     final container = ProviderContainer(
       overrides: <Override>[
         sharedActivityRepo.overrideWithValue(activityRepository),
+        sharedAmbientLightRepo.overrideWithValue(ambientLightRepository),
         sharedNoiseRepo.overrideWithValue(noiseRepository),
         sharedLocationRepo.overrideWithValue(locationRepository),
         sharedUsageRepo.overrideWithValue(usageRepository),
@@ -95,6 +97,7 @@ void main() {
     final locationController = StreamController<GeoPositionSample>.broadcast();
 
     final activityRepository = SharedActivityRepository();
+    final ambientLightRepository = SharedAmbientLightRepository();
     final noiseRepository = SharedNoiseRepository();
     final locationRepository = SharedLocationRepository();
     final usageRepository = SharedUsageRepository();
@@ -138,6 +141,7 @@ void main() {
     final container = ProviderContainer(
       overrides: <Override>[
         sharedActivityRepo.overrideWithValue(activityRepository),
+        sharedAmbientLightRepo.overrideWithValue(ambientLightRepository),
         sharedNoiseRepo.overrideWithValue(noiseRepository),
         sharedLocationRepo.overrideWithValue(locationRepository),
         sharedUsageRepo.overrideWithValue(usageRepository),

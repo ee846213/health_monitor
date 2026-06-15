@@ -104,6 +104,10 @@ class AndroidBackgroundCaptureScheduler(
         )
     }
 
+    fun currentRequest(): AndroidBackgroundCaptureRequest? {
+        return currentState().activeRequest
+    }
+
     private fun writeState(
         activeRequest: AndroidBackgroundCaptureRequest?,
         summary: String,

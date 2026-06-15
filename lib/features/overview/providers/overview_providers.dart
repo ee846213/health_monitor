@@ -5,6 +5,7 @@ import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/rules/engine/rule_verdict.dart';
 import 'package:health_monitor/services/android_risk_event_bridge.dart';
+import 'package:health_monitor/services/android_usage_stats_bridge.dart';
 import 'package:health_monitor/services/data_collector.dart';
 import 'package:health_monitor/services/health_insight_service.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
@@ -34,12 +35,16 @@ final reminderRepositoryProvider = FutureProvider<ReminderRepository>(
 final healthInsightServiceProvider = Provider<HealthInsightService>((Ref ref) {
   return HealthInsightService(
     activityRepository: ref.watch(sharedActivityRepo),
+    ambientLightRepository: ref.watch(sharedAmbientLightRepo),
     locationRepository: ref.watch(sharedLocationRepo),
     noiseRepository: ref.watch(sharedNoiseRepo),
     usageRepository: ref.watch(sharedUsageRepo),
     metricsRepository: ref.watch(sharedMetricsRepo),
     reminderRepositoryLoader: () => ref.read(reminderRepositoryProvider.future),
     androidRiskEventBridge: AndroidRiskEventBridge(
+      platformBridgeService: PlatformBridgeService(),
+    ),
+    androidUsageStatsBridge: AndroidUsageStatsBridge(
       platformBridgeService: PlatformBridgeService(),
     ),
   );
@@ -117,7 +122,8 @@ class OverviewViewModel {
   }
 }
 
-final walkingScreenRiskNoticeProvider = FutureProvider<String?>((Ref ref) async {
+final walkingScreenRiskNoticeProvider =
+    FutureProvider<String?>((Ref ref) async {
   final permissionStatuses = await ref.watch(permissionStatusProvider.future);
   return buildWalkingScreenRiskPrecisionNotice(
     permissionStatuses: permissionStatuses,
@@ -126,7 +132,8 @@ final walkingScreenRiskNoticeProvider = FutureProvider<String?>((Ref ref) async 
   );
 });
 
-final overviewViewModelProvider = FutureProvider<OverviewViewModel>((Ref ref) async {
+final overviewViewModelProvider =
+    FutureProvider<OverviewViewModel>((Ref ref) async {
   ref.watch(dataCollectorRevisionProvider);
   ref.watch(dataCollectorProvider);
 
@@ -181,7 +188,8 @@ final overviewViewModelProvider = FutureProvider<OverviewViewModel>((Ref ref) as
   );
 });
 
-final reminderListProvider = FutureProvider<List<ReminderRecord>>((Ref ref) async {
+final reminderListProvider =
+    FutureProvider<List<ReminderRecord>>((Ref ref) async {
   ref.watch(dataCollectorRevisionProvider);
   ref.watch(dataCollectorProvider);
   final repository = await ref.watch(reminderRepositoryProvider.future);
@@ -233,6 +241,8 @@ String localizedDimensionLabel(String dimension) {
       return '位置摘要';
     case 'noise':
       return '环境噪音';
+    case 'light':
+      return '环境光照';
     case 'digital_usage':
       return '数字生活';
     case 'daily_metrics':
@@ -256,7 +266,7 @@ String? buildWalkingScreenRiskPrecisionNotice({
 
   final backgroundStatus =
       permissionStatuses[PermissionType.backgroundCapture] ??
-      PermissionGrantStatus.unknown;
+          PermissionGrantStatus.unknown;
   if (backgroundStatus != PermissionGrantStatus.granted) {
     return '移动中看屏风险仅在后台采集开启后可精确识别。';
   }

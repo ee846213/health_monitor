@@ -12,6 +12,7 @@ import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
 import 'package:health_monitor/features/diagnostics/providers/diagnostics_providers.dart';
 import 'package:health_monitor/services/android_background_capture_bridge.dart';
 import 'package:health_monitor/services/background_capture_service.dart';
+import 'package:health_monitor/services/capture_health_service.dart';
 import 'package:health_monitor/services/ios_background_capture_bridge.dart';
 import 'package:health_monitor/services/location_capture_service.dart';
 import 'package:health_monitor/services/motion_capture_service.dart';
@@ -19,6 +20,7 @@ import 'package:health_monitor/services/noise_capture_service.dart';
 import 'package:health_monitor/services/digital_usage_capture_service.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
 import 'package:health_monitor/storage/repositories/activity_repository.dart';
+import 'package:health_monitor/storage/repositories/capture_health_repository.dart';
 import 'package:health_monitor/storage/repositories/location_summary_repository.dart';
 import 'package:health_monitor/storage/repositories/noise_sample_repository.dart';
 import 'package:health_monitor/storage/repositories/usage_summary_repository.dart';
@@ -87,8 +89,14 @@ void main() {
               PermissionType.microphone: PermissionGrantStatus.granted,
               PermissionType.notification: PermissionGrantStatus.granted,
               PermissionType.usageAccess: PermissionGrantStatus.denied,
-              PermissionType.backgroundCapture: PermissionGrantStatus.restricted,
+              PermissionType.backgroundCapture:
+                  PermissionGrantStatus.restricted,
             },
+          ),
+        ),
+        captureHealthServiceProvider.overrideWithValue(
+          CaptureHealthService(
+            repository: InMemoryCaptureHealthRepository(),
           ),
         ),
         motionCaptureServiceProvider.overrideWithValue(
@@ -185,27 +193,36 @@ void main() {
 
     final snapshot = await container.read(diagnosticsSnapshotProvider.future);
 
-    expect(snapshot.permissionStatuses[PermissionType.motion], PermissionGrantStatus.granted);
+    expect(snapshot.permissionStatuses[PermissionType.motion],
+        PermissionGrantStatus.granted);
     expect(snapshot.latestActivity?.type, ActivityType.walking);
     expect(snapshot.liveActivity?.type, ActivityType.walking);
     expect(snapshot.latestLocationSummary?.distanceMeters, 3200);
     expect(snapshot.latestNoise?.level, NoiseLevel.moderate);
     expect(snapshot.liveUsageSummary?.unlockCount, 1);
     expect(snapshot.latestUsageSummary?.topCategory, UsageCategory.tools);
-    expect(snapshot.backgroundCaptureState.status, BackgroundCaptureStatus.running);
+    expect(snapshot.backgroundCaptureState.status,
+        BackgroundCaptureStatus.running);
     expect(snapshot.androidHostStatus?.isRunning, isTrue);
     expect(snapshot.androidHostStatus?.summary, contains('宿主后台骨架'));
     expect(snapshot.iosHostStatus?.isRunning, isTrue);
     expect(snapshot.iosHostStatus?.summary, contains('iPhone 宿主后台骨架'));
     expect(snapshot.iosBackgroundCaptureStrategy.isEnabled, isTrue);
-    expect(snapshot.storageStatus.kind, DiagnosticsStorageStatusKind.hasRecentWrites);
+    expect(snapshot.storageStatus.kind,
+        DiagnosticsStorageStatusKind.hasRecentWrites);
   });
 
   test('无数据时调试页快照应给出空写入状态', () async {
     final container = ProviderContainer(
       overrides: <Override>[
         permissionStatusServiceProvider.overrideWithValue(
-          const FakePermissionStatusService(<PermissionType, PermissionGrantStatus>{}),
+          const FakePermissionStatusService(
+              <PermissionType, PermissionGrantStatus>{}),
+        ),
+        captureHealthServiceProvider.overrideWithValue(
+          CaptureHealthService(
+            repository: InMemoryCaptureHealthRepository(),
+          ),
         ),
         motionCaptureServiceProvider.overrideWithValue(
           MotionCaptureService(
@@ -235,7 +252,8 @@ void main() {
         ),
         digitalUsageCaptureServiceProvider.overrideWithValue(
           DigitalUsageCaptureService(
-            lifecycleEventStreamFactory: () => const Stream<AppUsageEvent>.empty(),
+            lifecycleEventStreamFactory: () =>
+                const Stream<AppUsageEvent>.empty(),
           ),
         ),
         backgroundCaptureServiceProvider.overrideWithValue(
@@ -278,7 +296,8 @@ void main() {
     expect(snapshot.latestNoise, isNull);
     expect(snapshot.liveUsageSummary, isNull);
     expect(snapshot.latestUsageSummary, isNull);
-    expect(snapshot.backgroundCaptureState.status, BackgroundCaptureStatus.permissionDenied);
+    expect(snapshot.backgroundCaptureState.status,
+        BackgroundCaptureStatus.permissionDenied);
     expect(snapshot.androidHostStatus?.summary, contains('暂未启动'));
     expect(snapshot.iosHostStatus?.summary, contains('暂未启动'));
     expect(snapshot.storageStatus.kind, DiagnosticsStorageStatusKind.empty);

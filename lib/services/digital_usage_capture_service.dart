@@ -32,13 +32,19 @@ class DigitalUsageCaptureException implements Exception {
 class DigitalUsageCaptureService {
   DigitalUsageCaptureService({
     AppUsageEventStreamFactory? lifecycleEventStreamFactory,
+    DigitalUsageSummary? restoredSummary,
   }) : _lifecycleEventStreamFactory =
-           lifecycleEventStreamFactory ?? _defaultLifecycleSource.streamFactory;
+           lifecycleEventStreamFactory ?? _defaultLifecycleSource.streamFactory,
+       _state = _DigitalUsageAccumulator.fromSummary(
+         restoredSummary ?? _DigitalUsageAccumulator.empty().toSummary(),
+       );
 
   final AppUsageEventStreamFactory _lifecycleEventStreamFactory;
 
   static final _AppLifecycleUsageEventSource _defaultLifecycleSource =
       _AppLifecycleUsageEventSource();
+
+  final _DigitalUsageAccumulator _state;
 
   Stream<DigitalUsageSummary> watchUsageSummaries() {
     return _lifecycleEventStreamFactory().transform<DigitalUsageSummary>(
@@ -47,8 +53,6 @@ class DigitalUsageCaptureService {
           AppUsageEvent event,
           EventSink<DigitalUsageSummary> sink,
         ) {
-          // 阶段 1 先把系统生命周期事件折算成“最小真实用机摘要”，
-          // 让双平台都能产出统一语义的数字生活样本，后续再接 Android Usage Access 全量能力。
           _state.apply(event);
           sink.add(_state.toSummary());
         },
@@ -65,8 +69,6 @@ class DigitalUsageCaptureService {
       ),
     );
   }
-
-  final _DigitalUsageAccumulator _state = _DigitalUsageAccumulator.empty();
 }
 
 class _AppLifecycleUsageEventSource {
@@ -102,6 +104,7 @@ class _AppLifecycleUsageEventSource {
 
   final StreamController<AppUsageEvent> _controller =
       StreamController<AppUsageEvent>.broadcast();
+
   // 这里需要保留 listener 引用，避免只注册回调却没有对象持有，
   // 导致调试阶段很难排查生命周期事件为什么没有持续进入流。
   late final AppLifecycleListener lifecycleListener;
@@ -116,6 +119,8 @@ class _DigitalUsageAccumulator {
     required this.unlockCount,
     required this.nighttimeUsageDuration,
     required this.focusSessionBreakCount,
+    required this.viewCount,
+    required this.longestContinuousUsageDuration,
     required this.sessionStartedAt,
     required this.lastForegroundExitAt,
   });
@@ -128,6 +133,22 @@ class _DigitalUsageAccumulator {
       unlockCount: 0,
       nighttimeUsageDuration: Duration.zero,
       focusSessionBreakCount: 0,
+      viewCount: 0,
+      longestContinuousUsageDuration: Duration.zero,
+      sessionStartedAt: null,
+      lastForegroundExitAt: null,
+    );
+  }
+
+  factory _DigitalUsageAccumulator.fromSummary(DigitalUsageSummary summary) {
+    return _DigitalUsageAccumulator(
+      date: DateTime(summary.date.year, summary.date.month, summary.date.day),
+      screenOnDuration: summary.screenOnDuration,
+      unlockCount: summary.unlockCount,
+      nighttimeUsageDuration: summary.nighttimeUsageDuration,
+      focusSessionBreakCount: summary.focusSessionBreakCount,
+      viewCount: summary.effectiveViewCount,
+      longestContinuousUsageDuration: summary.longestContinuousUsageDuration,
       sessionStartedAt: null,
       lastForegroundExitAt: null,
     );
@@ -138,22 +159,23 @@ class _DigitalUsageAccumulator {
   int unlockCount;
   Duration nighttimeUsageDuration;
   int focusSessionBreakCount;
+  int viewCount;
+  Duration longestContinuousUsageDuration;
   DateTime? sessionStartedAt;
   DateTime? lastForegroundExitAt;
 
   void apply(AppUsageEvent event) {
-    _rolloverIfNeeded(event.occurredAt);
+    _splitRolloverIfNeeded(event.occurredAt);
 
     switch (event.type) {
       case AppUsageEventType.foregroundEntered:
         unlockCount += 1;
-        // 把短时间内再次回到前台视为一次专注中断，
-        // 这样 Android 与 iPhone 都能先共享一套“碎片化查看”近似指标。
         if (lastForegroundExitAt != null &&
             event.occurredAt.difference(lastForegroundExitAt!) <=
                 const Duration(minutes: 15)) {
           focusSessionBreakCount += 1;
         }
+        viewCount += 1;
         sessionStartedAt = event.occurredAt;
       case AppUsageEventType.foregroundExited:
         if (sessionStartedAt == null) {
@@ -168,6 +190,9 @@ class _DigitalUsageAccumulator {
             sessionStartedAt!,
             event.occurredAt,
           );
+          if (duration > longestContinuousUsageDuration) {
+            longestContinuousUsageDuration = duration;
+          }
         }
         sessionStartedAt = null;
         lastForegroundExitAt = event.occurredAt;
@@ -181,36 +206,62 @@ class _DigitalUsageAccumulator {
       unlockCount: unlockCount,
       nighttimeUsageDuration: nighttimeUsageDuration,
       focusSessionBreakCount: focusSessionBreakCount,
+      viewCount: viewCount,
+      longestContinuousUsageDuration: longestContinuousUsageDuration,
       topCategory: UsageCategory.unknown,
+      source: DigitalUsageSource.lifecycleAlternative,
     );
   }
 
-  void _rolloverIfNeeded(DateTime occurredAt) {
-    final eventDate = DateTime(occurredAt.year, occurredAt.month, occurredAt.day);
-    if (_isSameDay(date, eventDate)) {
+  void _splitRolloverIfNeeded(DateTime occurredAt) {
+    if (_isSameDay(date, occurredAt)) {
       return;
     }
 
-    // 当前阶段先保证“按天聚合的真实用机入口”成立。
-    // 跨天仍在前台的长会话暂不拆分到前后两天，避免在阶段 1 过早引入复杂会话切割逻辑。
-    date = eventDate;
+    if (sessionStartedAt != null) {
+      final endOfCurrentDay = DateTime(date.year, date.month, date.day + 1);
+      final partialDuration = endOfCurrentDay.difference(sessionStartedAt!);
+      if (!partialDuration.isNegative) {
+        screenOnDuration += partialDuration;
+        nighttimeUsageDuration += _nightOverlap(
+          sessionStartedAt!,
+          endOfCurrentDay,
+        );
+        if (partialDuration > longestContinuousUsageDuration) {
+          longestContinuousUsageDuration = partialDuration;
+        }
+      }
+      sessionStartedAt = DateTime(
+        occurredAt.year,
+        occurredAt.month,
+        occurredAt.day,
+      );
+    }
+
+    date = DateTime(occurredAt.year, occurredAt.month, occurredAt.day);
     screenOnDuration = Duration.zero;
     unlockCount = 0;
     nighttimeUsageDuration = Duration.zero;
     focusSessionBreakCount = 0;
-    sessionStartedAt = eventDate;
+    viewCount = 0;
+    longestContinuousUsageDuration = Duration.zero;
     lastForegroundExitAt = null;
   }
 
   Duration _nightOverlap(DateTime start, DateTime end) {
-    final nightStart = DateTime(start.year, start.month, start.day, 22);
-    final nightEnd = DateTime(start.year, start.month, start.day + 1, 6);
-    final overlapStart = start.isAfter(nightStart) ? start : nightStart;
-    final overlapEnd = end.isBefore(nightEnd) ? end : nightEnd;
-    if (!overlapEnd.isAfter(overlapStart)) {
-      return Duration.zero;
+    var total = Duration.zero;
+    var cursor = DateTime(start.year, start.month, start.day);
+    while (cursor.isBefore(end)) {
+      final nightStart = DateTime(cursor.year, cursor.month, cursor.day, 22);
+      final nightEnd = DateTime(cursor.year, cursor.month, cursor.day + 1, 6);
+      final overlapStart = start.isAfter(nightStart) ? start : nightStart;
+      final overlapEnd = end.isBefore(nightEnd) ? end : nightEnd;
+      if (overlapEnd.isAfter(overlapStart)) {
+        total += overlapEnd.difference(overlapStart);
+      }
+      cursor = DateTime(cursor.year, cursor.month, cursor.day + 1);
     }
-    return overlapEnd.difference(overlapStart);
+    return total;
   }
 
   bool _isSameDay(DateTime left, DateTime right) {

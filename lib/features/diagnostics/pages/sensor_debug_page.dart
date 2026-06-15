@@ -5,7 +5,10 @@ import 'package:health_monitor/domain/background/android_foreground_service_stra
 import 'package:health_monitor/domain/background/background_capture_state.dart';
 import 'package:health_monitor/domain/background/ios_background_capture_host_status.dart';
 import 'package:health_monitor/domain/background/ios_background_capture_strategy.dart';
+import 'package:health_monitor/domain/environment/ambient_light_sample.dart';
 import 'package:health_monitor/domain/environment/noise_sample.dart';
+import 'package:health_monitor/domain/health/capture_checkpoint.dart';
+import 'package:health_monitor/domain/health/capture_health_event.dart';
 import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/motion/activity_sample.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
@@ -50,6 +53,10 @@ class SensorDebugPage extends ConsumerWidget {
                 child: Text(_noiseSummary(snapshot.latestNoise)),
               ),
               _SectionCard(
+                title: '最近环境光照',
+                child: Text(_lightSummary(snapshot.latestLight)),
+              ),
+              _SectionCard(
                 title: '实时数字生活入口',
                 child: Text(_usageSummary(snapshot.liveUsageSummary)),
               ),
@@ -59,7 +66,8 @@ class SensorDebugPage extends ConsumerWidget {
               ),
               _SectionCard(
                 title: '后台采集状态',
-                child: Text(_backgroundSummary(snapshot.backgroundCaptureState)),
+                child:
+                    Text(_backgroundSummary(snapshot.backgroundCaptureState)),
               ),
               _SectionCard(
                 title: 'Android 宿主状态',
@@ -89,6 +97,18 @@ class SensorDebugPage extends ConsumerWidget {
                 title: '本地写入状态',
                 child: Text(snapshot.storageStatus.label),
               ),
+              _SectionCard(
+                title: '数字生活数据源',
+                child: Text(_digitalUsageSourceSummary(snapshot)),
+              ),
+              _SectionCard(
+                title: '最近检查点',
+                child: Text(_checkpointSummary(snapshot.captureCheckpoints)),
+              ),
+              _SectionCard(
+                title: '最近健康事件',
+                child: Text(_healthEventSummary(snapshot.captureHealthEvents)),
+              ),
             ],
           );
         },
@@ -102,12 +122,14 @@ class SensorDebugPage extends ConsumerWidget {
     );
   }
 
-  String _permissionSummary(Map<PermissionType, PermissionGrantStatus> statuses) {
+  String _permissionSummary(
+      Map<PermissionType, PermissionGrantStatus> statuses) {
     if (statuses.isEmpty) {
       return '暂无权限状态';
     }
 
-    final entries = statuses.entries.map((MapEntry<PermissionType, PermissionGrantStatus> entry) {
+    final entries = statuses.entries
+        .map((MapEntry<PermissionType, PermissionGrantStatus> entry) {
       return '${entry.key.name}: ${entry.value.name}';
     });
     return entries.join('\n');
@@ -134,11 +156,54 @@ class SensorDebugPage extends ConsumerWidget {
     return '${sample.level.name} · ${sample.decibel.toStringAsFixed(0)} dB';
   }
 
+  String _lightSummary(AmbientLightSample? sample) {
+    if (sample == null) {
+      return '暂无光照样本';
+    }
+    return '${sample.level.name} · ${sample.lux.toStringAsFixed(0)} lux';
+  }
+
   String _usageSummary(DigitalUsageSummary? summary) {
     if (summary == null) {
       return '暂无数字生活摘要';
     }
-    return '${summary.topCategory.name} · 亮屏 ${summary.screenOnDuration.inHours} 小时';
+    final sourceLabel = switch (summary.source) {
+      DigitalUsageSource.androidUsageStats => 'Android Usage Stats',
+      DigitalUsageSource.lifecycleAlternative => '替代指标',
+    };
+    return '$sourceLabel · ${summary.topCategory.name} · 亮屏 ${summary.screenOnDuration.inMinutes} 分钟';
+  }
+
+  String _digitalUsageSourceSummary(DiagnosticsSnapshot snapshot) {
+    final summary = snapshot.latestUsageSummary;
+    if (summary == null) {
+      return '暂无可用的数字生活摘要。';
+    }
+    return '当前来源：${summary.source.name}，完整性：${summary.completeness.name}。';
+  }
+
+  String _checkpointSummary(List<CaptureCheckpoint> checkpoints) {
+    if (checkpoints.isEmpty) {
+      return '暂无检查点。';
+    }
+
+    final lines = checkpoints.map((CaptureCheckpoint checkpoint) {
+      final lastEvent = checkpoint.lastEventTypeKey ?? 'unknown';
+      final lastEventAt = checkpoint.lastEventAt?.toIso8601String() ?? 'n/a';
+      return '${checkpoint.streamKey} · ${checkpoint.state.name} · 恢复 ${checkpoint.recoveryCount} 次 · 最近事件 $lastEvent @ $lastEventAt';
+    });
+    return lines.join('\n');
+  }
+
+  String _healthEventSummary(List<CaptureHealthEvent> events) {
+    if (events.isEmpty) {
+      return '暂无健康事件。';
+    }
+
+    final lines = events.take(10).map((CaptureHealthEvent event) {
+      return '${event.streamKey} · ${event.eventType.name} · ${event.occurredAt.toIso8601String()}';
+    });
+    return lines.join('\n');
   }
 
   String _backgroundSummary(BackgroundCaptureState state) {

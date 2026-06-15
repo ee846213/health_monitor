@@ -1,4 +1,5 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:health_monitor/domain/environment/ambient_light_sample.dart';
 import 'package:health_monitor/domain/environment/noise_sample.dart';
 import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/metrics/daily_metrics.dart';
@@ -16,6 +17,7 @@ Duration ms(int minutes) => Duration(minutes: minutes);
 
 RuleInput _fullInput({
   List<ActivitySample> activities = const [],
+  List<AmbientLightSample> lights = const [],
   List<LocationSummary> locations = const [],
   List<NoiseSample> noises = const [],
   List<DigitalUsageSummary> usages = const [],
@@ -26,6 +28,7 @@ RuleInput _fullInput({
     activitySamples: activities,
     locationSummaries: locations,
     noiseSamples: noises,
+    ambientLightSamples: lights,
     usageSummaries: usages,
     dailyMetricsList: metrics,
     missingDimensions: const [],
@@ -40,9 +43,27 @@ void main() {
 
     test('活动样本充足多样时应返回正常', () {
       final input = _fullInput(activities: <ActivitySample>[
-        ActivitySample(capturedAt: now, duration: ms(15), type: ActivityType.walking, confidence: 0.8, stepCount: 500, source: MotionSampleSource.sensorFusion),
-        ActivitySample(capturedAt: now, duration: ms(30), type: ActivityType.running, confidence: 0.9, stepCount: 2000, source: MotionSampleSource.sensorFusion),
-        ActivitySample(capturedAt: now, duration: ms(45), type: ActivityType.cycling, confidence: 0.7, stepCount: 0, source: MotionSampleSource.sensorFusion),
+        ActivitySample(
+            capturedAt: now,
+            duration: ms(15),
+            type: ActivityType.walking,
+            confidence: 0.8,
+            stepCount: 500,
+            source: MotionSampleSource.sensorFusion),
+        ActivitySample(
+            capturedAt: now,
+            duration: ms(30),
+            type: ActivityType.running,
+            confidence: 0.9,
+            stepCount: 2000,
+            source: MotionSampleSource.sensorFusion),
+        ActivitySample(
+            capturedAt: now,
+            duration: ms(45),
+            type: ActivityType.cycling,
+            confidence: 0.7,
+            stepCount: 0,
+            source: MotionSampleSource.sensorFusion),
       ]);
       final v = rule.evaluate(input);
       // 第一个 veredict 应该是正常结论。
@@ -53,7 +74,13 @@ void main() {
 
     test('全静止样本应触发久坐提醒', () {
       final input = _fullInput(activities: <ActivitySample>[
-        ActivitySample(capturedAt: now, duration: ms(65), type: ActivityType.stationary, confidence: 0.9, stepCount: 0, source: MotionSampleSource.sensorFusion),
+        ActivitySample(
+            capturedAt: now,
+            duration: ms(65),
+            type: ActivityType.stationary,
+            confidence: 0.9,
+            stepCount: 0,
+            source: MotionSampleSource.sensorFusion),
       ]);
       final v = rule.evaluate(input);
       expect(v.where((x) => x.reminderType == 'sedentaryBreak'), isNotEmpty);
@@ -61,7 +88,13 @@ void main() {
 
     test('步数不足应产出 warning', () {
       final input = _fullInput(activities: <ActivitySample>[
-        ActivitySample(capturedAt: now, duration: ms(30), type: ActivityType.walking, confidence: 0.8, stepCount: 4200, source: MotionSampleSource.sensorFusion),
+        ActivitySample(
+            capturedAt: now,
+            duration: ms(30),
+            type: ActivityType.walking,
+            confidence: 0.8,
+            stepCount: 4200,
+            source: MotionSampleSource.sensorFusion),
       ]);
       final v = rule.evaluate(input);
       expect(v.where((x) => x.level == 'warning'), isNotEmpty);
@@ -86,17 +119,51 @@ void main() {
 
     test('有两次长静止应触发姿势提醒', () {
       final input = _fullInput(activities: <ActivitySample>[
-        ActivitySample(capturedAt: now, duration: ms(35), type: ActivityType.stationary, confidence: 0.9, stepCount: 0, source: MotionSampleSource.sensorFusion),
-        ActivitySample(capturedAt: now.add(ms(50)), duration: ms(35), type: ActivityType.stationary, confidence: 0.9, stepCount: 0, source: MotionSampleSource.sensorFusion),
-        ActivitySample(capturedAt: now.add(ms(100)), duration: ms(10), type: ActivityType.walking, confidence: 0.7, stepCount: 300, source: MotionSampleSource.sensorFusion),
+        ActivitySample(
+            capturedAt: now,
+            duration: ms(35),
+            type: ActivityType.stationary,
+            confidence: 0.9,
+            stepCount: 0,
+            source: MotionSampleSource.sensorFusion),
+        ActivitySample(
+            capturedAt: now.add(ms(50)),
+            duration: ms(35),
+            type: ActivityType.stationary,
+            confidence: 0.9,
+            stepCount: 0,
+            source: MotionSampleSource.sensorFusion),
+        ActivitySample(
+            capturedAt: now.add(ms(100)),
+            duration: ms(10),
+            type: ActivityType.walking,
+            confidence: 0.7,
+            stepCount: 300,
+            source: MotionSampleSource.sensorFusion),
       ]);
       final v = rule.evaluate(input);
       expect(v.where((x) => x.reminderType == 'postureRisk'), isNotEmpty);
     });
 
     test('行走占比高不再直接触发边走边看提醒', () {
-      final samples = List<ActivitySample>.generate(6, (_) => ActivitySample(capturedAt: now, duration: ms(10), type: ActivityType.walking, confidence: 0.8, stepCount: 400, source: MotionSampleSource.sensorFusion));
-      samples.addAll(List<ActivitySample>.generate(4, (_) => ActivitySample(capturedAt: now, duration: ms(10), type: ActivityType.stationary, confidence: 0.9, stepCount: 0, source: MotionSampleSource.sensorFusion)));
+      final samples = List<ActivitySample>.generate(
+          6,
+          (_) => ActivitySample(
+              capturedAt: now,
+              duration: ms(10),
+              type: ActivityType.walking,
+              confidence: 0.8,
+              stepCount: 400,
+              source: MotionSampleSource.sensorFusion));
+      samples.addAll(List<ActivitySample>.generate(
+          4,
+          (_) => ActivitySample(
+              capturedAt: now,
+              duration: ms(10),
+              type: ActivityType.stationary,
+              confidence: 0.9,
+              stepCount: 0,
+              source: MotionSampleSource.sensorFusion)));
       final input = _fullInput(activities: samples);
       final v = rule.evaluate(input);
       expect(v.where((x) => x.reminderType == 'walkingScreenRisk'), isEmpty);
@@ -108,7 +175,13 @@ void main() {
 
     test('夜间看屏超阈值应触发提醒', () {
       final input = _fullInput(usages: <DigitalUsageSummary>[
-        DigitalUsageSummary(date: DateTime(2026, 6, 10), screenOnDuration: ms(300), unlockCount: 30, nighttimeUsageDuration: ms(80), focusSessionBreakCount: 0, topCategory: UsageCategory.unknown),
+        DigitalUsageSummary(
+            date: DateTime(2026, 6, 10),
+            screenOnDuration: ms(300),
+            unlockCount: 30,
+            nighttimeUsageDuration: ms(80),
+            focusSessionBreakCount: 0,
+            topCategory: UsageCategory.unknown),
       ]);
       final v = rule.evaluate(input);
       expect(v.where((x) => x.reminderType == 'nightUsage'), isNotEmpty);
@@ -116,7 +189,13 @@ void main() {
 
     test('屏幕使用正常且夜间时长不高时不触发提醒', () {
       final input = _fullInput(usages: <DigitalUsageSummary>[
-        DigitalUsageSummary(date: DateTime(2026, 6, 10), screenOnDuration: ms(120), unlockCount: 30, nighttimeUsageDuration: ms(20), focusSessionBreakCount: 0, topCategory: UsageCategory.unknown),
+        DigitalUsageSummary(
+            date: DateTime(2026, 6, 10),
+            screenOnDuration: ms(120),
+            unlockCount: 30,
+            nighttimeUsageDuration: ms(20),
+            focusSessionBreakCount: 0,
+            topCategory: UsageCategory.unknown),
       ]);
       final v = rule.evaluate(input);
       expect(v.where((x) => x.shouldRemind), isEmpty);
@@ -124,10 +203,32 @@ void main() {
 
     test('解锁次数超过阈值应产出 warning', () {
       final input = _fullInput(usages: <DigitalUsageSummary>[
-        DigitalUsageSummary(date: DateTime(2026, 6, 10), screenOnDuration: ms(90), unlockCount: 40, nighttimeUsageDuration: ms(0), focusSessionBreakCount: 12, topCategory: UsageCategory.unknown),
+        DigitalUsageSummary(
+            date: DateTime(2026, 6, 10),
+            screenOnDuration: ms(90),
+            unlockCount: 40,
+            nighttimeUsageDuration: ms(0),
+            focusSessionBreakCount: 12,
+            topCategory: UsageCategory.unknown),
       ]);
       final v = rule.evaluate(input);
       expect(v.where((x) => x.level == 'warning'), isNotEmpty);
+    });
+
+    test('查看频率判断应优先使用 viewCount 而不是 unlockCount', () {
+      final input = _fullInput(usages: <DigitalUsageSummary>[
+        DigitalUsageSummary(
+          date: DateTime(2026, 6, 10),
+          screenOnDuration: ms(90),
+          unlockCount: 80,
+          viewCount: 12,
+          nighttimeUsageDuration: ms(0),
+          focusSessionBreakCount: 2,
+          topCategory: UsageCategory.unknown,
+        ),
+      ]);
+      final v = rule.evaluate(input);
+      expect(v.where((x) => x.summary == '查看频率偏高'), isEmpty);
     });
   });
 
@@ -136,7 +237,11 @@ void main() {
 
     test('高噪音应触发提醒', () {
       final input = _fullInput(noises: <NoiseSample>[
-        NoiseSample(capturedAt: now, duration: ms(1), decibel: 75, level: NoiseLevel.loud),
+        NoiseSample(
+            capturedAt: DateTime(2026, 6, 10, 23),
+            duration: const Duration(minutes: 35),
+            decibel: 75,
+            level: NoiseLevel.loud),
       ]);
       final v = rule.evaluate(input);
       expect(v.where((x) => x.reminderType == 'noisyEnvironment'), isNotEmpty);
@@ -144,10 +249,26 @@ void main() {
 
     test('正常噪音不触发提醒', () {
       final input = _fullInput(noises: <NoiseSample>[
-        NoiseSample(capturedAt: now, duration: ms(1), decibel: 45, level: NoiseLevel.quiet),
+        NoiseSample(
+            capturedAt: now,
+            duration: ms(1),
+            decibel: 45,
+            level: NoiseLevel.quiet),
       ]);
       final v = rule.evaluate(input);
       expect(v.where((x) => x.shouldRemind), isEmpty);
+    });
+
+    test('白天长时间过暗应产出 warning', () {
+      final input = _fullInput(lights: <AmbientLightSample>[
+        AmbientLightSample.fromLux(
+          capturedAt: DateTime(2026, 6, 10, 11),
+          duration: const Duration(minutes: 70),
+          lux: 6,
+        ),
+      ]);
+      final v = rule.evaluate(input);
+      expect(v.where((x) => x.summary == '白天光线偏暗'), isNotEmpty);
     });
 
     test('维度缺失时返回空', () {
@@ -167,8 +288,22 @@ void main() {
   group('ReminderRule', () {
     test('应汇总所有触发提醒的规则结论并去重', () {
       final input = _fullInput(
-        activities: List<ActivitySample>.generate(4, (_) => ActivitySample(capturedAt: now, duration: ms(60), type: ActivityType.stationary, confidence: 0.9, stepCount: 0, source: MotionSampleSource.sensorFusion)),
-        noises: <NoiseSample>[NoiseSample(capturedAt: now, duration: ms(1), decibel: 75, level: NoiseLevel.loud)],
+        activities: List<ActivitySample>.generate(
+            4,
+            (_) => ActivitySample(
+                capturedAt: now,
+                duration: ms(60),
+                type: ActivityType.stationary,
+                confidence: 0.9,
+                stepCount: 0,
+                source: MotionSampleSource.sensorFusion)),
+        noises: <NoiseSample>[
+          NoiseSample(
+              capturedAt: DateTime(2026, 6, 10, 23),
+              duration: ms(35),
+              decibel: 75,
+              level: NoiseLevel.loud)
+        ],
         metrics: <DailyMetrics>[
           DailyMetrics(
             date: now,
@@ -177,7 +312,7 @@ void main() {
             screenOnDuration: Duration.zero,
             outdoorDuration: Duration.zero,
             postureRiskCount: 2,
-            highNoiseExposureDuration: ms(1),
+            highNoiseExposureDuration: ms(35),
           ),
         ],
       );
@@ -191,11 +326,15 @@ void main() {
       final reminders = rule.evaluate(input);
 
       // 应有 sedentaryBreak + postureRisk + noisyEnvironment 三个提醒
-      expect(reminders.where((x) => x.reminderType == 'sedentaryBreak'), isNotEmpty);
-      expect(reminders.where((x) => x.reminderType == 'postureRisk'), isNotEmpty);
-      expect(reminders.where((x) => x.reminderType == 'noisyEnvironment'), isNotEmpty);
+      expect(reminders.where((x) => x.reminderType == 'sedentaryBreak'),
+          isNotEmpty);
+      expect(
+          reminders.where((x) => x.reminderType == 'postureRisk'), isNotEmpty);
+      expect(reminders.where((x) => x.reminderType == 'noisyEnvironment'),
+          isNotEmpty);
       // 去重测试: sedentaryBreak 应只出现一次
-      expect(reminders.where((x) => x.reminderType == 'sedentaryBreak').length, 1);
+      expect(
+          reminders.where((x) => x.reminderType == 'sedentaryBreak').length, 1);
     });
   });
 }

@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health_monitor/domain/background/background_capture_state.dart';
-import 'package:health_monitor/domain/background/ios_background_capture_strategy.dart';
 import 'package:health_monitor/domain/capability_matrix.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/services/background_capture_service.dart';
@@ -50,7 +49,8 @@ void main() {
       expect(state.requiresAttention, isTrue);
     });
 
-    test('permissionDenied requiresAttention 应为 true, isOperational 应为 false', () {
+    test('permissionDenied requiresAttention 应为 true, isOperational 应为 false',
+        () {
       const state = BackgroundCaptureState(
         status: BackgroundCaptureStatus.permissionDenied,
         label: 'Denied',

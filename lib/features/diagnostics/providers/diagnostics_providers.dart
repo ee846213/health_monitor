@@ -1,27 +1,33 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:health_monitor/domain/background/android_background_capture_host_status.dart';
 import 'package:health_monitor/domain/background/android_background_capture_config.dart';
-import 'package:health_monitor/domain/background/background_capture_state.dart';
-import 'package:health_monitor/domain/background/ios_background_capture_host_status.dart';
-import 'package:health_monitor/domain/background/ios_background_capture_config.dart';
-import 'package:health_monitor/domain/background/ios_background_capture_strategy.dart';
+import 'package:health_monitor/domain/background/android_background_capture_host_status.dart';
 import 'package:health_monitor/domain/background/android_foreground_service_strategy.dart';
+import 'package:health_monitor/domain/background/background_capture_state.dart';
+import 'package:health_monitor/domain/background/ios_background_capture_config.dart';
+import 'package:health_monitor/domain/background/ios_background_capture_host_status.dart';
+import 'package:health_monitor/domain/background/ios_background_capture_strategy.dart';
 import 'package:health_monitor/domain/capability_matrix.dart';
+import 'package:health_monitor/domain/environment/ambient_light_sample.dart';
 import 'package:health_monitor/domain/environment/noise_sample.dart';
+import 'package:health_monitor/domain/health/capture_checkpoint.dart';
+import 'package:health_monitor/domain/health/capture_health_event.dart';
 import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/motion/activity_sample.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
+import 'package:health_monitor/services/ambient_light_capture_service.dart';
 import 'package:health_monitor/services/android_background_capture_bridge.dart';
 import 'package:health_monitor/services/background_capture_service.dart';
-import 'package:health_monitor/services/ios_background_capture_bridge.dart';
+import 'package:health_monitor/services/capture_health_service.dart';
 import 'package:health_monitor/services/digital_usage_capture_service.dart';
+import 'package:health_monitor/services/ios_background_capture_bridge.dart';
 import 'package:health_monitor/services/location_capture_service.dart';
 import 'package:health_monitor/services/motion_capture_service.dart';
 import 'package:health_monitor/services/noise_capture_service.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
 import 'package:health_monitor/services/platform_bridge_service.dart';
 import 'package:health_monitor/storage/repositories/activity_repository.dart';
+import 'package:health_monitor/storage/repositories/ambient_light_sample_repository.dart';
 import 'package:health_monitor/storage/repositories/location_summary_repository.dart';
 import 'package:health_monitor/storage/repositories/noise_sample_repository.dart';
 import 'package:health_monitor/storage/repositories/query_window.dart';
@@ -31,23 +37,38 @@ final activityRepositoryProvider = Provider<ActivityRepository>((Ref ref) {
   return InMemoryActivityRepository(samples: const <ActivitySample>[]);
 });
 
-final locationSummaryRepositoryProvider = Provider<LocationSummaryRepository>((Ref ref) {
-  return InMemoryLocationSummaryRepository(summaries: const <LocationSummary>[]);
+final locationSummaryRepositoryProvider =
+    Provider<LocationSummaryRepository>((Ref ref) {
+  return InMemoryLocationSummaryRepository(
+    summaries: const <LocationSummary>[],
+  );
 });
 
-final noiseSampleRepositoryProvider = Provider<NoiseSampleRepository>((Ref ref) {
+final noiseSampleRepositoryProvider =
+    Provider<NoiseSampleRepository>((Ref ref) {
   return InMemoryNoiseSampleRepository(samples: const <NoiseSample>[]);
 });
 
-final usageSummaryRepositoryProvider = Provider<UsageSummaryRepository>((Ref ref) {
-  return InMemoryUsageSummaryRepository(summaries: const <DigitalUsageSummary>[]);
+final ambientLightSampleRepositoryProvider =
+    Provider<AmbientLightSampleRepository>((Ref ref) {
+  return InMemoryAmbientLightSampleRepository(
+    samples: const <AmbientLightSample>[],
+  );
+});
+
+final usageSummaryRepositoryProvider =
+    Provider<UsageSummaryRepository>((Ref ref) {
+  return InMemoryUsageSummaryRepository(
+    summaries: const <DigitalUsageSummary>[],
+  );
 });
 
 final capabilityMatrixProvider = Provider<CapabilityMatrix>((Ref ref) {
   return CapabilityMatrix.defaultMatrix();
 });
 
-final permissionStatusServiceProvider = Provider<PermissionStatusService>((Ref ref) {
+final permissionStatusServiceProvider =
+    Provider<PermissionStatusService>((Ref ref) {
   return const PermissionHandlerStatusService();
 });
 
@@ -55,7 +76,8 @@ final motionCaptureServiceProvider = Provider<MotionCaptureService>((Ref ref) {
   return MotionCaptureService();
 });
 
-final locationCaptureServiceProvider = Provider<LocationCaptureService>((Ref ref) {
+final locationCaptureServiceProvider =
+    Provider<LocationCaptureService>((Ref ref) {
   return LocationCaptureService();
 });
 
@@ -63,37 +85,44 @@ final noiseCaptureServiceProvider = Provider<NoiseCaptureService>((Ref ref) {
   return NoiseCaptureService();
 });
 
-final digitalUsageCaptureServiceProvider = Provider<DigitalUsageCaptureService>((Ref ref) {
+final ambientLightCaptureServiceProvider =
+    Provider<AmbientLightCaptureService>((Ref ref) {
+  return AmbientLightCaptureService();
+});
+
+final digitalUsageCaptureServiceProvider =
+    Provider<DigitalUsageCaptureService>((Ref ref) {
   return DigitalUsageCaptureService();
 });
 
-final backgroundCaptureServiceProvider = Provider<BackgroundCaptureStateService>((Ref ref) {
+final backgroundCaptureServiceProvider =
+    Provider<BackgroundCaptureStateService>((Ref ref) {
   return const BackgroundCaptureService();
 });
 
 final androidForegroundServiceStrategyResolverProvider =
     Provider<AndroidForegroundServiceStrategyResolver>((Ref ref) {
-      return const AndroidForegroundServiceStrategyResolver();
-    });
+  return const AndroidForegroundServiceStrategyResolver();
+});
 
 final iosBackgroundServiceStrategyResolverProvider =
     Provider<IosBackgroundCaptureStrategyResolver>((Ref ref) {
-      return const IosBackgroundCaptureStrategyResolver();
-    });
+  return const IosBackgroundCaptureStrategyResolver();
+});
 
 final androidBackgroundHostStatusServiceProvider =
     Provider<AndroidBackgroundCaptureHostStatusService>((Ref ref) {
-      return AndroidBackgroundCaptureBridge(
-        platformBridgeService: PlatformBridgeService(),
-      );
-    });
+  return AndroidBackgroundCaptureBridge(
+    platformBridgeService: PlatformBridgeService(),
+  );
+});
 
 final iosBackgroundHostStatusServiceProvider =
     Provider<IosBackgroundCaptureHostStatusService>((Ref ref) {
-      return IosBackgroundCaptureBridge(
-        platformBridgeService: PlatformBridgeService(),
-      );
-    });
+  return IosBackgroundCaptureBridge(
+    platformBridgeService: PlatformBridgeService(),
+  );
+});
 
 enum DiagnosticsStorageStatusKind {
   empty,
@@ -117,6 +146,8 @@ class DiagnosticsSnapshot {
     required this.latestActivity,
     required this.latestLocationSummary,
     required this.latestNoise,
+    required this.liveLight,
+    required this.latestLight,
     required this.liveUsageSummary,
     required this.latestUsageSummary,
     required this.backgroundCaptureState,
@@ -125,6 +156,8 @@ class DiagnosticsSnapshot {
     required this.androidForegroundServiceStrategy,
     required this.iosBackgroundCaptureStrategy,
     required this.storageStatus,
+    this.captureHealthEvents = const <CaptureHealthEvent>[],
+    this.captureCheckpoints = const <CaptureCheckpoint>[],
   });
 
   final Map<PermissionType, PermissionGrantStatus> permissionStatuses;
@@ -132,6 +165,8 @@ class DiagnosticsSnapshot {
   final ActivitySample? latestActivity;
   final LocationSummary? latestLocationSummary;
   final NoiseSample? latestNoise;
+  final AmbientLightSample? liveLight;
+  final AmbientLightSample? latestLight;
   final DigitalUsageSummary? liveUsageSummary;
   final DigitalUsageSummary? latestUsageSummary;
   final BackgroundCaptureState backgroundCaptureState;
@@ -140,19 +175,28 @@ class DiagnosticsSnapshot {
   final AndroidForegroundServiceStrategy androidForegroundServiceStrategy;
   final IosBackgroundCaptureStrategy iosBackgroundCaptureStrategy;
   final DiagnosticsStorageStatus storageStatus;
+  final List<CaptureHealthEvent> captureHealthEvents;
+  final List<CaptureCheckpoint> captureCheckpoints;
 }
 
-final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref) async {
+final diagnosticsSnapshotProvider =
+    FutureProvider<DiagnosticsSnapshot>((Ref ref) async {
   final capabilityMatrix = ref.watch(capabilityMatrixProvider);
   final activityRepository = ref.watch(activityRepositoryProvider);
+  final ambientLightRepository =
+      ref.watch(ambientLightSampleRepositoryProvider);
   final locationRepository = ref.watch(locationSummaryRepositoryProvider);
   final noiseRepository = ref.watch(noiseSampleRepositoryProvider);
   final usageRepository = ref.watch(usageSummaryRepositoryProvider);
   final permissionService = ref.watch(permissionStatusServiceProvider);
+  final captureHealthService = ref.watch(captureHealthServiceProvider);
   final motionCaptureService = ref.watch(motionCaptureServiceProvider);
+  final ambientLightCaptureService =
+      ref.watch(ambientLightCaptureServiceProvider);
   final locationCaptureService = ref.watch(locationCaptureServiceProvider);
   final noiseCaptureService = ref.watch(noiseCaptureServiceProvider);
-  final digitalUsageCaptureService = ref.watch(digitalUsageCaptureServiceProvider);
+  final digitalUsageCaptureService =
+      ref.watch(digitalUsageCaptureServiceProvider);
   final backgroundCaptureService = ref.watch(backgroundCaptureServiceProvider);
   final androidForegroundServiceStrategyResolver = ref.watch(
     androidForegroundServiceStrategyResolverProvider,
@@ -174,6 +218,9 @@ final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref
   final noiseSamples = await noiseRepository.listByWindow(
     QueryWindow.recentHours(24, referenceTime: referenceTime),
   );
+  final ambientLightSamples = await ambientLightRepository.listByWindow(
+    QueryWindow.recentHours(24, referenceTime: referenceTime),
+  );
   final locationSummaries = await locationRepository.listRecentDays(
     1,
     referenceDate: referenceTime,
@@ -184,7 +231,8 @@ final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref
     capabilitySet: capabilityMatrix.android,
     permissionStatuses: permissionStatuses,
   );
-  final androidForegroundServiceStrategy = androidForegroundServiceStrategyResolver.resolve(
+  final androidForegroundServiceStrategy =
+      androidForegroundServiceStrategyResolver.resolve(
     capabilitySet: capabilityMatrix.android,
     permissionStatuses: permissionStatuses,
     config: const AndroidBackgroundCaptureConfig(
@@ -197,7 +245,8 @@ final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref
       sampleIntervalMinutes: 15,
     ),
   );
-  final iosBackgroundCaptureStrategy = iosBackgroundServiceStrategyResolver.resolve(
+  final iosBackgroundCaptureStrategy =
+      iosBackgroundServiceStrategyResolver.resolve(
     capabilitySet: capabilityMatrix.ios,
     permissionStatuses: permissionStatuses,
     config: const IosBackgroundCaptureConfig(
@@ -209,18 +258,22 @@ final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref
       backgroundRefreshIntervalMinutes: 15,
     ),
   );
+
   AndroidBackgroundCaptureHostStatus? androidHostStatus;
   try {
-    androidHostStatus = await androidBackgroundHostStatusService.getHostStatus();
+    androidHostStatus =
+        await androidBackgroundHostStatusService.getHostStatus();
   } on AndroidBackgroundCaptureException {
     androidHostStatus = null;
   }
+
   IosBackgroundCaptureHostStatus? iosHostStatus;
   try {
     iosHostStatus = await iosBackgroundHostStatusService.getHostStatus();
   } on IosBackgroundCaptureException {
     iosHostStatus = null;
   }
+
   ActivitySample? liveActivity;
   try {
     liveActivity = await motionCaptureService.watchActivitySamples().first;
@@ -229,14 +282,17 @@ final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref
   } on StateError {
     liveActivity = null;
   }
+
   LocationSummary? liveLocationSummary;
   try {
-    liveLocationSummary = await locationCaptureService.watchLocationSummaries().first;
+    liveLocationSummary =
+        await locationCaptureService.watchLocationSummaries().first;
   } on LocationCaptureException {
     liveLocationSummary = null;
   } on StateError {
     liveLocationSummary = null;
   }
+
   NoiseSample? liveNoise;
   try {
     liveNoise = await noiseCaptureService.watchNoiseSamples().first;
@@ -245,20 +301,35 @@ final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref
   } on StateError {
     liveNoise = null;
   }
+
+  AmbientLightSample? liveLight;
+  try {
+    liveLight =
+        await ambientLightCaptureService.watchAmbientLightSamples().first;
+  } on AmbientLightCaptureException {
+    liveLight = null;
+  } on StateError {
+    liveLight = null;
+  }
+
   DigitalUsageSummary? liveUsageSummary;
   try {
-    liveUsageSummary = await digitalUsageCaptureService.watchUsageSummaries().first;
+    liveUsageSummary =
+        await digitalUsageCaptureService.watchUsageSummaries().first;
   } on DigitalUsageCaptureException {
     liveUsageSummary = null;
   } on StateError {
     liveUsageSummary = null;
   }
 
-  final hasRecentWrites =
-      activitySamples.isNotEmpty ||
+  final hasRecentWrites = activitySamples.isNotEmpty ||
+      ambientLightSamples.isNotEmpty ||
       noiseSamples.isNotEmpty ||
       locationSummaries.isNotEmpty ||
       usageSummary != null;
+  final captureHealthEvents =
+      await captureHealthService.recentEvents(limit: 20);
+  final captureCheckpoints = await captureHealthService.checkpoints();
 
   return DiagnosticsSnapshot(
     permissionStatuses: permissionStatuses,
@@ -268,6 +339,9 @@ final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref
         ? liveLocationSummary
         : locationSummaries.last,
     latestNoise: noiseSamples.isEmpty ? liveNoise : noiseSamples.last,
+    liveLight: liveLight,
+    latestLight:
+        ambientLightSamples.isEmpty ? liveLight : ambientLightSamples.last,
     liveUsageSummary: liveUsageSummary,
     latestUsageSummary: usageSummary ?? liveUsageSummary,
     backgroundCaptureState: backgroundCaptureState,
@@ -279,7 +353,9 @@ final diagnosticsSnapshotProvider = FutureProvider<DiagnosticsSnapshot>((Ref ref
       kind: hasRecentWrites
           ? DiagnosticsStorageStatusKind.hasRecentWrites
           : DiagnosticsStorageStatusKind.empty,
-      label: hasRecentWrites ? '最近已写入本地记录' : '暂无本地写入记录',
+      label: hasRecentWrites ? '最近已有本地写入记录' : '暂无本地写入记录',
     ),
+    captureHealthEvents: captureHealthEvents,
+    captureCheckpoints: captureCheckpoints,
   );
 });

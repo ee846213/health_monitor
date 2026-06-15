@@ -25,6 +25,7 @@
 - 网络层：Dio
 - 基础能力插件优先：`permission_handler`、`geolocator`、`sensors_plus`
 - 平台桥接：`MethodChannel` / `EventChannel`
+- `permission_handler` 主要负责 runtime 权限；Android `Usage Access`、忽略电池优化等特殊授权要走独立平台桥接或原生设置页，不要错误映射成 `systemAlertWindow` 之类的普通权限。
 
 ## 当前仓库状态
 
@@ -64,6 +65,7 @@
 - 页面按 feature 拆分，不要把所有逻辑堆进单文件。
 - Isar collection 负责落库结构，领域模型负责业务语义，不要把页面语义直接塞进存储层。
 - 数字生活能力必须同时考虑 Android 全量能力与 iPhone 替代指标，不能只围绕 Android 建模。
+- 权限项要按平台能力展示，Android 专属权限不要在 iPhone 页面里假装可操作。
 
 ## 隐私原则
 

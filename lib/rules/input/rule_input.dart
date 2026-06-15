@@ -1,4 +1,6 @@
-﻿import 'package:health_monitor/domain/environment/noise_sample.dart';
+import 'package:health_monitor/domain/environment/ambient_light_sample.dart';
+import 'package:health_monitor/domain/environment/environment_overview.dart';
+import 'package:health_monitor/domain/environment/noise_sample.dart';
 import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/metrics/daily_metrics.dart';
 import 'package:health_monitor/domain/motion/activity_sample.dart';
@@ -15,6 +17,7 @@ class RuleInput {
     required this.activitySamples,
     required this.locationSummaries,
     required this.noiseSamples,
+    this.ambientLightSamples = const <AmbientLightSample>[],
     required this.usageSummaries,
     required this.dailyMetricsList,
     required this.missingDimensions,
@@ -24,6 +27,7 @@ class RuleInput {
   final List<ActivitySample> activitySamples;
   final List<LocationSummary> locationSummaries;
   final List<NoiseSample> noiseSamples;
+  final List<AmbientLightSample> ambientLightSamples;
   final List<DigitalUsageSummary> usageSummaries;
   final List<DailyMetrics> dailyMetricsList;
   final List<String> missingDimensions;
@@ -109,7 +113,18 @@ class RuleInput {
   /// 噪音平均分贝。
   double get averageNoiseDb {
     if (noiseSamples.isEmpty) return 0;
-    return noiseSamples.fold(0.0, (sum, s) => sum + s.decibel) / noiseSamples.length;
+    return noiseSamples.fold(0.0, (sum, s) => sum + s.decibel) /
+        noiseSamples.length;
+  }
+
+  /// 光照平均 lux。
+  double get averageLightLux {
+    if (ambientLightSamples.isEmpty) return 0;
+    return ambientLightSamples.fold(
+          0.0,
+          (double sum, AmbientLightSample sample) => sum + sample.lux,
+        ) /
+        ambientLightSamples.length;
   }
 
   /// 屏幕亮起时长合计（分钟）。
@@ -127,6 +142,26 @@ class RuleInput {
     return usageSummaries.fold(0, (sum, s) => sum + s.unlockCount);
   }
 
+  /// 查看会话数合计。
+  int get totalViewCount {
+    if (usageSummaries.isEmpty) return 0;
+    return usageSummaries.fold(
+      0,
+      (int sum, DigitalUsageSummary summary) =>
+          sum + summary.effectiveViewCount,
+    );
+  }
+
+  int get usageDayCount => usageSummaries.length;
+
+  /// 单日平均查看次数。
+  double get averageDailyViewCount {
+    if (usageDayCount == 0) {
+      return 0;
+    }
+    return totalViewCount / usageDayCount;
+  }
+
   /// 夜间亮屏时长合计（分钟）。
   double get totalNightScreenMinutes {
     if (usageSummaries.isEmpty) return 0;
@@ -135,6 +170,14 @@ class RuleInput {
       (double sum, DigitalUsageSummary summary) =>
           sum + summary.nighttimeUsageDuration.inMinutes,
     );
+  }
+
+  /// 单日平均夜间使用时长（分钟）。
+  double get averageDailyNightScreenMinutes {
+    if (usageDayCount == 0) {
+      return 0;
+    }
+    return totalNightScreenMinutes / usageDayCount;
   }
 
   /// 专注中断次数合计。
@@ -147,9 +190,96 @@ class RuleInput {
     );
   }
 
+  /// 单日平均激活过密次数。
+  double get averageDailyFocusSessionBreakCount {
+    if (usageDayCount == 0) {
+      return 0;
+    }
+    return totalFocusSessionBreakCount / usageDayCount;
+  }
+
+  Duration get longestContinuousUsageDuration {
+    if (usageSummaries.isEmpty) {
+      return Duration.zero;
+    }
+    return usageSummaries.fold(
+      Duration.zero,
+      (Duration current, DigitalUsageSummary summary) =>
+          summary.longestContinuousUsageDuration > current
+              ? summary.longestContinuousUsageDuration
+              : current,
+    );
+  }
+
+  int get longestContinuousUsageMinutes =>
+      longestContinuousUsageDuration.inMinutes;
+
+  DigitalUsageSource? get primaryUsageSource {
+    if (usageSummaries.isEmpty) {
+      return null;
+    }
+    return usageSummaries.last.source;
+  }
+
+  UsageDataCompleteness get usageCompleteness {
+    if (usageSummaries.any((DigitalUsageSummary item) => item.isDegraded)) {
+      return UsageDataCompleteness.degraded;
+    }
+    if (usageSummaries.any((DigitalUsageSummary item) => item.hasPartialGap)) {
+      return UsageDataCompleteness.partialGap;
+    }
+    return UsageDataCompleteness.full;
+  }
+
   /// 是否存在明显碎片化查看。
   bool get hasFragmentedUsage {
-    return totalUnlockCount >= 40 || totalFocusSessionBreakCount >= 12;
+    return totalViewCount >= 40 || totalFocusSessionBreakCount >= 12;
+  }
+
+  Duration daytimeDarkLightDuration() {
+    return _ambientLightDuration(
+      daypart: EnvironmentDaypart.daytime,
+      level: AmbientLightLevel.dark,
+    );
+  }
+
+  Duration daytimeComfortableLightDuration() {
+    return _ambientLightDuration(
+      daypart: EnvironmentDaypart.daytime,
+      level: AmbientLightLevel.comfortable,
+    );
+  }
+
+  Duration daytimeBrightLightDuration() {
+    return _ambientLightDuration(
+      daypart: EnvironmentDaypart.daytime,
+      level: AmbientLightLevel.bright,
+    );
+  }
+
+  Duration nightLoudNoiseDuration() {
+    return _noiseDuration(
+      daypart: EnvironmentDaypart.night,
+      level: NoiseLevel.loud,
+    );
+  }
+
+  Duration nightModerateNoiseDuration() {
+    return _noiseDuration(
+      daypart: EnvironmentDaypart.night,
+      level: NoiseLevel.moderate,
+    );
+  }
+
+  EnvironmentDaypart daypartFor(DateTime dateTime) {
+    final hour = dateTime.hour;
+    if (hour >= 6 && hour < 18) {
+      return EnvironmentDaypart.daytime;
+    }
+    if (hour >= 18 && hour < 22) {
+      return EnvironmentDaypart.evening;
+    }
+    return EnvironmentDaypart.night;
   }
 
   /// 步行时长合计（分钟）。
@@ -192,6 +322,8 @@ class RuleInput {
         return locationSummaries.isNotEmpty;
       case 'noise':
         return noiseSamples.isNotEmpty;
+      case 'light':
+        return ambientLightSamples.isNotEmpty;
       case 'digital_usage':
         return usageSummaries.isNotEmpty;
       case 'daily_metrics':
@@ -199,6 +331,37 @@ class RuleInput {
       default:
         return false;
     }
+  }
+
+  Duration _ambientLightDuration({
+    required EnvironmentDaypart daypart,
+    required AmbientLightLevel level,
+  }) {
+    return ambientLightSamples
+        .where(
+          (AmbientLightSample sample) =>
+              daypartFor(sample.capturedAt) == daypart && sample.level == level,
+        )
+        .fold<Duration>(
+          Duration.zero,
+          (Duration total, AmbientLightSample sample) =>
+              total + sample.duration,
+        );
+  }
+
+  Duration _noiseDuration({
+    required EnvironmentDaypart daypart,
+    required NoiseLevel level,
+  }) {
+    return noiseSamples
+        .where(
+          (NoiseSample sample) =>
+              daypartFor(sample.capturedAt) == daypart && sample.level == level,
+        )
+        .fold<Duration>(
+          Duration.zero,
+          (Duration total, NoiseSample sample) => total + sample.duration,
+        );
   }
 }
 

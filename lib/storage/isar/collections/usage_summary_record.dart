@@ -10,9 +10,13 @@ class UsageSummaryRecord {
   late String dateKey;
   late int screenOnSeconds;
   late int unlockCount;
+  late int viewCount;
   late int nighttimeUsageSeconds;
   late int focusSessionBreakCount;
+  late int longestContinuousUsageSeconds;
   late String topCategoryKey;
+  late String sourceKey;
+  late String completenessKey;
 
   UsageSummaryRecord();
 
@@ -21,9 +25,14 @@ class UsageSummaryRecord {
       ..dateKey = _dateKey(summary.date)
       ..screenOnSeconds = summary.screenOnDuration.inSeconds
       ..unlockCount = summary.unlockCount
+      ..viewCount = summary.effectiveViewCount
       ..nighttimeUsageSeconds = summary.nighttimeUsageDuration.inSeconds
       ..focusSessionBreakCount = summary.focusSessionBreakCount
-      ..topCategoryKey = summary.topCategory.name;
+      ..longestContinuousUsageSeconds =
+          summary.longestContinuousUsageDuration.inSeconds
+      ..topCategoryKey = summary.topCategory.name
+      ..sourceKey = summary.source.name
+      ..completenessKey = summary.completeness.name;
   }
 
   DigitalUsageSummary toDomain() {
@@ -31,9 +40,15 @@ class UsageSummaryRecord {
       date: _dateFromKey(dateKey),
       screenOnDuration: Duration(seconds: screenOnSeconds),
       unlockCount: unlockCount,
+      viewCount: viewCount,
       nighttimeUsageDuration: Duration(seconds: nighttimeUsageSeconds),
       focusSessionBreakCount: focusSessionBreakCount,
+      longestContinuousUsageDuration: Duration(
+        seconds: longestContinuousUsageSeconds,
+      ),
       topCategory: _mapUsageCategory(topCategoryKey),
+      source: _mapUsageSource(sourceKey),
+      completeness: _mapCompleteness(completenessKey),
     );
   }
 
@@ -60,6 +75,20 @@ class UsageSummaryRecord {
     return UsageCategory.values.firstWhere(
       (UsageCategory item) => item.name == value,
       orElse: () => UsageCategory.unknown,
+    );
+  }
+
+  static DigitalUsageSource _mapUsageSource(String value) {
+    return DigitalUsageSource.values.firstWhere(
+      (DigitalUsageSource item) => item.name == value,
+      orElse: () => DigitalUsageSource.lifecycleAlternative,
+    );
+  }
+
+  static UsageDataCompleteness _mapCompleteness(String value) {
+    return UsageDataCompleteness.values.firstWhere(
+      (UsageDataCompleteness item) => item.name == value,
+      orElse: () => UsageDataCompleteness.full,
     );
   }
 }

@@ -3,6 +3,9 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_monitor/storage/isar/collections/activity_sample_record.dart';
+import 'package:health_monitor/storage/isar/collections/capture_checkpoint_record.dart';
+import 'package:health_monitor/storage/isar/collections/capture_health_event_record.dart';
+import 'package:health_monitor/storage/isar/collections/ambient_light_sample_record.dart';
 import 'package:health_monitor/storage/isar/collections/daily_metrics_record.dart';
 import 'package:health_monitor/storage/isar/collections/location_summary_record.dart';
 import 'package:health_monitor/storage/isar/collections/noise_sample_record.dart';
@@ -25,7 +28,8 @@ final appWritableBaseDirectoryProvider = FutureProvider<Directory>((
 });
 
 final appIsarDirectoryProvider = FutureProvider<String>((Ref ref) async {
-  final baseDirectory = await ref.watch(appWritableBaseDirectoryProvider.future);
+  final baseDirectory =
+      await ref.watch(appWritableBaseDirectoryProvider.future);
   final isarDirectory = Directory(
     '${baseDirectory.path}${Platform.pathSeparator}isar',
   );
@@ -44,6 +48,9 @@ final appIsarProvider = FutureProvider<Isar>((Ref ref) async {
   final isar = await Isar.open(
     <CollectionSchema>[
       ActivitySampleRecordSchema,
+      CaptureHealthEventRecordSchema,
+      CaptureCheckpointRecordSchema,
+      AmbientLightSampleRecordSchema,
       PostureSampleRecordSchema,
       LocationSummaryRecordSchema,
       NoiseSampleRecordSchema,

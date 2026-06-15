@@ -1,4 +1,5 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:health_monitor/domain/environment/ambient_light_sample.dart';
 import 'package:health_monitor/domain/environment/noise_sample.dart';
 import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/metrics/daily_metrics.dart';
@@ -8,6 +9,7 @@ import 'package:health_monitor/storage/repositories/query_window.dart';
 import 'package:health_monitor/rules/input/rule_input.dart';
 import 'package:health_monitor/rules/input/rule_input_service.dart';
 import 'package:health_monitor/storage/repositories/activity_repository.dart';
+import 'package:health_monitor/storage/repositories/ambient_light_sample_repository.dart';
 import 'package:health_monitor/storage/repositories/location_summary_repository.dart';
 import 'package:health_monitor/storage/repositories/metrics_repository.dart';
 import 'package:health_monitor/storage/repositories/noise_sample_repository.dart';
@@ -51,8 +53,16 @@ void main() {
         activitySamples: const <ActivitySample>[],
         locationSummaries: const <LocationSummary>[],
         noiseSamples: <NoiseSample>[
-          NoiseSample(capturedAt: now, duration: ms(1), decibel: 60, level: NoiseLevel.loud),
-          NoiseSample(capturedAt: now, duration: ms(1), decibel: 40, level: NoiseLevel.quiet),
+          NoiseSample(
+              capturedAt: now,
+              duration: ms(1),
+              decibel: 60,
+              level: NoiseLevel.loud),
+          NoiseSample(
+              capturedAt: now,
+              duration: ms(1),
+              decibel: 40,
+              level: NoiseLevel.quiet),
         ],
         usageSummaries: const <DigitalUsageSummary>[],
         dailyMetricsList: const <DailyMetrics>[],
@@ -63,7 +73,13 @@ void main() {
 
     test('全静止样本 stationaryRatio 为 1', () {
       final now = DateTime(2026, 6, 10);
-      final sample = ActivitySample(capturedAt: now, duration: ms(30), type: ActivityType.stationary, confidence: 0.9, stepCount: 0, source: MotionSampleSource.sensorFusion);
+      final sample = ActivitySample(
+          capturedAt: now,
+          duration: ms(30),
+          type: ActivityType.stationary,
+          confidence: 0.9,
+          stepCount: 0,
+          source: MotionSampleSource.sensorFusion);
       final input = RuleInput(
         window: QueryWindow.recentDay(referenceTime: now),
         activitySamples: <ActivitySample>[sample, sample],
@@ -83,8 +99,20 @@ void main() {
         locationSummaries: const <LocationSummary>[],
         noiseSamples: const <NoiseSample>[],
         usageSummaries: <DigitalUsageSummary>[
-          DigitalUsageSummary(date: DateTime(2026, 6, 9), screenOnDuration: ms(120), unlockCount: 30, nighttimeUsageDuration: ms(0), focusSessionBreakCount: 0, topCategory: UsageCategory.unknown),
-          DigitalUsageSummary(date: DateTime(2026, 6, 10), screenOnDuration: ms(80), unlockCount: 45, nighttimeUsageDuration: ms(0), focusSessionBreakCount: 0, topCategory: UsageCategory.unknown),
+          DigitalUsageSummary(
+              date: DateTime(2026, 6, 9),
+              screenOnDuration: ms(120),
+              unlockCount: 30,
+              nighttimeUsageDuration: ms(0),
+              focusSessionBreakCount: 0,
+              topCategory: UsageCategory.unknown),
+          DigitalUsageSummary(
+              date: DateTime(2026, 6, 10),
+              screenOnDuration: ms(80),
+              unlockCount: 45,
+              nighttimeUsageDuration: ms(0),
+              focusSessionBreakCount: 0,
+              topCategory: UsageCategory.unknown),
         ],
         dailyMetricsList: const <DailyMetrics>[],
         missingDimensions: const <String>[],
@@ -100,9 +128,27 @@ void main() {
       final input = RuleInput(
         window: QueryWindow.recentDay(referenceTime: now),
         activitySamples: <ActivitySample>[
-          ActivitySample(capturedAt: now, duration: const Duration(minutes: 2), type: ActivityType.stationary, confidence: 0.9, stepCount: 0, source: MotionSampleSource.sensorFusion),
-          ActivitySample(capturedAt: now.add(const Duration(minutes: 2, seconds: 20)), duration: const Duration(minutes: 2), type: ActivityType.stationary, confidence: 0.9, stepCount: 0, source: MotionSampleSource.sensorFusion),
-          ActivitySample(capturedAt: now.add(const Duration(minutes: 10)), duration: const Duration(minutes: 2), type: ActivityType.stationary, confidence: 0.9, stepCount: 0, source: MotionSampleSource.sensorFusion),
+          ActivitySample(
+              capturedAt: now,
+              duration: const Duration(minutes: 2),
+              type: ActivityType.stationary,
+              confidence: 0.9,
+              stepCount: 0,
+              source: MotionSampleSource.sensorFusion),
+          ActivitySample(
+              capturedAt: now.add(const Duration(minutes: 2, seconds: 20)),
+              duration: const Duration(minutes: 2),
+              type: ActivityType.stationary,
+              confidence: 0.9,
+              stepCount: 0,
+              source: MotionSampleSource.sensorFusion),
+          ActivitySample(
+              capturedAt: now.add(const Duration(minutes: 10)),
+              duration: const Duration(minutes: 2),
+              type: ActivityType.stationary,
+              confidence: 0.9,
+              stepCount: 0,
+              source: MotionSampleSource.sensorFusion),
         ],
         locationSummaries: const <LocationSummary>[],
         noiseSamples: const <NoiseSample>[],
@@ -117,7 +163,13 @@ void main() {
 
     test('isDimensionAvailable 判断维度可用性', () {
       final now = DateTime(2026, 6, 10);
-      final sample = ActivitySample(capturedAt: now, duration: ms(15), type: ActivityType.walking, confidence: 0.7, stepCount: 1200, source: MotionSampleSource.platformActivity);
+      final sample = ActivitySample(
+          capturedAt: now,
+          duration: ms(15),
+          type: ActivityType.walking,
+          confidence: 0.7,
+          stepCount: 1200,
+          source: MotionSampleSource.platformActivity);
       final input = RuleInput(
         window: QueryWindow.recentDay(referenceTime: now),
         activitySamples: <ActivitySample>[sample],
@@ -138,18 +190,59 @@ void main() {
     final window = QueryWindow.recentDay(referenceTime: now);
 
     test('所有仓储有数据时构建全量输入', () async {
-      final activitySample = ActivitySample(capturedAt: now.subtract(ms(360)), duration: ms(30), type: ActivityType.walking, confidence: 0.9, stepCount: 2000, source: MotionSampleSource.sensorFusion);
-      final noiseSample = NoiseSample(capturedAt: now.subtract(ms(60)), duration: ms(1), decibel: 55, level: NoiseLevel.moderate);
-      final locationSummary = LocationSummary(date: DateTime(2026, 6, 10), distanceMeters: 5000, outdoorDuration: ms(45), visitCount: 3, commuteCount: 1);
-      final usageSummary = DigitalUsageSummary(date: DateTime(2026, 6, 10), screenOnDuration: ms(90), unlockCount: 25, nighttimeUsageDuration: ms(0), focusSessionBreakCount: 0, topCategory: UsageCategory.unknown);
-      final dailyMetrics = DailyMetrics(date: DateTime(2026, 6, 10), stepCount: 5000, sedentaryDuration: ms(180), screenOnDuration: ms(90), outdoorDuration: ms(20), postureRiskCount: 2, highNoiseExposureDuration: ms(30));
+      final activitySample = ActivitySample(
+          capturedAt: now.subtract(ms(360)),
+          duration: ms(30),
+          type: ActivityType.walking,
+          confidence: 0.9,
+          stepCount: 2000,
+          source: MotionSampleSource.sensorFusion);
+      final noiseSample = NoiseSample(
+          capturedAt: now.subtract(ms(60)),
+          duration: ms(1),
+          decibel: 55,
+          level: NoiseLevel.moderate);
+      final lightSample = AmbientLightSample.fromLux(
+        capturedAt: now.subtract(ms(30)),
+        duration: ms(10),
+        lux: 300,
+      );
+      final locationSummary = LocationSummary(
+          date: DateTime(2026, 6, 10),
+          distanceMeters: 5000,
+          outdoorDuration: ms(45),
+          visitCount: 3,
+          commuteCount: 1);
+      final usageSummary = DigitalUsageSummary(
+          date: DateTime(2026, 6, 10),
+          screenOnDuration: ms(90),
+          unlockCount: 25,
+          nighttimeUsageDuration: ms(0),
+          focusSessionBreakCount: 0,
+          topCategory: UsageCategory.unknown);
+      final dailyMetrics = DailyMetrics(
+          date: DateTime(2026, 6, 10),
+          stepCount: 5000,
+          sedentaryDuration: ms(180),
+          screenOnDuration: ms(90),
+          outdoorDuration: ms(20),
+          postureRiskCount: 2,
+          highNoiseExposureDuration: ms(30));
 
       final service = RuleInputService(
-        activityRepository: InMemoryActivityRepository(samples: <ActivitySample>[activitySample]),
-        locationRepository: InMemoryLocationSummaryRepository(summaries: <LocationSummary>[locationSummary]),
-        noiseRepository: InMemoryNoiseSampleRepository(samples: <NoiseSample>[noiseSample]),
-        usageRepository: InMemoryUsageSummaryRepository(summaries: <DigitalUsageSummary>[usageSummary]),
-        metricsRepository: InMemoryMetricsRepository(metrics: <DailyMetrics>[dailyMetrics]),
+        activityRepository: InMemoryActivityRepository(
+            samples: <ActivitySample>[activitySample]),
+        ambientLightRepository: InMemoryAmbientLightSampleRepository(
+          samples: <AmbientLightSample>[lightSample],
+        ),
+        locationRepository: InMemoryLocationSummaryRepository(
+            summaries: <LocationSummary>[locationSummary]),
+        noiseRepository:
+            InMemoryNoiseSampleRepository(samples: <NoiseSample>[noiseSample]),
+        usageRepository: InMemoryUsageSummaryRepository(
+            summaries: <DigitalUsageSummary>[usageSummary]),
+        metricsRepository:
+            InMemoryMetricsRepository(metrics: <DailyMetrics>[dailyMetrics]),
       );
 
       final input = await service.buildInput(window: window);
@@ -161,14 +254,23 @@ void main() {
 
     test('禁用维度不被查询', () async {
       final service = RuleInputService(
-        activityRepository: InMemoryActivityRepository(samples: const <ActivitySample>[]),
-        locationRepository: InMemoryLocationSummaryRepository(summaries: const <LocationSummary>[]),
-        noiseRepository: InMemoryNoiseSampleRepository(samples: const <NoiseSample>[]),
-        usageRepository: InMemoryUsageSummaryRepository(summaries: const <DigitalUsageSummary>[]),
-        metricsRepository: InMemoryMetricsRepository(metrics: const <DailyMetrics>[]),
+        activityRepository:
+            InMemoryActivityRepository(samples: const <ActivitySample>[]),
+        ambientLightRepository:
+            InMemoryAmbientLightSampleRepository(samples: const []),
+        locationRepository: InMemoryLocationSummaryRepository(
+            summaries: const <LocationSummary>[]),
+        noiseRepository:
+            InMemoryNoiseSampleRepository(samples: const <NoiseSample>[]),
+        usageRepository: InMemoryUsageSummaryRepository(
+            summaries: const <DigitalUsageSummary>[]),
+        metricsRepository:
+            InMemoryMetricsRepository(metrics: const <DailyMetrics>[]),
       );
 
-      final input = await service.buildInput(window: window, disabledDimensions: const <String>['location', 'noise']);
+      final input = await service.buildInput(
+          window: window,
+          disabledDimensions: const <String>['location', 'noise']);
 
       expect(input.missingDimensions, contains('location'));
       expect(input.missingDimensions, contains('noise'));
@@ -178,11 +280,18 @@ void main() {
 
     test('空仓储自动标记缺失维度', () async {
       final service = RuleInputService(
-        activityRepository: InMemoryActivityRepository(samples: const <ActivitySample>[]),
-        locationRepository: InMemoryLocationSummaryRepository(summaries: const <LocationSummary>[]),
-        noiseRepository: InMemoryNoiseSampleRepository(samples: const <NoiseSample>[]),
-        usageRepository: InMemoryUsageSummaryRepository(summaries: const <DigitalUsageSummary>[]),
-        metricsRepository: InMemoryMetricsRepository(metrics: const <DailyMetrics>[]),
+        activityRepository:
+            InMemoryActivityRepository(samples: const <ActivitySample>[]),
+        ambientLightRepository:
+            InMemoryAmbientLightSampleRepository(samples: const []),
+        locationRepository: InMemoryLocationSummaryRepository(
+            summaries: const <LocationSummary>[]),
+        noiseRepository:
+            InMemoryNoiseSampleRepository(samples: const <NoiseSample>[]),
+        usageRepository: InMemoryUsageSummaryRepository(
+            summaries: const <DigitalUsageSummary>[]),
+        metricsRepository:
+            InMemoryMetricsRepository(metrics: const <DailyMetrics>[]),
       );
 
       final input = await service.buildInput(window: window);
@@ -194,4 +303,3 @@ void main() {
     });
   });
 }
-

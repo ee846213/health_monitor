@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health_monitor/domain/background/android_background_capture_host_status.dart';
@@ -12,7 +12,8 @@ import 'package:health_monitor/features/diagnostics/providers/diagnostics_provid
 import 'package:health_monitor/services/permission_status_service.dart';
 
 void main() {
-  testWidgets('Debug page loads with full DiagnosticsSnapshot', (WidgetTester tester) async {
+  testWidgets('Debug page loads with full DiagnosticsSnapshot',
+      (WidgetTester tester) async {
     const snapshot = DiagnosticsSnapshot(
       permissionStatuses: <PermissionType, PermissionGrantStatus>{
         PermissionType.motion: PermissionGrantStatus.granted,
@@ -22,6 +23,8 @@ void main() {
       latestActivity: null,
       latestLocationSummary: null,
       latestNoise: null,
+      liveLight: null,
+      latestLight: null,
       liveUsageSummary: null,
       latestUsageSummary: null,
       backgroundCaptureState: BackgroundCaptureState(

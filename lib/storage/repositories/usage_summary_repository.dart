@@ -7,6 +7,8 @@ abstract class UsageSummaryRepository {
   Future<DigitalUsageSummary?> getByDate(DateTime date);
 
   Future<void> upsertSummary(DigitalUsageSummary summary);
+
+  Future<void> upsertAll(List<DigitalUsageSummary> summaries);
 }
 
 class InMemoryUsageSummaryRepository implements UsageSummaryRepository {
@@ -36,6 +38,13 @@ class InMemoryUsageSummaryRepository implements UsageSummaryRepository {
     final key = DateKey.fromDate(summary.date);
     _summaries.removeWhere((item) => DateKey.fromDate(item.date) == key);
     _summaries.add(summary);
+  }
+
+  @override
+  Future<void> upsertAll(List<DigitalUsageSummary> summaries) async {
+    for (final summary in summaries) {
+      await upsertSummary(summary);
+    }
   }
 }
 
@@ -70,5 +79,12 @@ class IsarUsageSummaryRepository implements UsageSummaryRepository {
       }
       await isar.usageSummaryRecords.put(record);
     });
+  }
+
+  @override
+  Future<void> upsertAll(List<DigitalUsageSummary> summaries) async {
+    for (final summary in summaries) {
+      await upsertSummary(summary);
+    }
   }
 }
