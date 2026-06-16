@@ -5,6 +5,7 @@ build/
 .flutter-plugins-dependencies
 
 .superpowers/
+.worktrees/
 
 pubget.err.log
 pubget.out.log
