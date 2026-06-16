@@ -1,9 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
+import 'package:health_monitor/domain/environment/environment_overview.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/rules/engine/rule_verdict.dart';
+import 'package:health_monitor/rules/input/rule_input.dart';
+import 'package:health_monitor/services/dashboard_service.dart';
 import 'package:health_monitor/services/android_risk_event_bridge.dart';
 import 'package:health_monitor/services/android_usage_stats_bridge.dart';
 import 'package:health_monitor/services/data_collector.dart';
@@ -47,6 +51,37 @@ final healthInsightServiceProvider = Provider<HealthInsightService>((Ref ref) {
     androidUsageStatsBridge: AndroidUsageStatsBridge(
       platformBridgeService: PlatformBridgeService(),
     ),
+  );
+});
+
+final dashboardServiceProvider = Provider<DashboardService>((Ref ref) {
+  final insightService = ref.watch(healthInsightServiceProvider);
+  return DashboardService(
+    loadInsightSnapshot: ({
+      required QueryWindow window,
+      DateTime? referenceTime,
+    }) {
+      return insightService.buildSnapshot(
+        window: window,
+        referenceTime: referenceTime,
+      );
+    },
+    buildDailyAdvice: ({
+      required DateTime referenceTime,
+      required RuleInput input,
+      required HealthInsightMetrics metrics,
+      required List<RuleVerdict> verdicts,
+      required EnvironmentOverview? environmentOverview,
+    }) async {
+      return DailyAdviceBubble(
+        text: _buildDashboardFallbackAdvice(
+          metrics: metrics,
+          verdicts: verdicts,
+          environmentOverview: environmentOverview,
+        ),
+        source: DailyAdviceSource.fallback,
+      );
+    },
   );
 });
 
@@ -300,4 +335,21 @@ String _buildTodayStatusDetail({
     return '数据还在积累，稍后再看。';
   }
   return '步数 ${metrics.stepCount}，久坐 ${metrics.sedentaryMinutes} 分钟。';
+}
+
+String _buildDashboardFallbackAdvice({
+  required HealthInsightMetrics metrics,
+  required List<RuleVerdict> verdicts,
+  required EnvironmentOverview? environmentOverview,
+}) {
+  if (verdicts.isNotEmpty) {
+    return verdicts.first.detail;
+  }
+  if (environmentOverview != null) {
+    return environmentOverview.detail;
+  }
+  if (metrics.stepCount < 6000) {
+    return '今天离 6000 步还差一点，饭后补一小段步数会更稳。';
+  }
+  return '整体节奏比较平稳，继续保持现在的活动与用机边界。';
 }
