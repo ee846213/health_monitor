@@ -4,41 +4,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:health_monitor/app/app.dart';
 import 'package:health_monitor/app/router.dart';
+import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
+import 'package:health_monitor/domain/scoring/health_score_calculator.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
 import 'package:health_monitor/features/reminders/pages/reminder_pages.dart';
-import 'package:health_monitor/rules/engine/rule_verdict.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
 import 'package:health_monitor/storage/repositories/reminder_repository.dart';
 
 void main() {
-  const overviewViewModel = OverviewViewModel(
-    screenState: OverviewScreenState.ready,
-    isLoading: false,
-    verdicts: <RuleVerdict>[
-      RuleVerdict(
-        dimension: 'activity',
-        level: 'normal',
-        summary: '活动水平正常',
-        detail: '今天已经采集到稳定活动样本。',
-      ),
-    ],
-    summaryLabel: '活动水平正常',
-    summaryDetail: '今天已经采集到稳定活动样本。',
-    metrics: OverviewMetricSnapshot(
-      stepCount: 5200,
-      sedentaryMinutes: 80,
-      screenMinutes: 110,
-      outdoorMinutes: 22,
-    ),
-    reminders: <ReminderRecord>[],
-    permissionStatuses: <PermissionType, PermissionGrantStatus>{},
-    missingDimensions: <String>[],
-    hasRealData: true,
-  );
+  final overviewViewModel = _buildOverviewViewModel();
 
-  testWidgets('应用壳应渲染今日概览标题', (WidgetTester tester) async {
+  testWidgets('应用壳应渲染今日仪表盘标题', (WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: <Override>[
@@ -50,7 +28,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('今日状态'), findsOneWidget);
+    expect(find.text('今日仪表盘'), findsOneWidget);
   });
 
   testWidgets('应用壳应提供采集调试入口', (WidgetTester tester) async {
@@ -74,7 +52,7 @@ void main() {
 
   testWidgets('提醒记录页点击后应进入提醒详情页', (WidgetTester tester) async {
     final historyRecord = ReminderRecord(
-      triggeredAt: DateTime(2026, 6, 10, 15),
+      triggeredAt: DateTime(2026, 6, 16, 15),
       type: ReminderType.sedentaryBreak,
       title: '起身走一走',
       message: '你已经久坐较长时间，先活动 5 分钟。',
@@ -128,9 +106,11 @@ void main() {
     expect(find.text('最近 2 小时静止样本占比较高。'), findsOneWidget);
   });
 
-  testWidgets('提醒记录页应优先读取历史仓储而不是概览里的即时提醒', (WidgetTester tester) async {
+  testWidgets('提醒记录页应优先读取历史仓储而不是概览里的即时提醒', (
+    WidgetTester tester,
+  ) async {
     final generatedReminder = ReminderRecord(
-      triggeredAt: DateTime(2026, 6, 10, 11),
+      triggeredAt: DateTime(2026, 6, 16, 11),
       type: ReminderType.postureRisk,
       title: '抬高手肘',
       message: '即时规则结果，不应直接作为历史页数据源。',
@@ -139,7 +119,7 @@ void main() {
       response: ReminderResponse.pending,
     );
     final persistedReminder = ReminderRecord(
-      triggeredAt: DateTime(2026, 6, 10, 9),
+      triggeredAt: DateTime(2026, 6, 16, 9),
       type: ReminderType.nightUsage,
       title: '历史提醒',
       message: '这是持久化历史中的提醒。',
@@ -151,22 +131,8 @@ void main() {
       records: <ReminderRecord>[persistedReminder],
     );
 
-    final viewModelWithGeneratedReminder = OverviewViewModel(
-      screenState: OverviewScreenState.ready,
-      isLoading: false,
-      verdicts: <RuleVerdict>[],
-      summaryLabel: '活动水平正常',
-      summaryDetail: '今天已经采集到稳定活动样本。',
-      metrics: OverviewMetricSnapshot(
-        stepCount: 5200,
-        sedentaryMinutes: 80,
-        screenMinutes: 110,
-        outdoorMinutes: 22,
-      ),
+    final viewModelWithGeneratedReminder = _buildOverviewViewModel(
       reminders: <ReminderRecord>[generatedReminder],
-      permissionStatuses: <PermissionType, PermissionGrantStatus>{},
-      missingDimensions: <String>[],
-      hasRealData: true,
     );
 
     await tester.pumpWidget(
@@ -187,4 +153,47 @@ void main() {
     expect(find.text('历史提醒'), findsOneWidget);
     expect(find.text('抬高手肘'), findsNothing);
   });
+}
+
+OverviewDashboardViewModel _buildOverviewViewModel({
+  List<ReminderRecord> reminders = const <ReminderRecord>[],
+}) {
+  return OverviewDashboardViewModel(
+    screenState: OverviewScreenState.ready,
+    dashboard: DashboardSnapshot(
+      generatedAt: DateTime(2026, 6, 16, 9),
+      healthScore: HealthScoreBreakdown(
+        stepScore: 87,
+        sedentaryScore: 90,
+        screenScore: 88,
+        totalScore: 88,
+      ),
+      stepCard: DashboardStepCard(
+        currentSteps: 5200,
+        goalSteps: 6000,
+        achievementPercent: 87,
+      ),
+      sedentaryCard: DashboardSedentaryCard(
+        totalMinutes: 80,
+        longestSingleMinutes: 36,
+      ),
+      screenCard: DashboardScreenCard(
+        totalMinutes: 110,
+        yesterdayDeltaMinutes: -12,
+        changeDirection: DashboardChangeDirection.down,
+      ),
+      environmentSnapshot: DashboardEnvironmentSnapshot(
+        lightLabel: '舒适',
+        noiseLabel: '正常',
+      ),
+      dailyAdviceBubble: DailyAdviceBubble(
+        text: '今天节奏比较稳，晚饭后再补一点步数就很好。',
+        source: DailyAdviceSource.llm,
+      ),
+      hasRealData: true,
+      hasReminderHistory: true,
+    ),
+    permissionStatuses: const <PermissionType, PermissionGrantStatus>{},
+    reminders: reminders,
+  );
 }

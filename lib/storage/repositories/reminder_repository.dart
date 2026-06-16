@@ -12,6 +12,13 @@ abstract class ReminderRepository {
   });
 
   Future<ReminderRecord?> getLatest();
+
+  Future<List<ReminderRecord>> listUndeliveredSince(DateTime since);
+
+  Future<void> markDelivered(
+    Iterable<ReminderRecord> records, {
+    required DateTime deliveredAt,
+  });
 }
 
 class InMemoryReminderRepository implements ReminderRepository {
@@ -53,6 +60,30 @@ class InMemoryReminderRepository implements ReminderRepository {
     final sorted = _records.toList()
       ..sort((left, right) => right.triggeredAt.compareTo(left.triggeredAt));
     return sorted.first;
+  }
+
+  @override
+  Future<List<ReminderRecord>> listUndeliveredSince(DateTime since) async {
+    return _records
+        .where(
+          (item) => item.triggeredAt.isAfter(since) && item.deliveredAt == null,
+        )
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> markDelivered(
+    Iterable<ReminderRecord> records, {
+    required DateTime deliveredAt,
+  }) async {
+    final deliveredKeys = records.map(_historyDedupKeyForRecord).toSet();
+    for (var index = 0; index < _records.length; index++) {
+      final item = _records[index];
+      if (item.deliveredAt == null &&
+          deliveredKeys.contains(_historyDedupKeyForRecord(item))) {
+        _records[index] = item.copyWith(deliveredAt: deliveredAt);
+      }
+    }
   }
 
   void _mergeRecords(Iterable<ReminderRecord> records) {
@@ -105,7 +136,8 @@ class IsarReminderRepository implements ReminderRepository {
     required DateTime referenceDate,
   }) async {
     final keys = DateKey.recentDays(days, referenceDate: referenceDate);
-    final entities = await _isar.reminderRecordEntitys.where().anyId().findAll();
+    final entities =
+        await _isar.reminderRecordEntitys.where().anyId().findAll();
     final filteredEntities = entities
         .where((ReminderRecordEntity entity) => keys.contains(entity.dateKey))
         .toList(growable: false);
@@ -120,7 +152,8 @@ class IsarReminderRepository implements ReminderRepository {
 
   @override
   Future<ReminderRecord?> getLatest() async {
-    final entities = await _isar.reminderRecordEntitys.where().anyId().findAll();
+    final entities =
+        await _isar.reminderRecordEntitys.where().anyId().findAll();
     if (entities.isEmpty) {
       return null;
     }
@@ -128,6 +161,45 @@ class IsarReminderRepository implements ReminderRepository {
       (left, right) => right.triggeredAt.compareTo(left.triggeredAt),
     );
     return entities.first.toDomain();
+  }
+
+  @override
+  Future<List<ReminderRecord>> listUndeliveredSince(DateTime since) async {
+    final entities =
+        await _isar.reminderRecordEntitys.where().anyId().findAll();
+    return entities
+        .where(
+          (item) => item.triggeredAt.isAfter(since) && item.deliveredAt == null,
+        )
+        .map((item) => item.toDomain())
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> markDelivered(
+    Iterable<ReminderRecord> records, {
+    required DateTime deliveredAt,
+  }) async {
+    final deliveredKeys = records.map(_historyDedupKeyForRecord).toSet();
+    final entities =
+        await _isar.reminderRecordEntitys.where().anyId().findAll();
+    final targets = entities
+        .where(
+            (item) => deliveredKeys.contains(_historyDedupKeyForEntity(item)))
+        .toList(growable: false);
+    if (targets.isEmpty) {
+      return;
+    }
+
+    await _isar.writeTxn(() async {
+      for (final entity in targets) {
+        if (entity.deliveredAt != null) {
+          continue;
+        }
+        entity.deliveredAt = deliveredAt;
+      }
+      await _isar.reminderRecordEntitys.putAll(targets);
+    });
   }
 }
 

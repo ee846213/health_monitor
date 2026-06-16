@@ -28,48 +28,53 @@ const ReminderRecordEntitySchema = CollectionSchema(
       name: r'dateKey',
       type: IsarType.string,
     ),
-    r'message': PropertySchema(
+    r'deliveredAt': PropertySchema(
       id: 2,
+      name: r'deliveredAt',
+      type: IsarType.dateTime,
+    ),
+    r'message': PropertySchema(
+      id: 3,
       name: r'message',
       type: IsarType.string,
     ),
     r'reasonSummary': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'reasonSummary',
       type: IsarType.string,
     ),
     r'reminderTypeKey': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'reminderTypeKey',
       type: IsarType.string,
     ),
     r'responseKey': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'responseKey',
       type: IsarType.string,
     ),
     r'sourceDimension': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'sourceDimension',
       type: IsarType.string,
     ),
     r'sourceEventId': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'sourceEventId',
       type: IsarType.string,
     ),
     r'title': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'title',
       type: IsarType.string,
     ),
     r'triggeredAt': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'triggeredAt',
       type: IsarType.dateTime,
     ),
     r'typeKey': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'typeKey',
       type: IsarType.string,
     )
@@ -130,15 +135,16 @@ void _reminderRecordEntitySerialize(
 ) {
   writer.writeString(offsets[0], object.actionSuggestion);
   writer.writeString(offsets[1], object.dateKey);
-  writer.writeString(offsets[2], object.message);
-  writer.writeString(offsets[3], object.reasonSummary);
-  writer.writeString(offsets[4], object.reminderTypeKey);
-  writer.writeString(offsets[5], object.responseKey);
-  writer.writeString(offsets[6], object.sourceDimension);
-  writer.writeString(offsets[7], object.sourceEventId);
-  writer.writeString(offsets[8], object.title);
-  writer.writeDateTime(offsets[9], object.triggeredAt);
-  writer.writeString(offsets[10], object.typeKey);
+  writer.writeDateTime(offsets[2], object.deliveredAt);
+  writer.writeString(offsets[3], object.message);
+  writer.writeString(offsets[4], object.reasonSummary);
+  writer.writeString(offsets[5], object.reminderTypeKey);
+  writer.writeString(offsets[6], object.responseKey);
+  writer.writeString(offsets[7], object.sourceDimension);
+  writer.writeString(offsets[8], object.sourceEventId);
+  writer.writeString(offsets[9], object.title);
+  writer.writeDateTime(offsets[10], object.triggeredAt);
+  writer.writeString(offsets[11], object.typeKey);
 }
 
 ReminderRecordEntity _reminderRecordEntityDeserialize(
@@ -150,16 +156,17 @@ ReminderRecordEntity _reminderRecordEntityDeserialize(
   final object = ReminderRecordEntity();
   object.actionSuggestion = reader.readString(offsets[0]);
   object.dateKey = reader.readString(offsets[1]);
+  object.deliveredAt = reader.readDateTimeOrNull(offsets[2]);
   object.id = id;
-  object.message = reader.readString(offsets[2]);
-  object.reasonSummary = reader.readString(offsets[3]);
-  object.reminderTypeKey = reader.readStringOrNull(offsets[4]);
-  object.responseKey = reader.readString(offsets[5]);
-  object.sourceDimension = reader.readStringOrNull(offsets[6]);
-  object.sourceEventId = reader.readStringOrNull(offsets[7]);
-  object.title = reader.readString(offsets[8]);
-  object.triggeredAt = reader.readDateTime(offsets[9]);
-  object.typeKey = reader.readString(offsets[10]);
+  object.message = reader.readString(offsets[3]);
+  object.reasonSummary = reader.readString(offsets[4]);
+  object.reminderTypeKey = reader.readStringOrNull(offsets[5]);
+  object.responseKey = reader.readString(offsets[6]);
+  object.sourceDimension = reader.readStringOrNull(offsets[7]);
+  object.sourceEventId = reader.readStringOrNull(offsets[8]);
+  object.title = reader.readString(offsets[9]);
+  object.triggeredAt = reader.readDateTime(offsets[10]);
+  object.typeKey = reader.readString(offsets[11]);
   return object;
 }
 
@@ -175,22 +182,24 @@ P _reminderRecordEntityDeserializeProp<P>(
     case 1:
       return (reader.readString(offset)) as P;
     case 2:
-      return (reader.readString(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 3:
       return (reader.readString(offset)) as P;
     case 4:
-      return (reader.readStringOrNull(offset)) as P;
-    case 5:
       return (reader.readString(offset)) as P;
-    case 6:
+    case 5:
       return (reader.readStringOrNull(offset)) as P;
+    case 6:
+      return (reader.readString(offset)) as P;
     case 7:
       return (reader.readStringOrNull(offset)) as P;
     case 8:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 9:
-      return (reader.readDateTime(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 10:
+      return (reader.readDateTime(offset)) as P;
+    case 11:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -566,6 +575,80 @@ extension ReminderRecordEntityQueryFilter on QueryBuilder<ReminderRecordEntity,
       return query.addFilterCondition(FilterCondition.greaterThan(
         property: r'dateKey',
         value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> deliveredAtIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'deliveredAt',
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> deliveredAtIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'deliveredAt',
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> deliveredAtEqualTo(DateTime? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'deliveredAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> deliveredAtGreaterThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'deliveredAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> deliveredAtLessThan(
+    DateTime? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'deliveredAt',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity,
+      QAfterFilterCondition> deliveredAtBetween(
+    DateTime? lower,
+    DateTime? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'deliveredAt',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
       ));
     });
   }
@@ -1878,6 +1961,20 @@ extension ReminderRecordEntityQuerySortBy
   }
 
   QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QAfterSortBy>
+      sortByDeliveredAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'deliveredAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QAfterSortBy>
+      sortByDeliveredAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'deliveredAt', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QAfterSortBy>
       sortByMessage() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'message', Sort.asc);
@@ -2031,6 +2128,20 @@ extension ReminderRecordEntityQuerySortThenBy
       thenByDateKeyDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'dateKey', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QAfterSortBy>
+      thenByDeliveredAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'deliveredAt', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QAfterSortBy>
+      thenByDeliveredAtDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'deliveredAt', Sort.desc);
     });
   }
 
@@ -2193,6 +2304,13 @@ extension ReminderRecordEntityQueryWhereDistinct
   }
 
   QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QDistinct>
+      distinctByDeliveredAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'deliveredAt');
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, ReminderRecordEntity, QDistinct>
       distinctByMessage({bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'message', caseSensitive: caseSensitive);
@@ -2279,6 +2397,13 @@ extension ReminderRecordEntityQueryProperty on QueryBuilder<
       dateKeyProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'dateKey');
+    });
+  }
+
+  QueryBuilder<ReminderRecordEntity, DateTime?, QQueryOperations>
+      deliveredAtProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'deliveredAt');
     });
   }
 

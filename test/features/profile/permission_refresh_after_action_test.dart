@@ -1,18 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
+import 'package:health_monitor/domain/notification/notification_preference.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
-import 'package:health_monitor/domain/reminder/reminder_record.dart';
+import 'package:health_monitor/domain/scoring/health_score_calculator.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
 import 'package:health_monitor/features/profile/pages/profile_page.dart';
-import 'package:health_monitor/rules/engine/rule_verdict.dart';
+import 'package:health_monitor/features/profile/providers/notification_preference_provider.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
 
 void main() {
-  testWidgets('点击权限项后应重新读取权限并刷新首页状态', (WidgetTester tester) async {
+  testWidgets('点击权限项后应重新读取权限并刷新首页状态', (
+    WidgetTester tester,
+  ) async {
     var granted = false;
     var readCount = 0;
     var handledType = PermissionType.notification;
+    final notifier = _FakeNotificationPreferenceNotifier(
+      const NotificationPreference(
+        enabled: true,
+        startHour: 22,
+        startMinute: 30,
+        endHour: 7,
+        endMinute: 0,
+      ),
+    );
 
     final container = ProviderContainer(
       overrides: <Override>[
@@ -21,8 +34,9 @@ void main() {
             onRead: () {
               readCount += 1;
               return <PermissionType, PermissionGrantStatus>{
-                PermissionType.motion:
-                    granted ? PermissionGrantStatus.granted : PermissionGrantStatus.denied,
+                PermissionType.motion: granted
+                    ? PermissionGrantStatus.granted
+                    : PermissionGrantStatus.denied,
                 PermissionType.location: PermissionGrantStatus.granted,
                 PermissionType.microphone: PermissionGrantStatus.granted,
                 PermissionType.notification: PermissionGrantStatus.granted,
@@ -34,30 +48,45 @@ void main() {
         ),
         overviewViewModelProvider.overrideWith((Ref ref) async {
           final statuses = await ref.watch(permissionStatusProvider.future);
-          final deniedCount = statuses.values.where(
-            (PermissionGrantStatus status) =>
-                status == PermissionGrantStatus.denied ||
-                status == PermissionGrantStatus.restricted,
-          ).length;
-          return OverviewViewModel(
-            screenState:
-                deniedCount >= 3 ? OverviewScreenState.permissionDenied : OverviewScreenState.ready,
-            isLoading: false,
-            verdicts: const <RuleVerdict>[],
-            summaryLabel: '测试',
-            summaryDetail: '测试',
-            metrics: const OverviewMetricSnapshot(
-              stepCount: 1,
-              sedentaryMinutes: 1,
-              screenMinutes: 1,
-              outdoorMinutes: 1,
+          return OverviewDashboardViewModel(
+            screenState: OverviewScreenState.ready,
+            dashboard: DashboardSnapshot(
+              generatedAt: DateTime(2026, 6, 16, 9),
+              healthScore: HealthScoreBreakdown(
+                stepScore: 81,
+                sedentaryScore: 92,
+                screenScore: 88,
+                totalScore: 87,
+              ),
+              stepCard: DashboardStepCard(
+                currentSteps: 4860,
+                goalSteps: 6000,
+                achievementPercent: 81,
+              ),
+              sedentaryCard: DashboardSedentaryCard(
+                totalMinutes: 96,
+                longestSingleMinutes: 42,
+              ),
+              screenCard: DashboardScreenCard(
+                totalMinutes: 148,
+                yesterdayDeltaMinutes: -18,
+                changeDirection: DashboardChangeDirection.down,
+              ),
+              environmentSnapshot: DashboardEnvironmentSnapshot(
+                lightLabel: '舒适',
+                noiseLabel: '正常',
+              ),
+              dailyAdviceBubble: DailyAdviceBubble(
+                text: '晚饭后散步 15 分钟会更稳。',
+                source: DailyAdviceSource.llm,
+              ),
+              hasRealData: true,
+              hasReminderHistory: true,
             ),
-            reminders: const <ReminderRecord>[],
             permissionStatuses: statuses,
-            missingDimensions: const <String>[],
-            hasRealData: true,
           );
         }),
+        notificationPreferenceProvider.overrideWith(() => notifier),
         permissionInteractionServiceProvider.overrideWithValue(
           FakePermissionInteractionService(
             handler: (PermissionType type) async {
@@ -102,5 +131,23 @@ class _FakePermissionStatusService implements PermissionStatusService {
   @override
   Future<Map<PermissionType, PermissionGrantStatus>> getStatuses() async {
     return onRead();
+  }
+}
+
+class _FakeNotificationPreferenceNotifier
+    extends NotificationPreferenceNotifier {
+  _FakeNotificationPreferenceNotifier(NotificationPreference initialValue)
+      : _initialValue = initialValue;
+
+  final NotificationPreference _initialValue;
+
+  @override
+  Future<NotificationPreference> build() async {
+    return _initialValue;
+  }
+
+  @override
+  Future<void> save(NotificationPreference preference) async {
+    state = AsyncData(preference);
   }
 }

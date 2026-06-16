@@ -7,6 +7,7 @@ import 'package:health_monitor/features/overview/pages/overview_page.dart';
 import 'package:health_monitor/features/profile/pages/profile_page.dart';
 import 'package:health_monitor/features/reminders/pages/reminder_pages.dart';
 import 'package:health_monitor/features/state_pages/state_pages.dart';
+import 'package:health_monitor/features/trends/pages/trend_analysis_page.dart';
 
 const Color _textMuted = Color(0xFF7A8179);
 const Color _sageSoft = Color(0xFFE6EEE8);
@@ -162,6 +163,10 @@ final GoRouter appRouter = GoRouter(
           builder: (_, __) => const ProfilePage(),
         ),
       ],
+    ),
+    GoRoute(
+      path: '/trends',
+      builder: (_, __) => const TrendAnalysisPage(),
     ),
     GoRoute(
       path: '/reminders',

@@ -7,15 +7,18 @@ import 'package:health_monitor/domain/health/capture_checkpoint.dart';
 import 'package:health_monitor/domain/health/capture_health_event.dart';
 import 'package:health_monitor/domain/motion/activity_sample.dart';
 import 'package:health_monitor/domain/motion/posture_sample.dart';
+import 'package:health_monitor/domain/notification/notification_preference.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
 import 'package:health_monitor/storage/isar/collections/activity_sample_record.dart';
+import 'package:health_monitor/storage/isar/collections/ai_suggestion_cache_record.dart';
 import 'package:health_monitor/storage/isar/collections/capture_checkpoint_record.dart';
 import 'package:health_monitor/storage/isar/collections/capture_health_event_record.dart';
 import 'package:health_monitor/storage/isar/collections/ambient_light_sample_record.dart';
 import 'package:health_monitor/storage/isar/collections/daily_metrics_record.dart';
 import 'package:health_monitor/storage/isar/collections/location_summary_record.dart';
 import 'package:health_monitor/storage/isar/collections/noise_sample_record.dart';
+import 'package:health_monitor/storage/isar/collections/notification_preference_record.dart';
 import 'package:health_monitor/storage/isar/collections/posture_sample_record.dart';
 import 'package:health_monitor/storage/isar/collections/reminder_record_entity.dart';
 import 'package:health_monitor/storage/isar/collections/usage_summary_record.dart';
@@ -128,6 +131,7 @@ void main() {
       reasonSummary: '14:00 到 15:30 几乎没有活动。',
       actionSuggestion: '先活动两分钟再继续。',
       response: ReminderResponse.taken,
+      deliveredAt: DateTime(2026, 6, 9, 15, 31),
     );
 
     final record = ReminderRecordEntity.fromDomain(reminder);
@@ -135,7 +139,32 @@ void main() {
     expect(record.dateKey, '2026-06-09');
     expect(record.typeKey, ReminderType.sedentaryBreak.name);
     expect(record.responseKey, ReminderResponse.taken.name);
+    expect(record.deliveredAt, DateTime(2026, 6, 9, 15, 31));
     expect(record.reasonSummary, contains('没有活动'));
+  });
+
+  test('勿扰设置与 AI 建议缓存记录应保留恢复所需字段', () {
+    const preference = NotificationPreference(
+      enabled: true,
+      startHour: 22,
+      startMinute: 30,
+      endHour: 7,
+      endMinute: 0,
+    );
+
+    final preferenceRecord = NotificationPreferenceRecord.fromDomain(
+      preference,
+    );
+    final cacheRecord = AiSuggestionCacheRecord.fromFields(
+      date: DateTime(2026, 6, 16, 9),
+      text: '晚饭后散步 15 分钟会更稳。',
+    );
+
+    expect(preferenceRecord.enabled, isTrue);
+    expect(preferenceRecord.startHour, 22);
+    expect(preferenceRecord.endMinute, 0);
+    expect(cacheRecord.dateKey, '2026-06-16');
+    expect(cacheRecord.text, '晚饭后散步 15 分钟会更稳。');
   });
 
   test('采集健康事件与检查点应保留恢复诊断所需字段', () {

@@ -1,6 +1,12 @@
+import 'dart:ffi';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
+import 'package:health_monitor/rules/engine/rule_verdict.dart';
+import 'package:health_monitor/storage/isar/collections/reminder_record_entity.dart';
 import 'package:health_monitor/storage/repositories/reminder_repository.dart';
+import 'package:isar/isar.dart';
 
 void main() {
   test('提醒仓储应按最近天数返回最新在前的历史结果', () async {
@@ -104,4 +110,164 @@ void main() {
     expect(result, hasLength(1));
     expect(result.single.sourceEventId, 'walking-risk-1');
   });
+
+  test('提醒仓储能查询未投递记录并标记为已投递', () async {
+    final repository = InMemoryReminderRepository(
+      records: <ReminderRecord>[
+        ReminderRecord.fromVerdict(
+          verdict: const RuleVerdict(
+            dimension: 'activity',
+            level: 'warning',
+            summary: '起身活动一下',
+            detail: '已经久坐一段时间',
+            shouldRemind: true,
+            reminderType: 'sedentaryBreak',
+          ),
+          now: DateTime(2026, 6, 16, 10, 0),
+        ),
+      ],
+    );
+
+    final pending = await repository.listUndeliveredSince(
+      DateTime(2026, 6, 16, 0, 0),
+    );
+    await repository.markDelivered(
+      pending,
+      deliveredAt: DateTime(2026, 6, 16, 10, 1),
+    );
+    final afterDelivery = await repository.listUndeliveredSince(
+      DateTime(2026, 6, 16, 0, 0),
+    );
+
+    expect(pending, hasLength(1));
+    expect(pending.single.deliveredAt, isNull);
+    expect(afterDelivery, isEmpty);
+  });
+
+  test('重复标记已投递提醒时不应改写首次投递时间', () async {
+    final repository = InMemoryReminderRepository(
+      records: <ReminderRecord>[
+        ReminderRecord.fromVerdict(
+          verdict: const RuleVerdict(
+            dimension: 'activity',
+            level: 'warning',
+            summary: '起身活动一下',
+            detail: '已经久坐一段时间',
+            shouldRemind: true,
+            reminderType: 'sedentaryBreak',
+          ),
+          now: DateTime(2026, 6, 16, 10, 0),
+        ),
+      ],
+    );
+
+    final pending = await repository.listUndeliveredSince(
+      DateTime(2026, 6, 16, 0, 0),
+    );
+    await repository.markDelivered(
+      pending,
+      deliveredAt: DateTime(2026, 6, 16, 10, 1),
+    );
+    final deliveredRecord = (await repository.listRecentDays(
+      1,
+      referenceDate: DateTime(2026, 6, 16),
+    ))
+        .single;
+    await repository.markDelivered(
+      <ReminderRecord>[deliveredRecord],
+      deliveredAt: DateTime(2026, 6, 16, 10, 5),
+    );
+    final stored = (await repository.listRecentDays(
+      1,
+      referenceDate: DateTime(2026, 6, 16),
+    ))
+        .single;
+
+    expect(stored.deliveredAt, DateTime(2026, 6, 16, 10, 1));
+  });
+
+  test('Isar 提醒仓储能筛选未投递记录并保留首次投递时间', () async {
+    await _initializeIsarCoreForTest();
+    final dir = await Directory.systemTemp.createTemp('isar-reminder-test');
+    final isar = await Isar.open(
+      <CollectionSchema>[ReminderRecordEntitySchema],
+      directory: dir.path,
+      name: 'isar_reminder_repo_test',
+    );
+    final repository = IsarReminderRepository(isar);
+
+    addTearDown(() async {
+      await isar.close();
+      if (await dir.exists()) {
+        await dir.delete(recursive: true);
+      }
+    });
+
+    final reminder = ReminderRecord.fromVerdict(
+      verdict: const RuleVerdict(
+        dimension: 'activity',
+        level: 'warning',
+        summary: '起身活动一下',
+        detail: '已经久坐一段时间',
+        shouldRemind: true,
+        reminderType: 'sedentaryBreak',
+      ),
+      now: DateTime(2026, 6, 16, 10, 0),
+    );
+
+    await repository.saveAll(<ReminderRecord>[reminder]);
+    final pending = await repository.listUndeliveredSince(
+      DateTime(2026, 6, 16, 0, 0),
+    );
+    await repository.markDelivered(
+      pending,
+      deliveredAt: DateTime(2026, 6, 16, 10, 1),
+    );
+    final afterDelivery = await repository.listUndeliveredSince(
+      DateTime(2026, 6, 16, 0, 0),
+    );
+    final deliveredRecord = (await repository.listRecentDays(
+      1,
+      referenceDate: DateTime(2026, 6, 16),
+    ))
+        .single;
+    await repository.markDelivered(
+      <ReminderRecord>[deliveredRecord],
+      deliveredAt: DateTime(2026, 6, 16, 10, 5),
+    );
+    final stored = (await repository.listRecentDays(
+      1,
+      referenceDate: DateTime(2026, 6, 16),
+    ))
+        .single;
+
+    expect(pending, hasLength(1));
+    expect(afterDelivery, isEmpty);
+    expect(stored.deliveredAt, DateTime(2026, 6, 16, 10, 1));
+  });
+}
+
+Future<void> _initializeIsarCoreForTest() async {
+  final localAppData = Platform.environment['LOCALAPPDATA'];
+  if (localAppData == null || localAppData.isEmpty) {
+    throw StateError('缺少 LOCALAPPDATA，无法定位 Isar Windows 动态库。');
+  }
+
+  final hostedDirectory = Directory(
+    '$localAppData\\Pub\\Cache\\hosted\\pub.dev',
+  );
+  final libraryDirectory =
+      hostedDirectory.listSync().whereType<Directory>().firstWhere(
+            (item) => item.path
+                .split(Platform.pathSeparator)
+                .last
+                .startsWith('isar_flutter_libs-'),
+          );
+  final libraryPath =
+      '${libraryDirectory.path}${Platform.pathSeparator}windows${Platform.pathSeparator}isar.dll';
+  await Isar.initializeIsarCore(
+    libraries: <Abi, String>{
+      Abi.windowsX64: libraryPath,
+    },
+  );
 }

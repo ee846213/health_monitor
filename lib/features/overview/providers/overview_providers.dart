@@ -1,16 +1,23 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
+import 'package:health_monitor/domain/environment/environment_overview.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/rules/engine/rule_verdict.dart';
+import 'package:health_monitor/rules/input/rule_input.dart';
+import 'package:health_monitor/services/ai_suggestion_service.dart';
 import 'package:health_monitor/services/android_risk_event_bridge.dart';
 import 'package:health_monitor/services/android_usage_stats_bridge.dart';
+import 'package:health_monitor/services/dashboard_service.dart';
 import 'package:health_monitor/services/data_collector.dart';
 import 'package:health_monitor/services/health_insight_service.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
 import 'package:health_monitor/services/platform_bridge_service.dart';
 import 'package:health_monitor/storage/isar/app_isar.dart';
+import 'package:health_monitor/storage/repositories/ai_suggestion_cache_repository.dart';
 import 'package:health_monitor/storage/repositories/query_window.dart';
 import 'package:health_monitor/storage/repositories/reminder_repository.dart';
 
@@ -32,6 +39,52 @@ final reminderRepositoryProvider = FutureProvider<ReminderRepository>(
   },
 );
 
+final aiSuggestionCacheRepositoryProvider =
+    FutureProvider<AiSuggestionCacheRepository>((Ref ref) async {
+  final isar = await ref.watch(appIsarProvider.future);
+  return IsarAiSuggestionCacheRepository(isar);
+});
+
+final aiSuggestionDioProvider = Provider<Dio>((Ref ref) {
+  return Dio(
+    BaseOptions(
+      baseUrl: 'https://api.openai.com',
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 20),
+      contentType: Headers.jsonContentType,
+      responseType: ResponseType.json,
+    ),
+  );
+});
+
+final aiSuggestionServiceProvider = FutureProvider<AiSuggestionService>(
+  (Ref ref) async {
+    final cacheRepository =
+        await ref.watch(aiSuggestionCacheRepositoryProvider.future);
+    return AiSuggestionService(
+      cacheRepository: cacheRepository,
+      dio: ref.watch(aiSuggestionDioProvider),
+      apiKey: const String.fromEnvironment('OPENAI_API_KEY'),
+      model: const String.fromEnvironment(
+        'OPENAI_MODEL',
+        defaultValue: 'gpt-5.5',
+      ),
+      fallbackBuilder: (
+        RuleInput input,
+        HealthInsightMetrics metrics,
+        List<RuleVerdict> verdicts,
+        EnvironmentOverview? environmentOverview,
+      ) {
+        return _buildDashboardFallbackAdvice(
+          metrics: metrics,
+          verdicts: verdicts,
+          environmentOverview: environmentOverview,
+        );
+      },
+    );
+  },
+);
+
 final healthInsightServiceProvider = Provider<HealthInsightService>((Ref ref) {
   return HealthInsightService(
     activityRepository: ref.watch(sharedActivityRepo),
@@ -50,76 +103,64 @@ final healthInsightServiceProvider = Provider<HealthInsightService>((Ref ref) {
   );
 });
 
+final dashboardServiceProvider = Provider<DashboardService>((Ref ref) {
+  final insightService = ref.watch(healthInsightServiceProvider);
+  return DashboardService(
+    loadInsightSnapshot: ({
+      required QueryWindow window,
+      DateTime? referenceTime,
+    }) {
+      return insightService.buildSnapshot(
+        window: window,
+        referenceTime: referenceTime,
+      );
+    },
+    buildDailyAdvice: ({
+      required DateTime referenceTime,
+      required RuleInput input,
+      required HealthInsightMetrics metrics,
+      required List<RuleVerdict> verdicts,
+      required EnvironmentOverview? environmentOverview,
+    }) async {
+      final aiSuggestionService =
+          await ref.read(aiSuggestionServiceProvider.future);
+      return aiSuggestionService.buildDailyAdvice(
+        referenceTime: referenceTime,
+        input: input,
+        metrics: metrics,
+        verdicts: verdicts,
+        environmentOverview: environmentOverview,
+      );
+    },
+  );
+});
+
 enum OverviewScreenState {
   ready,
   permissionDenied,
   dataInsufficient,
 }
 
-class OverviewMetricSnapshot {
-  const OverviewMetricSnapshot({
-    required this.stepCount,
-    required this.sedentaryMinutes,
-    required this.screenMinutes,
-    required this.outdoorMinutes,
-  });
-
-  final int stepCount;
-  final int sedentaryMinutes;
-  final int screenMinutes;
-  final int outdoorMinutes;
-}
-
-class OverviewViewModel {
-  const OverviewViewModel({
+class OverviewDashboardViewModel {
+  const OverviewDashboardViewModel({
     required this.screenState,
-    required this.verdicts,
-    required this.summaryLabel,
-    required this.summaryDetail,
-    required this.metrics,
-    required this.reminders,
+    required this.dashboard,
     required this.permissionStatuses,
-    this.todayStatusLabel,
-    this.todayStatusDetail,
-    this.conclusionLabel,
-    this.conclusionDetail,
     this.preciseDetectionNotice,
     this.missingDimensions = const <String>[],
-    this.hasRealData = false,
-    this.isLoading = false,
+    this.reminders = const <ReminderRecord>[],
   });
 
   final OverviewScreenState screenState;
-  final bool isLoading;
-  final List<RuleVerdict> verdicts;
-  final String summaryLabel;
-  final String summaryDetail;
-  final String? todayStatusLabel;
-  final String? todayStatusDetail;
-  final String? conclusionLabel;
-  final String? conclusionDetail;
-  final String? preciseDetectionNotice;
-  final OverviewMetricSnapshot metrics;
-  final List<ReminderRecord> reminders;
+  final DashboardSnapshot dashboard;
   final Map<PermissionType, PermissionGrantStatus> permissionStatuses;
+  final String? preciseDetectionNotice;
   final List<String> missingDimensions;
-  final bool hasRealData;
-
-  String get resolvedTodayStatusLabel => todayStatusLabel ?? summaryLabel;
-  String get resolvedTodayStatusDetail => todayStatusDetail ?? summaryDetail;
-  String get resolvedConclusionLabel => conclusionLabel ?? summaryLabel;
-  String get resolvedConclusionDetail => conclusionDetail ?? summaryDetail;
+  final List<ReminderRecord> reminders;
 
   bool get hasMissingDimensions => missingDimensions.isNotEmpty;
   bool get hasPreciseDetectionNotice =>
       preciseDetectionNotice != null && preciseDetectionNotice!.isNotEmpty;
-
-  List<RuleVerdict> get secondaryVerdicts {
-    if (verdicts.length <= 1) {
-      return const <RuleVerdict>[];
-    }
-    return verdicts.skip(1).toList(growable: false);
-  }
 }
 
 final walkingScreenRiskNoticeProvider =
@@ -133,58 +174,36 @@ final walkingScreenRiskNoticeProvider =
 });
 
 final overviewViewModelProvider =
-    FutureProvider<OverviewViewModel>((Ref ref) async {
+    FutureProvider<OverviewDashboardViewModel>((Ref ref) async {
   ref.watch(dataCollectorRevisionProvider);
   ref.watch(dataCollectorProvider);
 
   final permissionStatuses = await ref.watch(permissionStatusProvider.future);
   final insightService = ref.watch(healthInsightServiceProvider);
-  final snapshot = await insightService.buildSnapshot(
-    window: QueryWindow.recentDay(referenceTime: DateTime.now()),
+  final dashboardService = ref.watch(dashboardServiceProvider);
+  final referenceTime = DateTime.now();
+  final insight = await insightService.buildSnapshot(
+    window: QueryWindow.recentDay(referenceTime: referenceTime),
   );
+  final dashboard = await dashboardService.build(referenceTime: referenceTime);
 
-  final metrics = OverviewMetricSnapshot(
-    stepCount: snapshot.metrics.stepCount,
-    sedentaryMinutes: snapshot.metrics.sedentaryMinutes,
-    screenMinutes: snapshot.metrics.screenMinutes,
-    outdoorMinutes: snapshot.metrics.outdoorMinutes,
-  );
-  final primary = snapshot.verdicts.isEmpty ? null : snapshot.verdicts.first;
-  final todayStatusLabel = _buildTodayStatusLabel(
-    metrics: metrics,
-    hasRealData: snapshot.hasRealData,
-  );
-  final todayStatusDetail = _buildTodayStatusDetail(
-    metrics: metrics,
-    hasRealData: snapshot.hasRealData,
-  );
-
-  return OverviewViewModel(
+  return OverviewDashboardViewModel(
     screenState: resolveOverviewScreenState(
       permissionStatuses: permissionStatuses,
-      hasRealData: snapshot.hasRealData,
-      hasReminderHistory: snapshot.reminderHistory.isNotEmpty,
+      hasRealData: dashboard.hasRealData,
+      hasReminderHistory: dashboard.hasReminderHistory,
     ),
-    isLoading: false,
-    verdicts: snapshot.verdicts,
-    summaryLabel: todayStatusLabel,
-    summaryDetail: todayStatusDetail,
-    todayStatusLabel: todayStatusLabel,
-    todayStatusDetail: todayStatusDetail,
-    conclusionLabel: primary?.summary ?? '暂时没风险',
-    conclusionDetail: primary?.detail ?? '当前没有需要优先处理的事项。',
+    dashboard: dashboard,
     preciseDetectionNotice: buildWalkingScreenRiskPrecisionNotice(
       permissionStatuses: permissionStatuses,
       isAndroid: Platform.isAndroid,
       isIOS: Platform.isIOS,
     ),
-    metrics: metrics,
-    reminders: snapshot.reminderHistory,
+    reminders: insight.reminderHistory,
     permissionStatuses: permissionStatuses,
-    missingDimensions: snapshot.input.missingDimensions
+    missingDimensions: insight.input.missingDimensions
         .map(localizedDimensionLabel)
         .toList(growable: false),
-    hasRealData: snapshot.hasRealData,
   );
 });
 
@@ -273,31 +292,19 @@ String? buildWalkingScreenRiskPrecisionNotice({
   return null;
 }
 
-String _buildTodayStatusLabel({
-  required OverviewMetricSnapshot metrics,
-  required bool hasRealData,
+String _buildDashboardFallbackAdvice({
+  required HealthInsightMetrics metrics,
+  required List<RuleVerdict> verdicts,
+  required EnvironmentOverview? environmentOverview,
 }) {
-  if (!hasRealData) {
-    return '数据还在积累';
+  if (verdicts.isNotEmpty) {
+    return verdicts.first.detail;
   }
-  if (metrics.stepCount < 5000) {
-    return '活动偏少';
+  if (environmentOverview != null) {
+    return environmentOverview.detail;
   }
-  if (metrics.sedentaryMinutes >= 180) {
-    return '久坐偏长';
+  if (metrics.stepCount < 6000) {
+    return '今天离 6000 步还差一点，饭后补一小段步数会更稳。';
   }
-  if (metrics.screenMinutes >= 240) {
-    return '看屏偏多';
-  }
-  return '状态平稳';
-}
-
-String _buildTodayStatusDetail({
-  required OverviewMetricSnapshot metrics,
-  required bool hasRealData,
-}) {
-  if (!hasRealData) {
-    return '数据还在积累，稍后再看。';
-  }
-  return '步数 ${metrics.stepCount}，久坐 ${metrics.sedentaryMinutes} 分钟。';
+  return '整体节奏比较平稳，继续保持现在的活动与用机边界。';
 }

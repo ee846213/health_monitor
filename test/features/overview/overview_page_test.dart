@@ -1,93 +1,108 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
-import 'package:health_monitor/domain/reminder/reminder_record.dart';
+import 'package:health_monitor/domain/scoring/health_score_calculator.dart';
 import 'package:health_monitor/features/overview/pages/overview_page.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
-import 'package:health_monitor/rules/engine/rule_verdict.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
 
 void main() {
-  testWidgets('overview shows dashboard for ready data', (WidgetTester tester) async {
-    const viewModel = OverviewViewModel(
-      screenState: OverviewScreenState.ready,
-      isLoading: false,
-      verdicts: <RuleVerdict>[
-        RuleVerdict(
-          dimension: 'activity',
-          level: 'concern',
-          summary: 'ACTIVE_TOO_LOW',
-          detail: 'take a 5 minute walk',
+  testWidgets('棣栭〉灞曠ず缁煎悎鍋ュ悍鍒嗐€佷笁寮犲崱鐗囥€佺幆澧冨揩鐓у拰 AI 寤鸿', (
+    WidgetTester tester,
+  ) async {
+    final viewModel = _buildViewModel();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          overviewViewModelProvider.overrideWith((Ref ref) async => viewModel),
+        ],
+        child: const MaterialApp(home: OverviewPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('综合健康分'), findsOneWidget);
+    expect(find.text('步数'), findsOneWidget);
+    expect(find.text('久坐'), findsOneWidget);
+    expect(find.text('屏幕'), findsOneWidget);
+    expect(find.textContaining('环境快照'), findsOneWidget);
+    expect(find.textContaining('AI 建议'), findsOneWidget);
+    expect(find.text('晚饭后散步 15 分钟会更稳。'), findsOneWidget);
+  });
+
+  testWidgets('点击综合健康分应跳转到趋势页', (WidgetTester tester) async {
+    final viewModel = _buildViewModel();
+    final router = GoRouter(
+      initialLocation: '/overview',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/overview',
+          builder: (_, __) => const OverviewPage(),
+        ),
+        GoRoute(
+          path: '/trends',
+          builder: (_, __) => const Scaffold(body: Text('趋势页占位')),
         ),
       ],
-      summaryLabel: 'ACTIVE_TOO_LOW',
-      summaryDetail: 'take a 5 minute walk',
-      todayStatusLabel: 'ACTIVE_LOW',
-      todayStatusDetail: 'steps 1600, sedentary 145',
-      conclusionLabel: 'ACTIVE_TOO_LOW',
-      conclusionDetail: 'take a 5 minute walk',
-      metrics: OverviewMetricSnapshot(
-        stepCount: 1600,
-        sedentaryMinutes: 145,
-        screenMinutes: 80,
-        outdoorMinutes: 10,
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          overviewViewModelProvider.overrideWith((Ref ref) async => viewModel),
+        ],
+        child: MaterialApp.router(routerConfig: router),
       ),
-      reminders: <ReminderRecord>[],
-      permissionStatuses: <PermissionType, PermissionGrantStatus>{},
-      missingDimensions: <String>[],
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('综合健康分'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('趋势页占位'), findsOneWidget);
+  });
+}
+
+OverviewDashboardViewModel _buildViewModel() {
+  return OverviewDashboardViewModel(
+    screenState: OverviewScreenState.ready,
+    dashboard: DashboardSnapshot(
+      generatedAt: DateTime(2026, 6, 16, 9),
+      healthScore: HealthScoreBreakdown(
+        stepScore: 81,
+        sedentaryScore: 92,
+        screenScore: 88,
+        totalScore: 87,
+      ),
+      stepCard: DashboardStepCard(
+        currentSteps: 4860,
+        goalSteps: 6000,
+        achievementPercent: 81,
+      ),
+      sedentaryCard: DashboardSedentaryCard(
+        totalMinutes: 96,
+        longestSingleMinutes: 42,
+      ),
+      screenCard: DashboardScreenCard(
+        totalMinutes: 148,
+        yesterdayDeltaMinutes: -18,
+        changeDirection: DashboardChangeDirection.down,
+      ),
+      environmentSnapshot: DashboardEnvironmentSnapshot(
+        lightLabel: '舒适',
+        noiseLabel: '正常',
+      ),
+      dailyAdviceBubble: DailyAdviceBubble(
+        text: '晚饭后散步 15 分钟会更稳。',
+        source: DailyAdviceSource.llm,
+      ),
       hasRealData: true,
-    );
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: <Override>[
-          overviewViewModelProvider.overrideWith((Ref ref) async => viewModel),
-        ],
-        child: const MaterialApp(home: OverviewPage()),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('ACTIVE_LOW'), findsOneWidget);
-    expect(find.byWidgetPredicate((Widget widget) =>
-        widget.runtimeType.toString() == '_MetricCard'), findsNWidgets(3));
-    expect(find.text('take a 5 minute walk'), findsWidgets);
-  });
-
-  testWidgets('overview keeps dashboard structure when data is insufficient',
-      (WidgetTester tester) async {
-    const viewModel = OverviewViewModel(
-      screenState: OverviewScreenState.dataInsufficient,
-      isLoading: false,
-      verdicts: <RuleVerdict>[],
-      summaryLabel: 'DATA_PENDING',
-      summaryDetail: 'keep using the app so data can accumulate',
-      metrics: OverviewMetricSnapshot(
-        stepCount: 0,
-        sedentaryMinutes: 0,
-        screenMinutes: 0,
-        outdoorMinutes: 0,
-      ),
-      reminders: <ReminderRecord>[],
-      permissionStatuses: <PermissionType, PermissionGrantStatus>{},
-      missingDimensions: <String>[],
-      hasRealData: false,
-    );
-
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: <Override>[
-          overviewViewModelProvider.overrideWith((Ref ref) async => viewModel),
-        ],
-        child: const MaterialApp(home: OverviewPage()),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('DATA_PENDING'), findsOneWidget);
-    expect(find.byWidgetPredicate((Widget widget) =>
-        widget.runtimeType.toString() == '_MetricCard'), findsNWidgets(3));
-    expect(find.text('DATA_INSUFFICIENT'), findsNothing);
-  });
+      hasReminderHistory: true,
+    ),
+    permissionStatuses: <PermissionType, PermissionGrantStatus>{},
+  );
 }

@@ -16,6 +16,7 @@ class ReminderRecordEntity {
   late String reasonSummary;
   late String actionSuggestion;
   late String responseKey;
+  DateTime? deliveredAt;
   String? sourceEventId;
   String? reminderTypeKey;
   String? sourceDimension;
@@ -32,6 +33,7 @@ class ReminderRecordEntity {
       ..reasonSummary = record.reasonSummary
       ..actionSuggestion = record.actionSuggestion
       ..responseKey = record.response.name
+      ..deliveredAt = record.deliveredAt
       ..sourceEventId = record.sourceEventId
       ..reminderTypeKey = record.reminderTypeKey
       ..sourceDimension = record.sourceDimension;
@@ -46,6 +48,7 @@ class ReminderRecordEntity {
       reasonSummary: reasonSummary,
       actionSuggestion: actionSuggestion,
       response: _mapReminderResponse(responseKey),
+      deliveredAt: deliveredAt,
       sourceEventId: sourceEventId,
       reminderTypeKey: reminderTypeKey,
       sourceDimension: sourceDimension,

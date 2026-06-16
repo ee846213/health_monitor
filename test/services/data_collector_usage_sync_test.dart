@@ -107,6 +107,85 @@ void main() {
     expect(summary.viewCount, 24);
   });
 
+  test('syncUsageSummary 在重建日指标后会触发提醒投递钩子', () async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(methodChannel, (MethodCall call) async {
+      switch (call.method) {
+        case 'android.usage.getCapabilityStatus':
+          return <Object?, Object?>{
+            'isSupported': true,
+            'hasUsageAccess': true,
+          };
+        case 'android.usage.drainPendingSummaries':
+          return <Object?>[];
+        case 'android.usage.readDailySummary':
+          return <Object?, Object?>{
+            'dateKey': '2026-06-16',
+            'screenOnDurationMillis': 1200000,
+            'unlockCount': 8,
+            'viewCount': 16,
+            'nighttimeUsageDurationMillis': 180000,
+            'focusSessionBreakCount': 2,
+            'longestContinuousUsageDurationMillis': 600000,
+            'topCategoryKey': 'tools',
+            'completenessKey': 'full',
+          };
+        default:
+          return null;
+      }
+    });
+
+    final deliveredAt = <DateTime>[];
+    final collector = DataCollector(
+      activityRepository: SharedActivityRepository(),
+      noiseRepository: SharedNoiseRepository(),
+      locationRepository: SharedLocationRepository(),
+      usageRepository: InMemoryUsageSummaryRepository(
+        summaries: const <DigitalUsageSummary>[],
+      ),
+      metricsRepository: InMemoryMetricsRepository(metrics: const []),
+      motionCaptureService: MotionCaptureService(
+        sensorStreamFactory: ({
+          Duration samplingPeriod = const Duration(milliseconds: 200),
+        }) =>
+            const Stream<MotionVectorSample>.empty(),
+      ),
+      noiseCaptureService: NoiseCaptureService(
+        noiseStreamFactory: () => const Stream<NoiseReadingSample>.empty(),
+      ),
+      locationCaptureService: LocationCaptureService(
+        positionStreamFactory: ({
+          Duration samplingPeriod = const Duration(seconds: 30),
+        }) =>
+            const Stream<GeoPositionSample>.empty(),
+        isLocationServiceEnabled: () async => true,
+        checkPermission: () async => GeoPermissionStatus.allowed,
+        requestPermission: () async => GeoPermissionStatus.allowed,
+      ),
+      androidUsageStatsBridge: AndroidUsageStatsBridge(
+        platformBridgeService: PlatformBridgeService(
+          methodChannel: methodChannel,
+          eventChannel: eventChannel,
+        ),
+        isAndroid: () => true,
+      ),
+      digitalUsageCaptureService: DigitalUsageCaptureService(
+        lifecycleEventStreamFactory: () => const Stream<AppUsageEvent>.empty(),
+      ),
+      deliverRuleReminders: (DateTime referenceTime) async {
+        deliveredAt.add(referenceTime);
+      },
+    );
+    addTearDown(collector.dispose);
+
+    await collector.syncUsageSummary(
+      referenceTime: DateTime(2026, 6, 16, 10),
+    );
+
+    expect(deliveredAt, hasLength(1));
+    expect(deliveredAt.single, DateTime(2026, 6, 16));
+  });
+
   test('Android 未授予 Usage Access 时应回退 lifecycle_alternative', () async {
     final controller = StreamController<AppUsageEvent>.broadcast();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger

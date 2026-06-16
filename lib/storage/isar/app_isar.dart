@@ -3,12 +3,14 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_monitor/storage/isar/collections/activity_sample_record.dart';
+import 'package:health_monitor/storage/isar/collections/ai_suggestion_cache_record.dart';
 import 'package:health_monitor/storage/isar/collections/capture_checkpoint_record.dart';
 import 'package:health_monitor/storage/isar/collections/capture_health_event_record.dart';
 import 'package:health_monitor/storage/isar/collections/ambient_light_sample_record.dart';
 import 'package:health_monitor/storage/isar/collections/daily_metrics_record.dart';
 import 'package:health_monitor/storage/isar/collections/location_summary_record.dart';
 import 'package:health_monitor/storage/isar/collections/noise_sample_record.dart';
+import 'package:health_monitor/storage/isar/collections/notification_preference_record.dart';
 import 'package:health_monitor/storage/isar/collections/posture_sample_record.dart';
 import 'package:health_monitor/storage/isar/collections/reminder_record_entity.dart';
 import 'package:health_monitor/storage/isar/collections/usage_summary_record.dart';
@@ -56,6 +58,8 @@ final appIsarProvider = FutureProvider<Isar>((Ref ref) async {
       NoiseSampleRecordSchema,
       UsageSummaryRecordSchema,
       DailyMetricsRecordSchema,
+      NotificationPreferenceRecordSchema,
+      AiSuggestionCacheRecordSchema,
       ReminderRecordEntitySchema,
     ],
     name: 'health_monitor',

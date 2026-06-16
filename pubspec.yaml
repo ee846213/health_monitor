@@ -22,6 +22,7 @@ dependencies:
   workmanager: ^0.9.0+3
   flutter_local_notifications: ^17.2.2
   path_provider: ^2.1.5
+  dio: ^5.7.0
 
 dev_dependencies:
   flutter_test:
