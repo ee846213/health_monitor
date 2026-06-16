@@ -23,9 +23,10 @@ HealthScoreBreakdown calculateHealthScore({
     idealUpperBoundMinutes: 120,
     zeroScoreAtMinutes: 360,
   );
-  final screenScore = _calculateScreenScore(
-    screenMinutes: screenMinutes,
-    targetMinutes: 180,
+  final screenScore = _calculatePenaltyScore(
+    actualMinutes: screenMinutes,
+    idealUpperBoundMinutes: 180,
+    zeroScoreAtMinutes: 540,
   );
   final totalScore =
       ((stepScore * 0.4) + (sedentaryScore * 0.4) + (screenScore * 0.2))
@@ -64,16 +65,5 @@ int _calculatePenaltyScore({
               (zeroScoreAtMinutes - idealUpperBoundMinutes) *
               100)
           .round();
-  return score.clamp(0, 100);
-}
-
-int _calculateScreenScore({
-  required int screenMinutes,
-  required int targetMinutes,
-}) {
-  if (screenMinutes <= 0) {
-    return 0;
-  }
-  final score = (screenMinutes / targetMinutes * 100).round();
   return score.clamp(0, 100);
 }
