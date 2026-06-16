@@ -79,7 +79,8 @@ class InMemoryReminderRepository implements ReminderRepository {
     final deliveredKeys = records.map(_historyDedupKeyForRecord).toSet();
     for (var index = 0; index < _records.length; index++) {
       final item = _records[index];
-      if (deliveredKeys.contains(_historyDedupKeyForRecord(item))) {
+      if (item.deliveredAt == null &&
+          deliveredKeys.contains(_historyDedupKeyForRecord(item))) {
         _records[index] = item.copyWith(deliveredAt: deliveredAt);
       }
     }
@@ -192,6 +193,9 @@ class IsarReminderRepository implements ReminderRepository {
 
     await _isar.writeTxn(() async {
       for (final entity in targets) {
+        if (entity.deliveredAt != null) {
+          continue;
+        }
         entity.deliveredAt = deliveredAt;
       }
       await _isar.reminderRecordEntitys.putAll(targets);
