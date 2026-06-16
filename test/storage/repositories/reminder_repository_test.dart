@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
+import 'package:health_monitor/rules/engine/rule_verdict.dart';
 import 'package:health_monitor/storage/repositories/reminder_repository.dart';
 
 void main() {
@@ -103,5 +104,38 @@ void main() {
 
     expect(result, hasLength(1));
     expect(result.single.sourceEventId, 'walking-risk-1');
+  });
+
+  test('提醒仓储能查询未投递记录并标记为已投递', () async {
+    final repository = InMemoryReminderRepository(
+      records: <ReminderRecord>[
+        ReminderRecord.fromVerdict(
+          verdict: const RuleVerdict(
+            dimension: 'activity',
+            level: 'warning',
+            summary: '起身活动一下',
+            detail: '已经久坐一段时间',
+            shouldRemind: true,
+            reminderType: 'sedentaryBreak',
+          ),
+          now: DateTime(2026, 6, 16, 10, 0),
+        ),
+      ],
+    );
+
+    final pending = await repository.listUndeliveredSince(
+      DateTime(2026, 6, 16, 0, 0),
+    );
+    await repository.markDelivered(
+      pending,
+      deliveredAt: DateTime(2026, 6, 16, 10, 1),
+    );
+    final afterDelivery = await repository.listUndeliveredSince(
+      DateTime(2026, 6, 16, 0, 0),
+    );
+
+    expect(pending, hasLength(1));
+    expect(pending.single.deliveredAt, isNull);
+    expect(afterDelivery, isEmpty);
   });
 }

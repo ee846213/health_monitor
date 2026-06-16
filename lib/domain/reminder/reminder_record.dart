@@ -1,4 +1,4 @@
-﻿import 'package:health_monitor/rules/engine/rule_verdict.dart';
+import 'package:health_monitor/rules/engine/rule_verdict.dart';
 
 enum ReminderType {
   sedentaryBreak,
@@ -24,6 +24,7 @@ class ReminderRecord {
     required this.reasonSummary,
     required this.actionSuggestion,
     required this.response,
+    this.deliveredAt,
     this.reminderTypeKey,
     this.sourceDimension,
     this.sourceEventId,
@@ -36,6 +37,7 @@ class ReminderRecord {
   final String reasonSummary;
   final String actionSuggestion;
   final ReminderResponse response;
+  final DateTime? deliveredAt;
   final String? reminderTypeKey;
   final String? sourceDimension;
   final String? sourceEventId;
@@ -61,6 +63,7 @@ class ReminderRecord {
       reasonSummary: verdict.summary,
       actionSuggestion: verdict.detail,
       response: response,
+      deliveredAt: null,
       reminderTypeKey: verdict.reminderType,
       sourceDimension: verdict.dimension,
     );
@@ -79,9 +82,28 @@ class ReminderRecord {
       reasonSummary: '移动状态下连续亮屏超过 8 秒。',
       actionSuggestion: '走路时先收起屏幕，等停下后再查看手机。',
       response: response,
+      deliveredAt: null,
       reminderTypeKey: 'walkingScreenRisk',
       sourceDimension: 'android_risk_event',
       sourceEventId: eventId,
+    );
+  }
+
+  ReminderRecord copyWith({
+    DateTime? deliveredAt,
+  }) {
+    return ReminderRecord(
+      triggeredAt: triggeredAt,
+      type: type,
+      title: title,
+      message: message,
+      reasonSummary: reasonSummary,
+      actionSuggestion: actionSuggestion,
+      response: response,
+      deliveredAt: deliveredAt ?? this.deliveredAt,
+      reminderTypeKey: reminderTypeKey,
+      sourceDimension: sourceDimension,
+      sourceEventId: sourceEventId,
     );
   }
 
