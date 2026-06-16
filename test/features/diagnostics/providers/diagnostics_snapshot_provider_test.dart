@@ -26,6 +26,8 @@ import 'package:health_monitor/storage/repositories/noise_sample_repository.dart
 import 'package:health_monitor/storage/repositories/usage_summary_repository.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('调试页快照应聚合最近权限状态与最新样本', () async {
     final container = ProviderContainer(
       overrides: <Override>[
@@ -136,6 +138,7 @@ void main() {
         ),
         noiseCaptureServiceProvider.overrideWithValue(
           NoiseCaptureService(
+            hasMicrophonePermission: () async => true,
             noiseStreamFactory: () {
               return Stream<NoiseReadingSample>.value(
                 NoiseReadingSample(
@@ -247,6 +250,7 @@ void main() {
         ),
         noiseCaptureServiceProvider.overrideWithValue(
           NoiseCaptureService(
+            hasMicrophonePermission: () async => true,
             noiseStreamFactory: () => const Stream<NoiseReadingSample>.empty(),
           ),
         ),

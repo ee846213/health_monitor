@@ -51,18 +51,35 @@ class BriefingViewModel {
   bool get hasMissingDimensions => missingDimensions.isNotEmpty;
 }
 
+final briefingReferenceTimeProvider = Provider<DateTime Function()>((Ref ref) {
+  return DateTime.now;
+});
+
 final briefingTimeRangeProvider = StateProvider<BriefingTimeRange>((Ref ref) {
   return BriefingTimeRange.today;
 });
 
+final briefingRangeRevisionProvider = Provider<String>((Ref ref) {
+  final selectedRange = ref.watch(briefingTimeRangeProvider);
+  final referenceTime = ref.watch(briefingReferenceTimeProvider)();
+  final dayKeys = _dayKeysForRange(selectedRange, referenceTime);
+
+  return ref.watch(
+    dataCollectorDailyRevisionProvider.select(
+      (Map<String, int> revisions) =>
+          dayKeys.map((String dayKey) => '${revisions[dayKey] ?? 0}').join('|'),
+    ),
+  );
+});
+
 final briefingViewModelProvider =
     FutureProvider<BriefingViewModel>((Ref ref) async {
-  ref.watch(dataCollectorRevisionProvider);
+  ref.watch(briefingRangeRevisionProvider);
   ref.watch(dataCollectorProvider);
   final selectedRange = ref.watch(briefingTimeRangeProvider);
   final permissionStatuses = await ref.watch(permissionStatusProvider.future);
   final insightService = ref.watch(healthInsightServiceProvider);
-  final now = DateTime.now();
+  final now = ref.watch(briefingReferenceTimeProvider)();
   final snapshot = await insightService.buildSnapshot(
     window: _windowForRange(selectedRange, referenceTime: now),
     referenceTime: now,
@@ -188,4 +205,18 @@ QueryWindow _windowForRange(
         referenceDate: referenceTime,
       );
   }
+}
+
+List<String> _dayKeysForRange(
+  BriefingTimeRange range,
+  DateTime referenceTime,
+) {
+  final window = _windowForRange(range, referenceTime: referenceTime);
+  return window.dailyDates().map(_dayKey).toList(growable: false);
+}
+
+String _dayKey(DateTime dateTime) {
+  final month = dateTime.month.toString().padLeft(2, '0');
+  final day = dateTime.day.toString().padLeft(2, '0');
+  return '${dateTime.year}-$month-$day';
 }

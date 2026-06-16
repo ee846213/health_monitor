@@ -2,8 +2,11 @@ import 'dart:async';
 
 import 'package:health_monitor/domain/environment/noise_sample.dart';
 import 'package:noise_meter/noise_meter.dart' as noise_meter;
+import 'package:permission_handler/permission_handler.dart'
+    as permission_handler;
 
 typedef NoiseReadingStreamFactory = Stream<NoiseReadingSample> Function();
+typedef MicrophonePermissionReader = Future<bool> Function();
 
 class NoiseReadingSample {
   const NoiseReadingSample({
@@ -29,12 +32,22 @@ class NoiseCaptureException implements Exception {
 class NoiseCaptureService {
   NoiseCaptureService({
     NoiseReadingStreamFactory? noiseStreamFactory,
-  }) : _noiseStreamFactory = noiseStreamFactory ?? _defaultNoiseStreamFactory;
+    MicrophonePermissionReader? hasMicrophonePermission,
+  })  : _noiseStreamFactory = noiseStreamFactory ?? _defaultNoiseStreamFactory,
+        _hasMicrophonePermission =
+            hasMicrophonePermission ?? _defaultMicrophonePermissionReader;
 
   final NoiseReadingStreamFactory _noiseStreamFactory;
+  final MicrophonePermissionReader _hasMicrophonePermission;
 
-  Stream<NoiseSample> watchNoiseSamples() {
-    return _noiseStreamFactory().transform<NoiseSample>(
+  Stream<NoiseSample> watchNoiseSamples() async* {
+    // 某些 Android 设备在麦克风权限未授权时，底层插件会直接触发原生崩溃。
+    // 这里先在 Dart 层做权限闸门，未授权时走降级而不是触发底层录音初始化。
+    if (!await _hasMicrophonePermission()) {
+      throw const NoiseCaptureException('未授予麦克风权限，暂不启动环境噪音采集');
+    }
+
+    yield* _noiseStreamFactory().transform<NoiseSample>(
       StreamTransformer<NoiseReadingSample, NoiseSample>.fromHandlers(
         handleData: (NoiseReadingSample reading, EventSink<NoiseSample> sink) {
           sink.add(
@@ -68,5 +81,10 @@ class NoiseCaptureService {
         maxDecibel: reading.maxDecibel,
       );
     });
+  }
+
+  static Future<bool> _defaultMicrophonePermissionReader() async {
+    final status = await permission_handler.Permission.microphone.status;
+    return status == permission_handler.PermissionStatus.granted;
   }
 }

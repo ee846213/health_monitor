@@ -32,6 +32,7 @@ import 'package:health_monitor/services/android_risk_event_bridge.dart';
 import 'package:health_monitor/services/platform_bridge_service.dart';
 
 typedef DataCollectorRevisionCallback = void Function();
+typedef DataCollectorDayRevisionCallback = void Function(DateTime changedAt);
 
 class SharedActivityRepository extends InMemoryActivityRepository {
   SharedActivityRepository() : super(samples: <ActivitySample>[]);
@@ -195,6 +196,8 @@ final usageSummaryRepositoryProvider = sharedUsageRepo;
 final metricsRepositoryProvider = sharedMetricsRepo;
 
 final dataCollectorRevisionProvider = StateProvider<int>((Ref ref) => 0);
+final dataCollectorDailyRevisionProvider =
+    StateProvider<Map<String, int>>((Ref ref) => <String, int>{});
 
 class _RevisionThrottle {
   _RevisionThrottle({
@@ -236,6 +239,38 @@ class _RevisionThrottle {
     _pending = false;
     _lastTickAt = now;
     onThrottledTick();
+  }
+}
+
+class _DayRevisionThrottle {
+  _DayRevisionThrottle({
+    required this.onThrottledTick,
+    this.interval = const Duration(seconds: 2),
+  });
+
+  final Duration interval;
+  final void Function(DateTime changedAt) onThrottledTick;
+  final Map<String, _RevisionThrottle> _throttles =
+      <String, _RevisionThrottle>{};
+
+  void markChanged(DateTime changedAt) {
+    final dayStart = _dayStart(changedAt);
+    final dayKey = _dayKey(dayStart);
+    final throttle = _throttles.putIfAbsent(
+      dayKey,
+      () => _RevisionThrottle(
+        interval: interval,
+        onThrottledTick: () => onThrottledTick(dayStart),
+      ),
+    );
+    throttle.markChanged();
+  }
+
+  void dispose() {
+    for (final throttle in _throttles.values) {
+      throttle.dispose();
+    }
+    _throttles.clear();
   }
 }
 
@@ -313,6 +348,7 @@ class DataCollector {
     AndroidUsageStatsBridge? androidUsageStatsBridge,
     CaptureHealthService? captureHealthService,
     DataCollectorRevisionCallback? onDataChanged,
+    DataCollectorDayRevisionCallback? onDayChanged,
     Future<void> Function(DateTime referenceTime)? persistRuleReminders,
     Future<void> Function()? syncNativeRiskEvents,
   })  : _motionCaptureService = motionCaptureService ?? MotionCaptureService(),
@@ -343,6 +379,7 @@ class DataCollector {
               repository: InMemoryCaptureHealthRepository(),
             ),
         _onDataChanged = onDataChanged,
+        _onDayChanged = onDayChanged,
         _persistRuleReminders = persistRuleReminders,
         _syncNativeRiskEvents = syncNativeRiskEvents;
 
@@ -362,6 +399,7 @@ class DataCollector {
   final AndroidUsageStatsBridge _androidUsageStatsBridge;
   final CaptureHealthService _captureHealthService;
   final DataCollectorRevisionCallback? _onDataChanged;
+  final DataCollectorDayRevisionCallback? _onDayChanged;
   final Future<void> Function(DateTime referenceTime)? _persistRuleReminders;
   final Future<void> Function()? _syncNativeRiskEvents;
   final List<StreamSubscription<dynamic>> _subscriptions =
@@ -721,6 +759,7 @@ class DataCollector {
     if (_persistRuleReminders != null) {
       await _persistRuleReminders.call(referenceTime);
     }
+    _onDayChanged?.call(dayStart);
     _onDataChanged?.call();
   }
 
@@ -805,6 +844,18 @@ final dataCollectorProvider = Provider<DataCollector>((Ref ref) {
       ref.read(dataCollectorRevisionProvider.notifier).state += 1;
     },
   );
+  final dayRevisionThrottle = _DayRevisionThrottle(
+    interval: const Duration(seconds: 2),
+    onThrottledTick: (DateTime changedAt) {
+      final dayKey = _dayKey(changedAt);
+      final notifier = ref.read(dataCollectorDailyRevisionProvider.notifier);
+      final current = notifier.state;
+      notifier.state = <String, int>{
+        ...current,
+        dayKey: (current[dayKey] ?? 0) + 1,
+      };
+    },
+  );
   final collector = DataCollector(
     activityRepository: ref.watch(sharedActivityRepo),
     ambientLightRepository: ref.watch(sharedAmbientLightRepo),
@@ -817,6 +868,7 @@ final dataCollectorProvider = Provider<DataCollector>((Ref ref) {
     ),
     captureHealthService: ref.watch(captureHealthServiceProvider),
     onDataChanged: revisionThrottle.markChanged,
+    onDayChanged: dayRevisionThrottle.markChanged,
     persistRuleReminders: (DateTime referenceTime) async {
       final insightService = HealthInsightService(
         activityRepository: ref.read(sharedActivityRepo),
@@ -863,6 +915,7 @@ final dataCollectorProvider = Provider<DataCollector>((Ref ref) {
   collector.start();
   ref.onDispose(() {
     revisionThrottle.dispose();
+    dayRevisionThrottle.dispose();
     collector.dispose();
   });
   return collector;

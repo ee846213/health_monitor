@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:health_monitor/app/theme/app_icons.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
+import 'package:health_monitor/features/overview/widgets/metric_detail_sheets.dart';
 import 'package:health_monitor/features/state_pages/state_pages.dart';
 import 'package:health_monitor/rules/engine/rule_verdict.dart';
 
@@ -189,7 +190,12 @@ class _TodayStatusCard extends StatelessWidget {
           const SizedBox(height: 16),
           _ConclusionBox(viewModel: viewModel),
           const SizedBox(height: 10),
-          _MetricsRow(metrics: viewModel.metrics),
+          _MetricsRow(
+            metrics: viewModel.metrics,
+            onStepTap: () => showStepDetailSheet(context),
+            onSedentaryTap: () => showSedentaryDetailSheet(context),
+            onScreenTap: () => showScreenDetailSheet(context),
+          ),
         ],
       ),
     );
@@ -291,9 +297,17 @@ class _MiniTag extends StatelessWidget {
 }
 
 class _MetricsRow extends StatelessWidget {
-  const _MetricsRow({required this.metrics});
+  const _MetricsRow({
+    required this.metrics,
+    required this.onStepTap,
+    required this.onSedentaryTap,
+    required this.onScreenTap,
+  });
 
   final OverviewMetricSnapshot metrics;
+  final VoidCallback onStepTap;
+  final VoidCallback onSedentaryTap;
+  final VoidCallback onScreenTap;
 
   @override
   Widget build(BuildContext context) {
@@ -306,6 +320,7 @@ class _MetricsRow extends StatelessWidget {
             unit: '步',
             status: metrics.stepCount >= 5000 ? '达标' : '偏少',
             backgroundColor: _surface,
+            onTap: onStepTap,
           ),
         ),
         const SizedBox(width: 10),
@@ -316,6 +331,7 @@ class _MetricsRow extends StatelessWidget {
             unit: '分钟',
             status: metrics.sedentaryMinutes >= 120 ? '偏高' : '可控',
             backgroundColor: _warmSand,
+            onTap: onSedentaryTap,
           ),
         ),
         const SizedBox(width: 10),
@@ -326,6 +342,7 @@ class _MetricsRow extends StatelessWidget {
             unit: '分钟',
             status: metrics.screenMinutes >= 240 ? '偏多' : '正常',
             backgroundColor: _mistBlue,
+            onTap: onScreenTap,
           ),
         ),
       ],
@@ -340,6 +357,7 @@ class _MetricCard extends StatelessWidget {
     required this.unit,
     required this.status,
     required this.backgroundColor,
+    this.onTap,
   });
 
   final String name;
@@ -347,56 +365,64 @@ class _MetricCard extends StatelessWidget {
   final String unit;
   final String status;
   final Color backgroundColor;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: backgroundColor,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: _line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            name,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: _textSecondary,
-            ),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: _line),
           ),
-          const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                value,
+                name,
                 style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w700,
-                  color: _textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: _textSecondary,
                 ),
               ),
-              const SizedBox(width: 6),
+              const SizedBox(height: 10),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: <Widget>[
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      color: _textPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    unit,
+                    style: const TextStyle(fontSize: 12, color: _textMuted),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
               Text(
-                unit,
-                style: const TextStyle(fontSize: 12, color: _textMuted),
+                status,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: _textMuted,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            status,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: _textMuted,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
