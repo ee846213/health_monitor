@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 
 const Color _envSurface = Color(0xFFF4EFE7);
 const Color _envText = Color(0xFF1F2320);
@@ -7,12 +8,7 @@ const Color _envMuted = Color(0xFF59615B);
 const Color _envLine = Color(0xFFDDD8CF);
 
 class EnvironmentSnapshotBar extends StatelessWidget {
-  const EnvironmentSnapshotBar({
-    super.key,
-    required this.snapshot,
-  });
-
-  final DashboardEnvironmentSnapshot snapshot;
+  const EnvironmentSnapshotBar({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -39,24 +35,42 @@ class EnvironmentSnapshotBar extends StatelessWidget {
           Row(
             children: <Widget>[
               Expanded(
-                child: _EnvironmentItem(
-                  icon: _lightEmoji(snapshot.lightLabel),
-                  title: '光照',
-                  value: snapshot.lightLabel,
-                ),
+                child: _LightEnvironmentItem(),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _EnvironmentItem(
-                  icon: _noiseEmoji(snapshot.noiseLabel),
-                  title: '噪音',
-                  value: snapshot.noiseLabel,
-                ),
+                child: _NoiseEnvironmentItem(),
               ),
             ],
           ),
         ],
       ),
+    );
+  }
+}
+
+class _LightEnvironmentItem extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final icon = ref.watch(overviewEnvironmentLightIconProvider);
+    final value = ref.watch(overviewEnvironmentLightTextProvider);
+    return _EnvironmentItem(
+      icon: _lightEmoji(icon),
+      title: '光照',
+      value: value,
+    );
+  }
+}
+
+class _NoiseEnvironmentItem extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final icon = ref.watch(overviewEnvironmentNoiseIconProvider);
+    final value = ref.watch(overviewEnvironmentNoiseTextProvider);
+    return _EnvironmentItem(
+      icon: _noiseEmoji(icon),
+      title: '噪音',
+      value: value,
     );
   }
 }
@@ -114,28 +128,28 @@ class _EnvironmentItem extends StatelessWidget {
   }
 }
 
-String _lightEmoji(String label) {
-  switch (label) {
-    case '明亮':
+String _lightEmoji(OverviewEnvironmentLightIcon icon) {
+  switch (icon) {
+    case OverviewEnvironmentLightIcon.bright:
       return '🌞';
-    case '舒适':
+    case OverviewEnvironmentLightIcon.comfortable:
       return '🌥';
-    case '过暗':
+    case OverviewEnvironmentLightIcon.dark:
       return '🌙';
-    default:
+    case OverviewEnvironmentLightIcon.waiting:
       return '🫥';
   }
 }
 
-String _noiseEmoji(String label) {
-  switch (label) {
-    case '嘈杂':
+String _noiseEmoji(OverviewEnvironmentNoiseIcon icon) {
+  switch (icon) {
+    case OverviewEnvironmentNoiseIcon.loud:
       return '🔊';
-    case '正常':
+    case OverviewEnvironmentNoiseIcon.normal:
       return '🔉';
-    case '安静':
+    case OverviewEnvironmentNoiseIcon.quiet:
       return '🔇';
-    default:
+    case OverviewEnvironmentNoiseIcon.waiting:
       return '🫥';
   }
 }

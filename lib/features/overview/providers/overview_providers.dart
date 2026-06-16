@@ -159,6 +159,7 @@ class OverviewDashboardViewModel {
   final List<ReminderRecord> reminders;
 
   bool get hasMissingDimensions => missingDimensions.isNotEmpty;
+  bool get hasRealData => dashboard.hasRealData;
   bool get hasPreciseDetectionNotice =>
       preciseDetectionNotice != null && preciseDetectionNotice!.isNotEmpty;
 }

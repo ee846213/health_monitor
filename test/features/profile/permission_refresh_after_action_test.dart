@@ -4,8 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
 import 'package:health_monitor/domain/notification/notification_preference.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
+import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/domain/scoring/health_score_calculator.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
+import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 import 'package:health_monitor/features/profile/pages/profile_page.dart';
 import 'package:health_monitor/features/profile/providers/notification_preference_provider.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
@@ -16,6 +18,7 @@ void main() {
   ) async {
     var granted = false;
     var readCount = 0;
+    var readyDataReadCount = 0;
     var handledType = PermissionType.notification;
     final notifier = _FakeNotificationPreferenceNotifier(
       const NotificationPreference(
@@ -46,43 +49,22 @@ void main() {
             },
           ),
         ),
+        overviewReadyDataProvider.overrideWith((Ref ref) async {
+          readyDataReadCount += 1;
+          final statuses = await ref.watch(permissionStatusProvider.future);
+          return OverviewReadyData(
+            dashboard: _buildDashboardSnapshot(),
+            permissionStatuses: statuses,
+            missingDimensions: const <String>[],
+            reminders: const <ReminderRecord>[],
+            preciseDetectionNotice: null,
+          );
+        }),
         overviewViewModelProvider.overrideWith((Ref ref) async {
           final statuses = await ref.watch(permissionStatusProvider.future);
           return OverviewDashboardViewModel(
             screenState: OverviewScreenState.ready,
-            dashboard: DashboardSnapshot(
-              generatedAt: DateTime(2026, 6, 16, 9),
-              healthScore: HealthScoreBreakdown(
-                stepScore: 81,
-                sedentaryScore: 92,
-                screenScore: 88,
-                totalScore: 87,
-              ),
-              stepCard: DashboardStepCard(
-                currentSteps: 4860,
-                goalSteps: 6000,
-                achievementPercent: 81,
-              ),
-              sedentaryCard: DashboardSedentaryCard(
-                totalMinutes: 96,
-                longestSingleMinutes: 42,
-              ),
-              screenCard: DashboardScreenCard(
-                totalMinutes: 148,
-                yesterdayDeltaMinutes: -18,
-                changeDirection: DashboardChangeDirection.down,
-              ),
-              environmentSnapshot: DashboardEnvironmentSnapshot(
-                lightLabel: '舒适',
-                noiseLabel: '正常',
-              ),
-              dailyAdviceBubble: DailyAdviceBubble(
-                text: '晚饭后散步 15 分钟会更稳。',
-                source: DailyAdviceSource.llm,
-              ),
-              hasRealData: true,
-              hasReminderHistory: true,
-            ),
+            dashboard: _buildDashboardSnapshot(),
             permissionStatuses: statuses,
           );
         }),
@@ -109,6 +91,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(readCount, 1);
+    final initialReadyData =
+        await container.read(overviewReadyDataProvider.future);
+    expect(
+      initialReadyData.permissionStatuses[PermissionType.motion],
+      PermissionGrantStatus.denied,
+    );
+    expect(readCount, 1);
+    expect(readyDataReadCount, 1);
     expect(find.text('未开启'), findsWidgets);
 
     await tester.ensureVisible(find.text('活动识别'));
@@ -119,8 +109,51 @@ void main() {
 
     expect(handledType, PermissionType.motion);
     expect(readCount, 2);
+    final refreshedReadyData =
+        await container.read(overviewReadyDataProvider.future);
+    expect(
+      refreshedReadyData.permissionStatuses[PermissionType.motion],
+      PermissionGrantStatus.granted,
+    );
+    expect(readyDataReadCount, 2);
     expect(find.text('已开启'), findsWidgets);
   });
+}
+
+DashboardSnapshot _buildDashboardSnapshot() {
+  return DashboardSnapshot(
+    generatedAt: DateTime(2026, 6, 16, 9),
+    healthScore: HealthScoreBreakdown(
+      stepScore: 81,
+      sedentaryScore: 92,
+      screenScore: 88,
+      totalScore: 87,
+    ),
+    stepCard: DashboardStepCard(
+      currentSteps: 4860,
+      goalSteps: 6000,
+      achievementPercent: 81,
+    ),
+    sedentaryCard: DashboardSedentaryCard(
+      totalMinutes: 96,
+      longestSingleMinutes: 42,
+    ),
+    screenCard: DashboardScreenCard(
+      totalMinutes: 148,
+      yesterdayDeltaMinutes: -18,
+      changeDirection: DashboardChangeDirection.down,
+    ),
+    environmentSnapshot: DashboardEnvironmentSnapshot(
+      lightLabel: '舒适',
+      noiseLabel: '正常',
+    ),
+    dailyAdviceBubble: DailyAdviceBubble(
+      text: '晚饭后散步 15 分钟会更稳妥。',
+      source: DailyAdviceSource.llm,
+    ),
+    hasRealData: true,
+    hasReminderHistory: true,
+  );
 }
 
 class _FakePermissionStatusService implements PermissionStatusService {

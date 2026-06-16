@@ -4,21 +4,26 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
+import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/domain/scoring/health_score_calculator.dart';
 import 'package:health_monitor/features/overview/pages/overview_page.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
+import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
 
 void main() {
   testWidgets('棣栭〉灞曠ず缁煎悎鍋ュ悍鍒嗐€佷笁寮犲崱鐗囥€佺幆澧冨揩鐓у拰 AI 寤鸿', (
     WidgetTester tester,
   ) async {
-    final viewModel = _buildViewModel();
+    final readyData = _buildReadyData();
 
     await tester.pumpWidget(
       ProviderScope(
         overrides: <Override>[
-          overviewViewModelProvider.overrideWith((Ref ref) async => viewModel),
+          overviewScreenStateProvider.overrideWith(
+            (Ref ref) => const AsyncData(OverviewScreenState.ready),
+          ),
+          overviewReadyDataStateProvider.overrideWith((Ref ref) => readyData),
         ],
         child: const MaterialApp(home: OverviewPage()),
       ),
@@ -35,7 +40,7 @@ void main() {
   });
 
   testWidgets('点击综合健康分应跳转到趋势页', (WidgetTester tester) async {
-    final viewModel = _buildViewModel();
+    final readyData = _buildReadyData();
     final router = GoRouter(
       initialLocation: '/overview',
       routes: <RouteBase>[
@@ -53,7 +58,10 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: <Override>[
-          overviewViewModelProvider.overrideWith((Ref ref) async => viewModel),
+          overviewScreenStateProvider.overrideWith(
+            (Ref ref) => const AsyncData(OverviewScreenState.ready),
+          ),
+          overviewReadyDataStateProvider.overrideWith((Ref ref) => readyData),
         ],
         child: MaterialApp.router(routerConfig: router),
       ),
@@ -67,9 +75,8 @@ void main() {
   });
 }
 
-OverviewDashboardViewModel _buildViewModel() {
-  return OverviewDashboardViewModel(
-    screenState: OverviewScreenState.ready,
+OverviewReadyData _buildReadyData() {
+  return OverviewReadyData(
     dashboard: DashboardSnapshot(
       generatedAt: DateTime(2026, 6, 16, 9),
       healthScore: HealthScoreBreakdown(
@@ -103,6 +110,16 @@ OverviewDashboardViewModel _buildViewModel() {
       hasRealData: true,
       hasReminderHistory: true,
     ),
-    permissionStatuses: <PermissionType, PermissionGrantStatus>{},
+    permissionStatuses: <PermissionType, PermissionGrantStatus>{
+      PermissionType.motion: PermissionGrantStatus.granted,
+      PermissionType.location: PermissionGrantStatus.granted,
+      PermissionType.microphone: PermissionGrantStatus.granted,
+      PermissionType.notification: PermissionGrantStatus.granted,
+      PermissionType.usageAccess: PermissionGrantStatus.granted,
+      PermissionType.backgroundCapture: PermissionGrantStatus.granted,
+    },
+    missingDimensions: const <String>[],
+    reminders: const <ReminderRecord>[],
+    preciseDetectionNotice: null,
   );
 }

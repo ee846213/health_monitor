@@ -2,11 +2,17 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
 import 'package:health_monitor/domain/motion/activity_sample.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
+import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
+import 'package:health_monitor/services/android_risk_event_bridge.dart';
+import 'package:health_monitor/services/android_usage_stats_bridge.dart';
+import 'package:health_monitor/services/dashboard_service.dart';
 import 'package:health_monitor/services/data_collector.dart';
 import 'package:health_monitor/services/digital_usage_capture_service.dart';
+import 'package:health_monitor/services/health_insight_service.dart';
 import 'package:health_monitor/services/location_capture_service.dart';
 import 'package:health_monitor/services/motion_capture_service.dart';
 import 'package:health_monitor/services/noise_capture_service.dart';
@@ -67,13 +73,44 @@ void main() {
         reminderRepositoryProvider.overrideWith(
           (Ref ref) async => InMemoryReminderRepository(),
         ),
+        healthInsightServiceProvider.overrideWith(
+          (Ref ref) => _buildInsightService(
+            activityRepository: activityRepository,
+            ambientLightRepository: ambientLightRepository,
+            noiseRepository: noiseRepository,
+            locationRepository: locationRepository,
+            usageRepository: usageRepository,
+            metricsRepository: metricsRepository,
+          ),
+        ),
+        dashboardServiceProvider.overrideWith((Ref ref) {
+          final insightService = ref.watch(healthInsightServiceProvider);
+          return DashboardService(
+            loadInsightSnapshot: insightService.buildSnapshot,
+            buildDailyAdvice: ({
+              required DateTime referenceTime,
+              required input,
+              required metrics,
+              required verdicts,
+              required environmentOverview,
+            }) async {
+              return const DailyAdviceBubble(
+                text: 'test fallback advice',
+                source: DailyAdviceSource.fallback,
+              );
+            },
+          );
+        }),
       ],
     );
     addTearDown(container.dispose);
 
-    final initial = await container.read(overviewViewModelProvider.future);
-    expect(initial.screenState, OverviewScreenState.dataInsufficient);
-    expect(initial.hasRealData, isFalse);
+    final initial = await container.read(overviewReadyDataProvider.future);
+    expect(
+      container.read(overviewScreenStateProvider).requireValue,
+      OverviewScreenState.dataInsufficient,
+    );
+    expect(initial.dashboard.hasRealData, isFalse);
 
     activityRepository.addSample(
       ActivitySample(
@@ -87,9 +124,12 @@ void main() {
     );
     container.read(dataCollectorRevisionProvider.notifier).state += 1;
 
-    final refreshed = await container.read(overviewViewModelProvider.future);
-    expect(refreshed.screenState, OverviewScreenState.ready);
-    expect(refreshed.hasRealData, isTrue);
+    final refreshed = await container.read(overviewReadyDataProvider.future);
+    expect(
+      container.read(overviewScreenStateProvider).requireValue,
+      OverviewScreenState.ready,
+    );
+    expect(refreshed.dashboard.hasRealData, isTrue);
   });
 
   test('同一天的汇总连续写入相同计算值时不应重复推进版本', () async {
@@ -153,11 +193,39 @@ void main() {
         reminderRepositoryProvider.overrideWith(
           (Ref ref) async => InMemoryReminderRepository(),
         ),
+        healthInsightServiceProvider.overrideWith(
+          (Ref ref) => _buildInsightService(
+            activityRepository: activityRepository,
+            ambientLightRepository: ambientLightRepository,
+            noiseRepository: noiseRepository,
+            locationRepository: locationRepository,
+            usageRepository: usageRepository,
+            metricsRepository: metricsRepository,
+          ),
+        ),
+        dashboardServiceProvider.overrideWith((Ref ref) {
+          final insightService = ref.watch(healthInsightServiceProvider);
+          return DashboardService(
+            loadInsightSnapshot: insightService.buildSnapshot,
+            buildDailyAdvice: ({
+              required DateTime referenceTime,
+              required input,
+              required metrics,
+              required verdicts,
+              required environmentOverview,
+            }) async {
+              return const DailyAdviceBubble(
+                text: 'test fallback advice',
+                source: DailyAdviceSource.fallback,
+              );
+            },
+          );
+        }),
       ],
     );
     addTearDown(container.dispose);
 
-    await container.read(overviewViewModelProvider.future);
+    await container.read(overviewReadyDataProvider.future);
     expect(revisionCount, 0);
 
     final sameDay = DateTime(2026, 6, 11, 8, 0);
@@ -171,7 +239,7 @@ void main() {
     );
     await Future<void>.delayed(const Duration(milliseconds: 10));
     container.read(dataCollectorRevisionProvider.notifier).state += 1;
-    await container.read(overviewViewModelProvider.future);
+    await container.read(overviewReadyDataProvider.future);
 
     expect(revisionCount, 1);
 
@@ -185,10 +253,31 @@ void main() {
     );
     await Future<void>.delayed(const Duration(milliseconds: 10));
     container.read(dataCollectorRevisionProvider.notifier).state += 1;
-    await container.read(overviewViewModelProvider.future);
+    await container.read(overviewReadyDataProvider.future);
 
     expect(revisionCount, 1);
   });
+}
+
+HealthInsightService _buildInsightService({
+  required SharedActivityRepository activityRepository,
+  required SharedAmbientLightRepository ambientLightRepository,
+  required SharedNoiseRepository noiseRepository,
+  required SharedLocationRepository locationRepository,
+  required SharedUsageRepository usageRepository,
+  required SharedMetricsRepository metricsRepository,
+}) {
+  return HealthInsightService(
+    activityRepository: activityRepository,
+    ambientLightRepository: ambientLightRepository,
+    locationRepository: locationRepository,
+    noiseRepository: noiseRepository,
+    usageRepository: usageRepository,
+    metricsRepository: metricsRepository,
+    reminderRepositoryLoader: () async => InMemoryReminderRepository(),
+    androidRiskEventBridge: AndroidRiskEventBridge(isAndroid: () => false),
+    androidUsageStatsBridge: AndroidUsageStatsBridge(isAndroid: () => false),
+  );
 }
 
 class _GrantedPermissionStatusService implements PermissionStatusService {

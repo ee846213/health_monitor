@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/features/diagnostics/providers/diagnostics_providers.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
+import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 import 'package:health_monitor/features/profile/widgets/do_not_disturb_section.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
 
@@ -280,6 +281,7 @@ class _PermissionStatusCard extends ConsumerWidget {
 
     ref.invalidate(permissionStatusProvider);
     ref.invalidate(overviewViewModelProvider);
+    ref.invalidate(overviewReadyDataProvider);
     ref.invalidate(diagnosticsSnapshotProvider);
 
     switch (result) {

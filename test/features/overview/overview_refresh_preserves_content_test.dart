@@ -1,21 +1,23 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
+import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/domain/scoring/health_score_calculator.dart';
 import 'package:health_monitor/features/overview/pages/overview_page.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
+import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
 
 void main() {
   testWidgets('首页在刷新仪表盘数据时应保留已展示内容而不是回到加载态', (
     WidgetTester tester,
   ) async {
-    final viewModel = OverviewDashboardViewModel(
-      screenState: OverviewScreenState.ready,
+    final screenStateProvider = StateProvider<AsyncValue<OverviewScreenState>>(
+      (Ref ref) => const AsyncData(OverviewScreenState.ready),
+    );
+    final readyData = OverviewReadyData(
       dashboard: DashboardSnapshot(
         generatedAt: DateTime(2026, 6, 16, 9),
         healthScore: HealthScoreBreakdown(
@@ -49,20 +51,25 @@ void main() {
         hasRealData: true,
         hasReminderHistory: true,
       ),
-      permissionStatuses: <PermissionType, PermissionGrantStatus>{},
+      permissionStatuses: <PermissionType, PermissionGrantStatus>{
+        PermissionType.motion: PermissionGrantStatus.granted,
+        PermissionType.location: PermissionGrantStatus.granted,
+        PermissionType.microphone: PermissionGrantStatus.granted,
+        PermissionType.notification: PermissionGrantStatus.granted,
+        PermissionType.usageAccess: PermissionGrantStatus.granted,
+        PermissionType.backgroundCapture: PermissionGrantStatus.granted,
+      },
+      missingDimensions: const <String>[],
+      reminders: const <ReminderRecord>[],
+      preciseDetectionNotice: null,
     );
 
-    var buildCount = 0;
-    final pendingRefresh = Completer<OverviewDashboardViewModel>();
     final container = ProviderContainer(
       overrides: <Override>[
-        overviewViewModelProvider.overrideWith((Ref ref) {
-          buildCount += 1;
-          if (buildCount == 1) {
-            return Future<OverviewDashboardViewModel>.value(viewModel);
-          }
-          return pendingRefresh.future;
-        }),
+        overviewScreenStateProvider.overrideWith(
+          (Ref ref) => ref.watch(screenStateProvider),
+        ),
+        overviewReadyDataStateProvider.overrideWith((Ref ref) => readyData),
       ],
     );
     addTearDown(container.dispose);
@@ -78,16 +85,19 @@ void main() {
     expect(find.text('综合健康分'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsNothing);
 
-    container.invalidate(overviewViewModelProvider);
+    container.read(screenStateProvider.notifier).state =
+        const AsyncLoading<OverviewScreenState>().copyWithPrevious(
+      const AsyncData(OverviewScreenState.ready),
+    );
     await tester.pump();
 
     expect(find.text('综合健康分'), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsNothing);
 
-    pendingRefresh.complete(viewModel);
+    container.read(screenStateProvider.notifier).state =
+        const AsyncData(OverviewScreenState.ready);
     await tester.pumpAndSettle();
 
-    expect(buildCount, 2);
     expect(find.text('综合健康分'), findsOneWidget);
   });
 }

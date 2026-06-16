@@ -1,7 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 
 const Color _heroSurface = Color(0xFFEEF3EA);
 const Color _heroRing = Color(0xFF5E775F);
@@ -13,11 +14,9 @@ const Color _heroLine = Color(0xFFD3D9CC);
 class HealthScoreHero extends StatelessWidget {
   const HealthScoreHero({
     super.key,
-    required this.snapshot,
     this.onTap,
   });
 
-  final DashboardSnapshot snapshot;
   final VoidCallback? onTap;
 
   @override
@@ -43,33 +42,8 @@ class HealthScoreHero extends StatelessWidget {
                 child: Stack(
                   alignment: Alignment.center,
                   children: <Widget>[
-                    CustomPaint(
-                      size: const Size.square(120),
-                      painter: _ScoreRingPainter(
-                        progress: snapshot.healthScore.totalScore / 100,
-                      ),
-                    ),
-                    Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: <Widget>[
-                        const Text(
-                          '综合健康分',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: _heroMuted,
-                          ),
-                        ),
-                        Text(
-                          '${snapshot.healthScore.totalScore}',
-                          style: const TextStyle(
-                            fontSize: 36,
-                            fontWeight: FontWeight.w800,
-                            color: _heroText,
-                          ),
-                        ),
-                      ],
-                    ),
+                    const _ScoreRing(),
+                    const _HealthScoreValue(),
                   ],
                 ),
               ),
@@ -96,31 +70,15 @@ class HealthScoreHero extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      _scoreSummary(snapshot.healthScore.totalScore),
-                      style: const TextStyle(
-                        fontSize: 13,
-                        height: 1.6,
-                        color: _heroMuted,
-                      ),
-                    ),
+                    const _HealthScoreSummaryText(),
                     const SizedBox(height: 12),
-                    Wrap(
+                    const Wrap(
                       spacing: 8,
                       runSpacing: 8,
                       children: <Widget>[
-                        _MetricPill(
-                          label: '步数',
-                          value: '${snapshot.healthScore.stepScore}',
-                        ),
-                        _MetricPill(
-                          label: '久坐',
-                          value: '${snapshot.healthScore.sedentaryScore}',
-                        ),
-                        _MetricPill(
-                          label: '屏幕',
-                          value: '${snapshot.healthScore.screenScore}',
-                        ),
+                        _StepMetricPill(),
+                        _SedentaryMetricPill(),
+                        _ScreenMetricPill(),
                       ],
                     ),
                   ],
@@ -134,10 +92,69 @@ class HealthScoreHero extends StatelessWidget {
   }
 }
 
-class _MetricPill extends StatelessWidget {
-  const _MetricPill({required this.label, required this.value});
+class _ScoreRing extends ConsumerWidget {
+  const _ScoreRing();
 
-  final String label;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final progress = ref.watch(overviewHealthScoreProgressProvider);
+    return CustomPaint(
+      size: const Size.square(120),
+      painter: _ScoreRingPainter(progress: progress),
+    );
+  }
+}
+
+class _HealthScoreValue extends ConsumerWidget {
+  const _HealthScoreValue();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final value = ref.watch(overviewHealthScoreValueProvider);
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: <Widget>[
+        const Text(
+          '综合健康分',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: _heroMuted,
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 36,
+            fontWeight: FontWeight.w800,
+            color: _heroText,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HealthScoreSummaryText extends ConsumerWidget {
+  const _HealthScoreSummaryText();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final summary = ref.watch(overviewHealthScoreSummaryProvider);
+    return Text(
+      summary,
+      style: const TextStyle(
+        fontSize: 13,
+        height: 1.6,
+        color: _heroMuted,
+      ),
+    );
+  }
+}
+
+class _MetricPill extends StatelessWidget {
+  const _MetricPill({required this.value});
+
   final String value;
 
   @override
@@ -149,7 +166,7 @@ class _MetricPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
       ),
       child: Text(
-        '$label $value',
+        value,
         style: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w700,
@@ -157,6 +174,36 @@ class _MetricPill extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _StepMetricPill extends ConsumerWidget {
+  const _StepMetricPill();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final value = ref.watch(overviewHealthScoreStepPillProvider);
+    return _MetricPill(value: value);
+  }
+}
+
+class _SedentaryMetricPill extends ConsumerWidget {
+  const _SedentaryMetricPill();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final value = ref.watch(overviewHealthScoreSedentaryPillProvider);
+    return _MetricPill(value: value);
+  }
+}
+
+class _ScreenMetricPill extends ConsumerWidget {
+  const _ScreenMetricPill();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final value = ref.watch(overviewHealthScoreScreenPillProvider);
+    return _MetricPill(value: value);
   }
 }
 
@@ -197,14 +244,4 @@ class _ScoreRingPainter extends CustomPainter {
   bool shouldRepaint(covariant _ScoreRingPainter oldDelegate) {
     return oldDelegate.progress != progress;
   }
-}
-
-String _scoreSummary(int score) {
-  if (score >= 85) {
-    return '今天整体节奏比较稳，适合继续保持当前活动边界。';
-  }
-  if (score >= 70) {
-    return '整体状态还不错，再补一点步数或减少久坐会更漂亮。';
-  }
-  return '今天还有提升空间，先从最容易调整的一项开始就好。';
 }

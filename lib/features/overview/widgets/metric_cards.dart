@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 
 const Color _metricSurface = Color(0xFFF8F3EA);
 const Color _metricSand = Color(0xFFF3E6D4);
@@ -11,13 +12,11 @@ const Color _metricLine = Color(0xFFDDD8CF);
 class MetricCards extends StatelessWidget {
   const MetricCards({
     super.key,
-    required this.snapshot,
     this.onStepTap,
     this.onSedentaryTap,
     this.onScreenTap,
   });
 
-  final DashboardSnapshot snapshot;
   final VoidCallback? onStepTap;
   final VoidCallback? onSedentaryTap;
   final VoidCallback? onScreenTap;
@@ -30,9 +29,8 @@ class MetricCards extends StatelessWidget {
           child: _MetricCard(
             key: const Key('metric-step-card'),
             title: '步数',
-            value: '${snapshot.stepCard.currentSteps}',
-            caption:
-                '目标 ${snapshot.stepCard.goalSteps} · ${snapshot.stepCard.achievementPercent}%',
+            value: const _StepValueText(),
+            caption: const _StepCaptionText(),
             backgroundColor: _metricSurface,
             onTap: onStepTap,
           ),
@@ -42,8 +40,8 @@ class MetricCards extends StatelessWidget {
           child: _MetricCard(
             key: const Key('metric-sedentary-card'),
             title: '久坐',
-            value: '${snapshot.sedentaryCard.totalMinutes}',
-            caption: '最长 ${snapshot.sedentaryCard.longestSingleMinutes} 分钟',
+            value: const _SedentaryValueText(),
+            caption: const _SedentaryCaptionText(),
             backgroundColor: _metricSand,
             onTap: onSedentaryTap,
           ),
@@ -53,8 +51,8 @@ class MetricCards extends StatelessWidget {
           child: _MetricCard(
             key: const Key('metric-screen-card'),
             title: '屏幕',
-            value: '${snapshot.screenCard.totalMinutes}',
-            caption: _screenCaption(snapshot.screenCard),
+            value: const _ScreenValueText(),
+            caption: const _ScreenCaptionText(),
             backgroundColor: _metricBlue,
             onTap: onScreenTap,
           ),
@@ -75,8 +73,8 @@ class _MetricCard extends StatelessWidget {
   });
 
   final String title;
-  final String value;
-  final String caption;
+  final Widget value;
+  final Widget caption;
   final Color backgroundColor;
   final VoidCallback? onTap;
 
@@ -106,23 +104,9 @@ class _MetricCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  color: _metricText,
-                ),
-              ),
+              value,
               const SizedBox(height: 6),
-              Text(
-                caption,
-                style: const TextStyle(
-                  fontSize: 12,
-                  height: 1.5,
-                  color: _metricMuted,
-                ),
-              ),
+              caption,
             ],
           ),
         ),
@@ -131,13 +115,98 @@ class _MetricCard extends StatelessWidget {
   }
 }
 
-String _screenCaption(DashboardScreenCard card) {
-  switch (card.changeDirection) {
-    case DashboardChangeDirection.up:
-      return '较昨日 ↑ ${card.yesterdayDeltaMinutes.abs()} 分钟';
-    case DashboardChangeDirection.down:
-      return '较昨日 ↓ ${card.yesterdayDeltaMinutes.abs()} 分钟';
-    case DashboardChangeDirection.steady:
-      return '和昨日基本持平';
+class _StepValueText extends ConsumerWidget {
+  const _StepValueText();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final value = ref.watch(overviewStepValueTextProvider);
+    return _MetricValueText(value: value);
+  }
+}
+
+class _StepCaptionText extends ConsumerWidget {
+  const _StepCaptionText();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final caption = ref.watch(overviewStepCaptionTextProvider);
+    return _MetricCaptionText(caption: caption);
+  }
+}
+
+class _SedentaryValueText extends ConsumerWidget {
+  const _SedentaryValueText();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final value = ref.watch(overviewSedentaryValueTextProvider);
+    return _MetricValueText(value: value);
+  }
+}
+
+class _SedentaryCaptionText extends ConsumerWidget {
+  const _SedentaryCaptionText();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final caption = ref.watch(overviewSedentaryCaptionTextProvider);
+    return _MetricCaptionText(caption: caption);
+  }
+}
+
+class _ScreenValueText extends ConsumerWidget {
+  const _ScreenValueText();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final value = ref.watch(overviewScreenValueTextProvider);
+    return _MetricValueText(value: value);
+  }
+}
+
+class _ScreenCaptionText extends ConsumerWidget {
+  const _ScreenCaptionText();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final caption = ref.watch(overviewScreenCaptionTextProvider);
+    return _MetricCaptionText(caption: caption);
+  }
+}
+
+class _MetricValueText extends StatelessWidget {
+  const _MetricValueText({required this.value});
+
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      value,
+      style: const TextStyle(
+        fontSize: 28,
+        fontWeight: FontWeight.w800,
+        color: _metricText,
+      ),
+    );
+  }
+}
+
+class _MetricCaptionText extends StatelessWidget {
+  const _MetricCaptionText({required this.caption});
+
+  final String caption;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      caption,
+      style: const TextStyle(
+        fontSize: 12,
+        height: 1.5,
+        color: _metricMuted,
+      ),
+    );
   }
 }

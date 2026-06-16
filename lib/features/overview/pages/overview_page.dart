@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
+import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 import 'package:health_monitor/features/overview/widgets/ai_suggestion_bubble.dart';
 import 'package:health_monitor/features/overview/widgets/environment_snapshot_bar.dart';
 import 'package:health_monitor/features/overview/widgets/health_score_hero.dart';
@@ -20,24 +21,24 @@ class OverviewPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final asyncViewModel = ref.watch(overviewViewModelProvider);
+    final asyncScreenState = ref.watch(overviewScreenStateProvider);
 
     return Scaffold(
       backgroundColor: _surface,
       body: SafeArea(
-        child: asyncViewModel.when(
+        child: asyncScreenState.when(
           skipLoadingOnRefresh: true,
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (Object error, StackTrace _) =>
               const Center(child: Text('加载首页失败')),
-          data: (OverviewDashboardViewModel viewModel) {
-            switch (viewModel.screenState) {
+          data: (OverviewScreenState screenState) {
+            switch (screenState) {
               case OverviewScreenState.permissionDenied:
                 return const PermissionDeniedPage();
               case OverviewScreenState.dataInsufficient:
                 return const DataInsufficientPage();
               case OverviewScreenState.ready:
-                return _OverviewDashboardBody(viewModel: viewModel);
+                return const _OverviewDashboardBody();
             }
           },
         ),
@@ -46,13 +47,11 @@ class OverviewPage extends ConsumerWidget {
   }
 }
 
-class _OverviewDashboardBody extends StatelessWidget {
-  const _OverviewDashboardBody({required this.viewModel});
-
-  final OverviewDashboardViewModel viewModel;
+class _OverviewDashboardBody extends ConsumerWidget {
+  const _OverviewDashboardBody();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(18, 20, 18, 28),
       child: Column(
@@ -61,47 +60,57 @@ class _OverviewDashboardBody extends StatelessWidget {
           const _PageHeader(),
           const SizedBox(height: 20),
           HealthScoreHero(
-            snapshot: viewModel.dashboard,
             onTap: () => context.push('/trends'),
           ),
-          if (viewModel.hasPreciseDetectionNotice) ...<Widget>[
-            const SizedBox(height: 14),
-            _InfoBanner(message: viewModel.preciseDetectionNotice!),
-          ],
-          if (viewModel.hasMissingDimensions) ...<Widget>[
-            const SizedBox(height: 14),
-            _InfoBanner(
-              message: '部分维度仍在采集中：${viewModel.missingDimensions.join('、')}',
-            ),
-          ],
+          const _PreciseDetectionNoticeSection(),
+          const _MissingDimensionsSection(),
           const SizedBox(height: 18),
           MetricCards(
-            snapshot: viewModel.dashboard,
-            onStepTap: () => _showDetailSheet(
-              context,
-              StepTrendDetailSheet(card: viewModel.dashboard.stepCard),
-            ),
-            onSedentaryTap: () => _showDetailSheet(
-              context,
-              SedentaryTimelineDetailSheet(
-                card: viewModel.dashboard.sedentaryCard,
-              ),
-            ),
-            onScreenTap: () => _showDetailSheet(
-              context,
-              ScreenUsageDetailSheet(card: viewModel.dashboard.screenCard),
-            ),
+            onStepTap: () => _showStepDetailSheet(context, ref),
+            onSedentaryTap: () => _showSedentaryDetailSheet(context, ref),
+            onScreenTap: () => _showScreenDetailSheet(context, ref),
           ),
           const SizedBox(height: 18),
-          EnvironmentSnapshotBar(
-            snapshot: viewModel.dashboard.environmentSnapshot,
-          ),
+          const EnvironmentSnapshotBar(),
           const SizedBox(height: 18),
-          AiSuggestionBubble(bubble: viewModel.dashboard.dailyAdviceBubble),
+          const AiSuggestionBubble(),
         ],
       ),
     );
   }
+}
+
+Future<void> _showStepDetailSheet(BuildContext context, WidgetRef ref) {
+  final dashboard = ref.read(overviewDashboardSnapshotProvider);
+  if (dashboard == null) {
+    return Future<void>.value();
+  }
+  return _showDetailSheet(
+    context,
+    StepTrendDetailSheet(card: dashboard.stepCard),
+  );
+}
+
+Future<void> _showSedentaryDetailSheet(BuildContext context, WidgetRef ref) {
+  final dashboard = ref.read(overviewDashboardSnapshotProvider);
+  if (dashboard == null) {
+    return Future<void>.value();
+  }
+  return _showDetailSheet(
+    context,
+    SedentaryTimelineDetailSheet(card: dashboard.sedentaryCard),
+  );
+}
+
+Future<void> _showScreenDetailSheet(BuildContext context, WidgetRef ref) {
+  final dashboard = ref.read(overviewDashboardSnapshotProvider);
+  if (dashboard == null) {
+    return Future<void>.value();
+  }
+  return _showDetailSheet(
+    context,
+    ScreenUsageDetailSheet(card: dashboard.screenCard),
+  );
 }
 
 Future<void> _showDetailSheet(BuildContext context, Widget child) {
@@ -150,6 +159,42 @@ class _PageHeader extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _PreciseDetectionNoticeSection extends ConsumerWidget {
+  const _PreciseDetectionNoticeSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final message = ref.watch(overviewPreciseDetectionNoticeTextProvider);
+    if (message == null || message.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      children: <Widget>[
+        const SizedBox(height: 14),
+        _InfoBanner(message: message),
+      ],
+    );
+  }
+}
+
+class _MissingDimensionsSection extends ConsumerWidget {
+  const _MissingDimensionsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final message = ref.watch(overviewMissingDimensionsTextProvider);
+    if (message == null || message.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      children: <Widget>[
+        const SizedBox(height: 14),
+        _InfoBanner(message: message),
+      ],
     );
   }
 }
