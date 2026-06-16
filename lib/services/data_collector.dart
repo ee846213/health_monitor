@@ -7,6 +7,7 @@ import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/metrics/daily_metrics.dart';
 import 'package:health_monitor/domain/motion/activity_sample.dart';
 import 'package:health_monitor/domain/motion/step_count_state.dart';
+import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
 import 'package:health_monitor/services/ambient_light_capture_service.dart';
 import 'package:health_monitor/services/android_usage_stats_bridge.dart';
@@ -14,9 +15,12 @@ import 'package:health_monitor/services/capture_health_service.dart';
 import 'package:health_monitor/services/capture_stream_gap_policy.dart';
 import 'package:health_monitor/services/digital_usage_capture_service.dart';
 import 'package:health_monitor/services/health_insight_service.dart';
+import 'package:health_monitor/services/local_notification_service.dart';
 import 'package:health_monitor/services/location_capture_service.dart';
 import 'package:health_monitor/services/motion_capture_service.dart';
 import 'package:health_monitor/services/noise_capture_service.dart';
+import 'package:health_monitor/services/permission_status_service.dart';
+import 'package:health_monitor/services/reminder_delivery_service.dart';
 import 'package:health_monitor/services/step_counter_service.dart';
 import 'package:health_monitor/storage/isar/app_isar.dart';
 import 'package:health_monitor/storage/repositories/activity_repository.dart';
@@ -25,6 +29,7 @@ import 'package:health_monitor/storage/repositories/ambient_light_sample_reposit
 import 'package:health_monitor/storage/repositories/location_summary_repository.dart';
 import 'package:health_monitor/storage/repositories/metrics_repository.dart';
 import 'package:health_monitor/storage/repositories/noise_sample_repository.dart';
+import 'package:health_monitor/storage/repositories/notification_preference_repository.dart';
 import 'package:health_monitor/storage/repositories/query_window.dart';
 import 'package:health_monitor/storage/repositories/reminder_repository.dart';
 import 'package:health_monitor/storage/repositories/usage_summary_repository.dart';
@@ -314,6 +319,7 @@ class DataCollector {
     CaptureHealthService? captureHealthService,
     DataCollectorRevisionCallback? onDataChanged,
     Future<void> Function(DateTime referenceTime)? persistRuleReminders,
+    Future<void> Function(DateTime referenceTime)? deliverRuleReminders,
     Future<void> Function()? syncNativeRiskEvents,
   })  : _motionCaptureService = motionCaptureService ?? MotionCaptureService(),
         ambientLightRepository = ambientLightRepository ??
@@ -344,6 +350,7 @@ class DataCollector {
             ),
         _onDataChanged = onDataChanged,
         _persistRuleReminders = persistRuleReminders,
+        _deliverRuleReminders = deliverRuleReminders,
         _syncNativeRiskEvents = syncNativeRiskEvents;
 
   final ActivityRepository activityRepository;
@@ -363,6 +370,7 @@ class DataCollector {
   final CaptureHealthService _captureHealthService;
   final DataCollectorRevisionCallback? _onDataChanged;
   final Future<void> Function(DateTime referenceTime)? _persistRuleReminders;
+  final Future<void> Function(DateTime referenceTime)? _deliverRuleReminders;
   final Future<void> Function()? _syncNativeRiskEvents;
   final List<StreamSubscription<dynamic>> _subscriptions =
       <StreamSubscription<dynamic>>[];
@@ -721,6 +729,9 @@ class DataCollector {
     if (_persistRuleReminders != null) {
       await _persistRuleReminders.call(referenceTime);
     }
+    if (_deliverRuleReminders != null) {
+      await _deliverRuleReminders.call(referenceTime);
+    }
     _onDataChanged?.call();
   }
 
@@ -858,6 +869,41 @@ final dataCollectorProvider = Provider<DataCollector>((Ref ref) {
         ),
       );
       await insightService.syncNativeWalkingScreenRiskEvents();
+    },
+    deliverRuleReminders: (DateTime referenceTime) async {
+      final isar = await ref.read(appIsarProvider.future);
+      final reminderRepository = IsarReminderRepository(isar);
+      final reminderDeliveryService = ReminderDeliveryService(
+        notificationPreferenceRepository:
+            IsarNotificationPreferenceRepository(isar),
+        notificationPermissionReader: () async {
+          final statuses =
+              await const PermissionHandlerStatusService().getStatuses();
+          return statuses[PermissionType.notification] ??
+              PermissionGrantStatus.unknown;
+        },
+      );
+      final localNotificationService = LocalNotificationService();
+      final startOfDay = DateTime(
+        referenceTime.year,
+        referenceTime.month,
+        referenceTime.day,
+      );
+      final undelivered =
+          await reminderRepository.listUndeliveredSince(startOfDay);
+      if (undelivered.isEmpty) {
+        return;
+      }
+
+      final plan = await reminderDeliveryService.buildPlan(
+        records: undelivered,
+        referenceTime: referenceTime,
+      );
+      await localNotificationService.sendPlan(plan);
+      await reminderRepository.markDelivered(
+        plan.readyRecords,
+        deliveredAt: referenceTime,
+      );
     },
   );
   collector.start();

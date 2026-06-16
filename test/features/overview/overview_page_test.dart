@@ -1,42 +1,51 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
-import 'package:health_monitor/domain/reminder/reminder_record.dart';
+import 'package:health_monitor/domain/scoring/health_score_calculator.dart';
 import 'package:health_monitor/features/overview/pages/overview_page.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
-import 'package:health_monitor/rules/engine/rule_verdict.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
 
 void main() {
-  testWidgets('首页应渲染真实概览文案而不是静态占位文案', (WidgetTester tester) async {
-    const viewModel = OverviewViewModel(
+  testWidgets('首页应渲染新版仪表盘而不是旧概览文案', (WidgetTester tester) async {
+    final viewModel = OverviewDashboardViewModel(
       screenState: OverviewScreenState.ready,
-      isLoading: false,
-      verdicts: <RuleVerdict>[
-        RuleVerdict(
-          dimension: 'activity',
-          level: 'concern',
-          summary: '活动量偏低',
-          detail: '最近两小时连续久坐，建议先起来活动 5 分钟。',
+      dashboard: DashboardSnapshot(
+        generatedAt: DateTime(2026, 6, 16, 9),
+        healthScore: HealthScoreBreakdown(
+          stepScore: 81,
+          sedentaryScore: 92,
+          screenScore: 88,
+          totalScore: 87,
         ),
-      ],
-      summaryLabel: '活动量偏低',
-      summaryDetail: '最近两小时连续久坐，建议先起来活动 5 分钟。',
-      todayStatusLabel: '活动偏少',
-      todayStatusDetail: '步数 1600，久坐 145 分钟。',
-      conclusionLabel: '活动量偏低',
-      conclusionDetail: '最近两小时连续久坐，建议先起来活动 5 分钟。',
-      metrics: OverviewMetricSnapshot(
-        stepCount: 1600,
-        sedentaryMinutes: 145,
-        screenMinutes: 80,
-        outdoorMinutes: 10,
+        stepCard: DashboardStepCard(
+          currentSteps: 4860,
+          goalSteps: 6000,
+          achievementPercent: 81,
+        ),
+        sedentaryCard: DashboardSedentaryCard(
+          totalMinutes: 96,
+          longestSingleMinutes: 42,
+        ),
+        screenCard: DashboardScreenCard(
+          totalMinutes: 148,
+          yesterdayDeltaMinutes: -18,
+          changeDirection: DashboardChangeDirection.down,
+        ),
+        environmentSnapshot: DashboardEnvironmentSnapshot(
+          lightLabel: '舒适',
+          noiseLabel: '正常',
+        ),
+        dailyAdviceBubble: DailyAdviceBubble(
+          text: '晚饭后散步 15 分钟会更稳。',
+          source: DailyAdviceSource.llm,
+        ),
+        hasRealData: true,
+        hasReminderHistory: true,
       ),
-      reminders: <ReminderRecord>[],
       permissionStatuses: <PermissionType, PermissionGrantStatus>{},
-      missingDimensions: <String>[],
-      hasRealData: true,
     );
 
     await tester.pumpWidget(
@@ -49,10 +58,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('活动偏少'), findsOneWidget);
-    expect(find.text('步数 1600，久坐 145 分钟。'), findsOneWidget);
-    expect(find.text('活动量偏低'), findsWidgets);
-    expect(find.text('最近两小时连续久坐，建议先起来活动 5 分钟。'), findsWidgets);
-    expect(find.text('今天整体还不错，下午久坐有点集中。'), findsNothing);
+    expect(find.text('综合健康分'), findsOneWidget);
+    expect(find.text('步数'), findsOneWidget);
+    expect(find.text('久坐'), findsOneWidget);
+    expect(find.text('屏幕'), findsOneWidget);
+    expect(find.textContaining('AI 建议'), findsOneWidget);
+    expect(find.text('结论先看'), findsNothing);
   });
 }

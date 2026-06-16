@@ -2,9 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:health_monitor/features/diagnostics/providers/diagnostics_providers.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
+import 'package:health_monitor/features/diagnostics/providers/diagnostics_providers.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
+import 'package:health_monitor/features/profile/widgets/do_not_disturb_section.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
 
 const Color _surface = Color(0xFFFFFDF8);
@@ -40,7 +41,7 @@ class ProfilePage extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (Object error, StackTrace _) =>
             const Center(child: Text('加载我的页面失败')),
-        data: (OverviewViewModel viewModel) {
+        data: (OverviewDashboardViewModel viewModel) {
           return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(18, 6, 18, 24),
             child: Column(
@@ -48,7 +49,7 @@ class ProfilePage extends ConsumerWidget {
               children: <Widget>[
                 _MyRemindersCard(viewModel: viewModel),
                 const SizedBox(height: 20),
-                const _ReminderPrefsCard(),
+                const DoNotDisturbSection(),
                 const SizedBox(height: 20),
                 _PermissionStatusCard(viewModel: viewModel),
               ],
@@ -63,7 +64,7 @@ class ProfilePage extends ConsumerWidget {
 class _MyRemindersCard extends StatelessWidget {
   const _MyRemindersCard({required this.viewModel});
 
-  final OverviewViewModel viewModel;
+  final OverviewDashboardViewModel viewModel;
 
   @override
   Widget build(BuildContext context) {
@@ -118,48 +119,10 @@ class _MyRemindersCard extends StatelessWidget {
   }
 }
 
-class _ReminderPrefsCard extends StatelessWidget {
-  const _ReminderPrefsCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: _surfaceSoft,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: _line),
-      ),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            '提醒与显示偏好',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: _textPrimary,
-            ),
-          ),
-          SizedBox(height: 10),
-          _ValueRow(title: '久坐提醒强度', value: '轻柔'),
-          SizedBox(height: 8),
-          _ValueRow(title: '夜间减少提醒', value: '已开启'),
-          SizedBox(height: 8),
-          _ValueRow(title: '简报提醒时间', value: '20:30'),
-          SizedBox(height: 8),
-          _ValueRow(title: '扩展观察显示', value: '仅显示重点'),
-        ],
-      ),
-    );
-  }
-}
-
 class _PermissionStatusCard extends ConsumerWidget {
   const _PermissionStatusCard({required this.viewModel});
 
-  final OverviewViewModel viewModel;
+  final OverviewDashboardViewModel viewModel;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -189,8 +152,6 @@ class _PermissionStatusCard extends ConsumerWidget {
         status: viewModel.permissionStatuses[PermissionType.usageAccess],
       ),
     ].where((_PermissionRowData row) {
-      // Usage Access 只在 Android 上有稳定的系统入口，iPhone 不展示，
-      // 避免把“平台不支持”误导成“用户没开权限”。
       if (row.type == PermissionType.usageAccess &&
           defaultTargetPlatform != TargetPlatform.android) {
         return false;
@@ -317,8 +278,6 @@ class _PermissionStatusCard extends ConsumerWidget {
       return;
     }
 
-    // 权限处理结束后立刻失效相关状态，避免用户从系统设置返回时仍停留在旧快照。
-    // 这里不直接重建页面，而是让首页、我的页面和诊断页按各自 provider 自己重算。
     ref.invalidate(permissionStatusProvider);
     ref.invalidate(overviewViewModelProvider);
     ref.invalidate(diagnosticsSnapshotProvider);
@@ -403,47 +362,6 @@ class _ActionRow extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _ValueRow extends StatelessWidget {
-  const _ValueRow({required this.title, required this.value});
-
-  final String title;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: _line),
-      ),
-      child: Row(
-        children: <Widget>[
-          Expanded(
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: _textPrimary,
-              ),
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: _textMuted,
-            ),
-          ),
-        ],
       ),
     );
   }
