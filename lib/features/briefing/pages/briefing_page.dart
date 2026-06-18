@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_monitor/app/theme/app_icons.dart';
+import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
 import 'package:health_monitor/features/briefing/providers/briefing_providers.dart';
+import 'package:health_monitor/features/overview/widgets/metric_detail_sheets.dart';
 
 const Color _surface = Color(0xFFFFFDF8);
 const Color _surfaceSoft = Color(0xFFF0ECE4);
@@ -21,7 +23,7 @@ class BriefingPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final asyncViewModel = ref.watch(briefingViewModelProvider);
+    final asyncRange = ref.watch(briefingPageRangeProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F3EE),
@@ -31,21 +33,21 @@ class BriefingPage extends ConsumerWidget {
         elevation: 0,
         toolbarHeight: 8,
       ),
-      body: asyncViewModel.when(
+      body: asyncRange.when(
         skipLoadingOnRefresh: true,
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (Object error, StackTrace _) =>
             const Center(child: Text('加载简报失败')),
-        data: (BriefingViewModel viewModel) {
+        data: (BriefingTimeRange selectedRange) {
           return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(18, 16, 18, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                _PageHeader(viewModel: viewModel),
+                const _PageHeader(),
                 const SizedBox(height: 14),
                 _TimeRangeSegment(
-                  selectedRange: viewModel.selectedRange,
+                  selectedRange: selectedRange,
                 ),
                 const SizedBox(height: 14),
                 AnimatedSwitcher(
@@ -73,8 +75,7 @@ class BriefingPage extends ConsumerWidget {
                     );
                   },
                   child: _DailyReportCard(
-                    key: ValueKey<String>(viewModel.selectedRange.name),
-                    viewModel: viewModel,
+                    key: ValueKey<String>(selectedRange.name),
                   ),
                 ),
               ],
@@ -87,9 +88,7 @@ class BriefingPage extends ConsumerWidget {
 }
 
 class _PageHeader extends StatelessWidget {
-  const _PageHeader({required this.viewModel});
-
-  final BriefingViewModel viewModel;
+  const _PageHeader();
 
   @override
   Widget build(BuildContext context) {
@@ -134,7 +133,7 @@ class _PageHeader extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              _StatusChip(text: viewModel.windowLabel),
+              const _WindowLabelChip(),
             ],
           ),
           const SizedBox(height: 12),
@@ -159,6 +158,15 @@ class _PageHeader extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _WindowLabelChip extends ConsumerWidget {
+  const _WindowLabelChip();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return _StatusChip(text: ref.watch(briefingWindowLabelProvider));
   }
 }
 
@@ -243,9 +251,7 @@ class _TimeRangeSegment extends ConsumerWidget {
 }
 
 class _DailyReportCard extends StatelessWidget {
-  const _DailyReportCard({super.key, required this.viewModel});
-
-  final BriefingViewModel viewModel;
+  const _DailyReportCard({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -264,98 +270,138 @@ class _DailyReportCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Row(
-            children: <Widget>[
-              _SectionPill(text: viewModel.windowLabel),
-              const SizedBox(width: 8),
-              _SectionPill(
-                text: viewModel.hasRealData ? '真实数据' : '等待积累',
-                backgroundColor:
-                    viewModel.hasRealData ? _sageSoft : const Color(0xFFF2E8DD),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            viewModel.briefSnapshot.headline,
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w700,
-              color: _textPrimary,
-              height: 1.1,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            viewModel.briefSnapshot.supportingDetail,
-            style: const TextStyle(
-              fontSize: 13,
-              color: _textSecondary,
-              height: 1.6,
-            ),
-          ),
-          const SizedBox(height: 14),
-          _MetricGrid(viewModel: viewModel),
-          const SizedBox(height: 14),
-          const _SectionHeading(title: '三个核心指标'),
-          const SizedBox(height: 10),
-          _MetricHighlights(viewModel: viewModel),
-          const SizedBox(height: 14),
-          const _SectionHeading(title: '建议'),
-          const SizedBox(height: 10),
-          _SuggestionBanner(viewModel: viewModel),
-          if (viewModel.briefSnapshot.qualityNote != null) ...<Widget>[
-            const SizedBox(height: 14),
-            const _SectionHeading(title: '质量说明'),
-            const SizedBox(height: 10),
-            _SummaryCard(
-              title: '数据质量',
-              content: viewModel.briefSnapshot.qualityNote!,
-            ),
-          ],
+          _ReportStatusRow(),
+          SizedBox(height: 8),
+          _ReportHeadline(),
+          SizedBox(height: 8),
+          _ReportSupportingDetail(),
+          SizedBox(height: 14),
+          _MetricGrid(),
+          SizedBox(height: 14),
+          _SectionHeading(title: '三个核心指标'),
+          SizedBox(height: 10),
+          _MetricHighlights(),
+          SizedBox(height: 14),
+          _SectionHeading(title: '建议'),
+          SizedBox(height: 10),
+          _SuggestionBanner(),
+          _QualityNoteSection(),
         ],
       ),
     );
   }
 }
 
-class _MetricGrid extends StatelessWidget {
-  const _MetricGrid({required this.viewModel});
-
-  final BriefingViewModel viewModel;
+class _ReportStatusRow extends ConsumerWidget {
+  const _ReportStatusRow();
 
   @override
-  Widget build(BuildContext context) {
-    final metrics = viewModel.briefSnapshot.metrics;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final windowLabel = ref.watch(briefingWindowLabelProvider);
+    final hasRealData = ref.watch(briefingHasRealDataProvider);
+    return Row(
+      children: <Widget>[
+        _SectionPill(text: windowLabel),
+        const SizedBox(width: 8),
+        _SectionPill(
+          text: hasRealData ? '真实数据' : '等待积累',
+          backgroundColor: hasRealData ? _sageSoft : const Color(0xFFF2E8DD),
+        ),
+      ],
+    );
+  }
+}
+
+class _ReportHeadline extends ConsumerWidget {
+  const _ReportHeadline();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Text(
+      ref.watch(briefingHeadlineProvider),
+      style: const TextStyle(
+        fontSize: 24,
+        fontWeight: FontWeight.w700,
+        color: _textPrimary,
+        height: 1.1,
+      ),
+    );
+  }
+}
+
+class _ReportSupportingDetail extends ConsumerWidget {
+  const _ReportSupportingDetail();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Text(
+      ref.watch(briefingSupportingDetailProvider),
+      style: const TextStyle(
+        fontSize: 13,
+        color: _textSecondary,
+        height: 1.6,
+      ),
+    );
+  }
+}
+
+class _MetricGrid extends ConsumerWidget {
+  const _MetricGrid();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final metrics = ref.watch(briefingMetricsProvider);
+    final selectedRange = ref.watch(briefingTimeRangeProvider);
+    if (metrics.length < 3) {
+      return const SizedBox.shrink();
+    }
     return Row(
       children: <Widget>[
         Expanded(
           child: _MetricTile(
+            key: const Key('briefing-step-card'),
             title: metrics[0].label,
             value: metrics[0].value,
             unit: metrics[0].unit,
             backgroundColor: _sageSoft,
+            onTap: () => _showStepDetailSheet(
+              context,
+              selectedRange,
+              int.tryParse(metrics[0].value) ?? 0,
+            ),
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: _MetricTile(
+            key: const Key('briefing-sedentary-card'),
             title: metrics[1].label,
             value: metrics[1].value,
             unit: metrics[1].unit,
             backgroundColor: _warmAccent,
+            onTap: () => _showSedentaryDetailSheet(
+              context,
+              selectedRange,
+              int.tryParse(metrics[1].value) ?? 0,
+            ),
           ),
         ),
         const SizedBox(width: 8),
         Expanded(
           child: _MetricTile(
+            key: const Key('briefing-screen-card'),
             title: metrics[2].label,
             value: metrics[2].value,
             unit: metrics[2].unit,
             backgroundColor: _mistAccent,
+            onTap: () => _showScreenDetailSheet(
+              context,
+              selectedRange,
+              int.tryParse(metrics[2].value) ?? 0,
+            ),
           ),
         ),
       ],
@@ -363,21 +409,31 @@ class _MetricGrid extends StatelessWidget {
   }
 }
 
-class _MetricHighlights extends StatelessWidget {
-  const _MetricHighlights({required this.viewModel});
-
-  final BriefingViewModel viewModel;
+class _MetricHighlights extends ConsumerWidget {
+  const _MetricHighlights();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final metrics = ref.watch(briefingMetricsProvider);
+    final selectedRange = ref.watch(briefingTimeRangeProvider);
     return Column(
-      children: viewModel.briefSnapshot.metrics
+      children: metrics.indexed
           .map(
-            (metric) => Padding(
+            (entry) => Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: _SummaryCard(
-                title: metric.label,
-                content: '本段${metric.label}为 ${metric.value} ${metric.unit}。',
+                key: ValueKey<String>(
+                  'briefing-${entry.$1}-summary-card',
+                ),
+                title: entry.$2.label,
+                content:
+                    '本段${entry.$2.label}为 ${entry.$2.value} ${entry.$2.unit}。',
+                onTap: () => _showMetricDetailSheet(
+                  context,
+                  selectedRange,
+                  entry.$1,
+                  int.tryParse(entry.$2.value) ?? 0,
+                ),
               ),
             ),
           )
@@ -388,96 +444,199 @@ class _MetricHighlights extends StatelessWidget {
 
 class _MetricTile extends StatelessWidget {
   const _MetricTile({
+    super.key,
     required this.title,
     required this.value,
     required this.unit,
     required this.backgroundColor,
+    required this.onTap,
   });
 
   final String title;
   final String value;
   final String unit;
   final Color backgroundColor;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: backgroundColor,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: _line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: _textSecondary,
-            ),
+        child: Ink(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: _line),
           ),
-          const SizedBox(height: 10),
-          Text(
-            '$value $unit',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 21,
-              fontWeight: FontWeight.w700,
-              color: _textPrimary,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: _textSecondary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '$value $unit',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 21,
+                  fontWeight: FontWeight.w700,
+                  color: _textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                '本段',
+                style: TextStyle(fontSize: 11, color: _textMuted),
+              ),
+            ],
           ),
-          const SizedBox(height: 4),
-          const Text(
-            '本段',
-            style: TextStyle(fontSize: 11, color: _textMuted),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
+Future<void> _showStepDetailSheet(
+  BuildContext context,
+  BriefingTimeRange range,
+  int steps,
+) {
+  final goalSteps = range == BriefingTimeRange.recent7Days ? 42000 : 6000;
+  final achievementPercent =
+      goalSteps == 0 ? 0 : (steps / goalSteps * 100).round();
+  return showMetricDetailSheet(
+    context,
+    StepTrendDetailSheet(
+      card: DashboardStepCard(
+        currentSteps: steps,
+        goalSteps: goalSteps,
+        achievementPercent: achievementPercent,
+      ),
+      detailProvider: briefingStepDetailProvider(range),
+      summary: '${range.label}累计 $steps 步。',
+      progressLabel: switch (range) {
+        BriefingTimeRange.today => '今日进度',
+        BriefingTimeRange.yesterday => '昨日进度',
+        BriefingTimeRange.recent7Days => '7 日目标进度',
+      },
+    ),
+  );
+}
+
+Future<void> _showSedentaryDetailSheet(
+  BuildContext context,
+  BriefingTimeRange range,
+  int minutes,
+) {
+  return showMetricDetailSheet(
+    context,
+    SedentaryTimelineDetailSheet(
+      card: DashboardSedentaryCard(
+        totalMinutes: minutes,
+        longestSingleMinutes: 0,
+      ),
+      detailProvider: briefingSedentaryDetailProvider(range),
+      title: '${range.label}久坐分布',
+      summary: '${range.label}累计久坐 $minutes 分钟。',
+    ),
+  );
+}
+
+Future<void> _showScreenDetailSheet(
+  BuildContext context,
+  BriefingTimeRange range,
+  int minutes,
+) {
+  return showMetricDetailSheet(
+    context,
+    ScreenUsageDetailSheet(
+      card: DashboardScreenCard(
+        totalMinutes: minutes,
+        yesterdayDeltaMinutes: 0,
+        changeDirection: DashboardChangeDirection.steady,
+      ),
+      detailProvider: briefingScreenDetailProvider(range),
+      title: '${range.label}分时段使用分布',
+      summary: '${range.label}亮屏 $minutes 分钟。',
+    ),
+  );
+}
+
+Future<void> _showMetricDetailSheet(
+  BuildContext context,
+  BriefingTimeRange range,
+  int metricIndex,
+  int value,
+) {
+  return switch (metricIndex) {
+    0 => _showStepDetailSheet(context, range, value),
+    1 => _showSedentaryDetailSheet(context, range, value),
+    2 => _showScreenDetailSheet(context, range, value),
+    _ => Future<void>.value(),
+  };
+}
+
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.title, required this.content});
+  const _SummaryCard({
+    super.key,
+    required this.title,
+    required this.content,
+    this.onTap,
+  });
 
   final String title;
   final String content;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: _surfaceSoft,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: _line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: _textMuted,
-            ),
+        child: Ink(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: _surfaceSoft,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: _line),
           ),
-          const SizedBox(height: 8),
-          Text(
-            content,
-            style: const TextStyle(
-              fontSize: 13,
-              color: _textSecondary,
-              height: 1.55,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: _textMuted,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                content,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: _textSecondary,
+                  height: 1.55,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -543,14 +702,12 @@ class _SectionPill extends StatelessWidget {
   }
 }
 
-class _SuggestionBanner extends StatelessWidget {
-  const _SuggestionBanner({required this.viewModel});
-
-  final BriefingViewModel viewModel;
+class _SuggestionBanner extends ConsumerWidget {
+  const _SuggestionBanner();
 
   @override
-  Widget build(BuildContext context) {
-    final suggestions = viewModel.briefSnapshot.suggestions;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final suggestions = ref.watch(briefingSuggestionsProvider);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -591,6 +748,30 @@ class _SuggestionBanner extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _QualityNoteSection extends ConsumerWidget {
+  const _QualityNoteSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final qualityNote = ref.watch(briefingQualityNoteProvider);
+    if (qualityNote == null || qualityNote.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const SizedBox(height: 14),
+        const _SectionHeading(title: '质量说明'),
+        const SizedBox(height: 10),
+        _SummaryCard(
+          title: '数据质量',
+          content: qualityNote,
+        ),
+      ],
     );
   }
 }

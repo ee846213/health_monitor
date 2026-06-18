@@ -85,7 +85,7 @@ Future<void> _showStepDetailSheet(BuildContext context, WidgetRef ref) {
   if (dashboard == null) {
     return Future<void>.value();
   }
-  return _showDetailSheet(
+  return showMetricDetailSheet(
     context,
     StepTrendDetailSheet(card: dashboard.stepCard),
   );
@@ -96,7 +96,7 @@ Future<void> _showSedentaryDetailSheet(BuildContext context, WidgetRef ref) {
   if (dashboard == null) {
     return Future<void>.value();
   }
-  return _showDetailSheet(
+  return showMetricDetailSheet(
     context,
     SedentaryTimelineDetailSheet(card: dashboard.sedentaryCard),
   );
@@ -107,20 +107,9 @@ Future<void> _showScreenDetailSheet(BuildContext context, WidgetRef ref) {
   if (dashboard == null) {
     return Future<void>.value();
   }
-  return _showDetailSheet(
+  return showMetricDetailSheet(
     context,
     ScreenUsageDetailSheet(card: dashboard.screenCard),
-  );
-}
-
-Future<void> _showDetailSheet(BuildContext context, Widget child) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
-    builder: (BuildContext context) {
-      return child;
-    },
   );
 }
 

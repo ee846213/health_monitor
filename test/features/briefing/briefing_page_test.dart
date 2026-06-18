@@ -130,6 +130,42 @@ void main() {
     );
     expect(find.text('1200 步'), findsOneWidget);
 
+    await tester.tap(find.byKey(const Key('briefing-step-card')));
+    await tester.pumpAndSettle();
+    expect(find.text('近 7 天步数'), findsOneWidget);
+    expect(find.text('今日累计 1200 步。'), findsOneWidget);
+
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('briefing-sedentary-card')));
+    await tester.pumpAndSettle();
+    expect(find.text('今日久坐分布'), findsOneWidget);
+    expect(find.text('今日累计久坐 60 分钟。'), findsOneWidget);
+
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('briefing-screen-card')));
+    await tester.pumpAndSettle();
+    expect(find.text('今日分时段使用分布'), findsOneWidget);
+    expect(find.text('今日亮屏 90 分钟。'), findsOneWidget);
+
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    final stepSummaryCard = find.byKey(
+      const ValueKey<String>('briefing-0-summary-card'),
+    );
+    await tester.ensureVisible(stepSummaryCard);
+    await tester.tap(stepSummaryCard);
+    await tester.pumpAndSettle();
+    expect(find.text('近 7 天步数'), findsOneWidget);
+
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('昨日'));
     await tester.tap(find.text('昨日'));
     await tester.pumpAndSettle();
 
@@ -141,6 +177,14 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('2400 步'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('briefing-screen-card')));
+    await tester.pumpAndSettle();
+    expect(find.text('昨日分时段使用分布'), findsOneWidget);
+    expect(find.text('昨日亮屏 150 分钟。'), findsOneWidget);
+
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('最近 7 天'));
     await tester.pumpAndSettle();
