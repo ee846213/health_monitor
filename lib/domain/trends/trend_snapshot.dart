@@ -9,11 +9,13 @@ class TrendPoint {
   const TrendPoint({
     required this.label,
     required this.value,
+    this.hasData = true,
     this.delta,
   });
 
   final String label;
   final num value;
+  final bool hasData;
   final num? delta;
 }
 

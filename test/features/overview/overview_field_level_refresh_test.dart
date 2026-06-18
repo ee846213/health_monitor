@@ -4,6 +4,7 @@ import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/domain/scoring/health_score_calculator.dart';
+import 'package:health_monitor/features/overview/providers/overview_providers.dart';
 import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
 
@@ -102,6 +103,47 @@ void main() {
       OverviewEnvironmentLightIcon.bright,
     ]);
     expect(stepEvents, isEmpty);
+  });
+  test('字段变化但页面仍为 ready 时不触发首页外层刷新', () async {
+    final readyDataProvider =
+        StateProvider<OverviewReadyData?>((Ref ref) => _buildReadyData(
+              steps: 1200,
+              lightLabel: 'comfortable',
+              noiseLabel: 'normal',
+            ));
+    final container = ProviderContainer(
+      overrides: <Override>[
+        overviewReadyDataStateProvider.overrideWith(
+          (Ref ref) => ref.watch(readyDataProvider),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    final screenStateEvents = <AsyncValue<OverviewScreenState>>[];
+    final stepEvents = <String>[];
+    final screenStateSub = container.listen<AsyncValue<OverviewScreenState>>(
+      overviewScreenStateProvider,
+      (previous, next) => screenStateEvents.add(next),
+      fireImmediately: false,
+    );
+    final stepSub = container.listen<String>(
+      overviewStepValueTextProvider,
+      (previous, next) => stepEvents.add(next),
+      fireImmediately: false,
+    );
+    addTearDown(screenStateSub.close);
+    addTearDown(stepSub.close);
+
+    container.read(readyDataProvider.notifier).state = _buildReadyData(
+      steps: 2400,
+      lightLabel: 'comfortable',
+      noiseLabel: 'normal',
+    );
+    await container.pump();
+
+    expect(stepEvents, <String>['2400']);
+    expect(screenStateEvents, isEmpty);
   });
 }
 

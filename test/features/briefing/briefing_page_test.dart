@@ -129,6 +129,18 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('1200 步'), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: find.text('1200 步'),
+        matching: find.byType(FittedBox),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('三个核心指标'), findsNothing);
+    expect(
+      find.byKey(const ValueKey<String>('briefing-0-summary-card')),
+      findsNothing,
+    );
 
     await tester.tap(find.byKey(const Key('briefing-step-card')));
     await tester.pumpAndSettle();
@@ -150,17 +162,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('今日分时段使用分布'), findsOneWidget);
     expect(find.text('今日亮屏 90 分钟。'), findsOneWidget);
-
-    await tester.tapAt(const Offset(10, 10));
-    await tester.pumpAndSettle();
-
-    final stepSummaryCard = find.byKey(
-      const ValueKey<String>('briefing-0-summary-card'),
-    );
-    await tester.ensureVisible(stepSummaryCard);
-    await tester.tap(stepSummaryCard);
-    await tester.pumpAndSettle();
-    expect(find.text('近 7 天步数'), findsOneWidget);
 
     await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();

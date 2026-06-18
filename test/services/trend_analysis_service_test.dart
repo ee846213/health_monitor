@@ -32,6 +32,65 @@ void main() {
     expect(snapshot.points.length, 7);
     expect(snapshot.insightText, contains('6000'));
   });
+
+  test('没有环境样本时不应把缺失数据计算成 100 分', () async {
+    final service = TrendAnalysisService(
+      metricsRepository: InMemoryMetricsRepository(metrics: const []),
+      usageRepository: InMemoryUsageSummaryRepository(summaries: const []),
+      ambientLightRepository:
+          InMemoryAmbientLightSampleRepository(samples: const []),
+      noiseRepository: InMemoryNoiseSampleRepository(samples: const []),
+    );
+
+    final snapshot = await service.build(
+      referenceTime: DateTime(2026, 6, 16, 9),
+      selectedTab: TrendTab.environment,
+    );
+
+    expect(snapshot.points, hasLength(7));
+    expect(snapshot.points.every((TrendPoint point) => !point.hasData), isTrue);
+    expect(snapshot.emptyStateText, contains('还没有采集到'));
+    expect(snapshot.insightText, contains('真实'));
+  });
+
+  test('环境趋势只对有真实样本的日期生成分数', () async {
+    final service = TrendAnalysisService(
+      metricsRepository: InMemoryMetricsRepository(metrics: const []),
+      usageRepository: InMemoryUsageSummaryRepository(summaries: const []),
+      ambientLightRepository: InMemoryAmbientLightSampleRepository(
+        samples: <AmbientLightSample>[
+          AmbientLightSample(
+            capturedAt: DateTime(2026, 6, 15, 22),
+            duration: const Duration(minutes: 20),
+            lux: 3,
+            level: AmbientLightLevel.dark,
+          ),
+        ],
+      ),
+      noiseRepository: InMemoryNoiseSampleRepository(
+        samples: <NoiseSample>[
+          NoiseSample(
+            capturedAt: DateTime(2026, 6, 15, 22),
+            duration: const Duration(minutes: 10),
+            decibel: 75,
+            level: NoiseLevel.loud,
+          ),
+        ],
+      ),
+    );
+
+    final snapshot = await service.build(
+      referenceTime: DateTime(2026, 6, 16, 9),
+      selectedTab: TrendTab.environment,
+    );
+
+    expect(
+      snapshot.points.where((TrendPoint point) => point.hasData),
+      hasLength(1),
+    );
+    expect(snapshot.points[5].value, 70);
+    expect(snapshot.emptyStateText, isNull);
+  });
 }
 
 List<DailyMetrics> _sevenDayMetrics() {

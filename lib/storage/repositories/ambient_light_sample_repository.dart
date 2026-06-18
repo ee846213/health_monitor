@@ -44,18 +44,19 @@ class IsarAmbientLightSampleRepository implements AmbientLightSampleRepository {
   @override
   Future<List<AmbientLightSample>> listByWindow(QueryWindow window) async {
     final isar = await _isarFuture;
-    final records =
-        await isar.ambientLightSampleRecords.where().anyId().findAll();
-    final result = records
+    final records = await isar.ambientLightSampleRecords
+        .filter()
+        .capturedAtBetween(
+          window.startAt,
+          window.endAt,
+          includeLower: true,
+          includeUpper: false,
+        )
+        .sortByCapturedAt()
+        .findAll();
+    return records
         .map((AmbientLightSampleRecord record) => record.toDomain())
-        .where(
-            (AmbientLightSample sample) => window.contains(sample.capturedAt))
-        .toList();
-    result.sort(
-      (AmbientLightSample left, AmbientLightSample right) =>
-          left.capturedAt.compareTo(right.capturedAt),
-    );
-    return result;
+        .toList(growable: false);
   }
 
   @override

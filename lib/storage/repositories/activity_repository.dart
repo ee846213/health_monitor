@@ -18,7 +18,8 @@ class InMemoryActivityRepository implements ActivityRepository {
 
   @override
   Future<List<ActivitySample>> listByWindow(QueryWindow window) async {
-    final result = _samples.where((sample) => window.contains(sample.capturedAt)).toList();
+    final result =
+        _samples.where((sample) => window.contains(sample.capturedAt)).toList();
     result.sort((left, right) => left.capturedAt.compareTo(right.capturedAt));
     return result;
   }
@@ -37,21 +38,26 @@ class IsarActivityRepository implements ActivityRepository {
   @override
   Future<List<ActivitySample>> listByWindow(QueryWindow window) async {
     final isar = await _isarFuture;
-    final records = await isar.activitySampleRecords.where().anyId().findAll();
-    final result = records
+    final records = await isar.activitySampleRecords
+        .filter()
+        .capturedAtBetween(
+          window.startAt,
+          window.endAt,
+          includeLower: true,
+          includeUpper: false,
+        )
+        .sortByCapturedAt()
+        .findAll();
+    return records
         .map((ActivitySampleRecord record) => record.toDomain())
-        .where((sample) => window.contains(sample.capturedAt))
-        .toList();
-    result.sort((left, right) => left.capturedAt.compareTo(right.capturedAt));
-    return result;
+        .toList(growable: false);
   }
 
   @override
   Future<void> saveAll(Iterable<ActivitySample> samples) async {
     final isar = await _isarFuture;
-    final records = samples
-        .map(ActivitySampleRecord.fromDomain)
-        .toList(growable: false);
+    final records =
+        samples.map(ActivitySampleRecord.fromDomain).toList(growable: false);
     if (records.isEmpty) {
       return;
     }

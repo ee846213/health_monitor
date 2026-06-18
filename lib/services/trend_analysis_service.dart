@@ -52,21 +52,25 @@ class TrendAnalysisService {
       QueryWindow.recentCalendarDays(7, referenceDate: referenceTime),
     );
 
-    final points = dates
-        .map(
-          (date) => TrendPoint(
-            label: '${date.month}/${date.day}',
-            value: _valueForTab(
-              selectedTab: selectedTab,
-              date: date,
-              metrics: metrics,
-              usageByDate: usageByDate,
-              lightSamples: lightSamples,
-              noiseSamples: noiseSamples,
-            ),
-          ),
-        )
+    final points = dates.map((date) {
+      final value = _valueForTab(
+        selectedTab: selectedTab,
+        date: date,
+        metrics: metrics,
+        usageByDate: usageByDate,
+        lightSamples: lightSamples,
+        noiseSamples: noiseSamples,
+      );
+      return TrendPoint(
+        label: '${date.month}/${date.day}',
+        value: value.value,
+        hasData: value.hasData,
+      );
+    }).toList(growable: false);
+    final availablePoints = points
+        .where((TrendPoint point) => point.hasData)
         .toList(growable: false);
+    final hasAnyData = availablePoints.isNotEmpty;
 
     return TrendSnapshot(
       generatedAt: referenceTime,
@@ -74,14 +78,25 @@ class TrendAnalysisService {
       title: _titleForTab(selectedTab),
       unitLabel: _unitForTab(selectedTab),
       points: points,
-      insightText: _insightForTab(selectedTab, points),
-      emptyStateText:
-          points.every((item) => item.value == 0) ? '最近 7 天还没有足够的可展示数据。' : null,
+      insightText: hasAnyData
+          ? _insightForTab(selectedTab, availablePoints)
+          : _emptyInsightForTab(selectedTab),
+      emptyStateText: hasAnyData ? null : _emptyStateForTab(selectedTab),
     );
   }
 }
 
-num _valueForTab({
+class _TrendValue {
+  const _TrendValue({
+    required this.value,
+    required this.hasData,
+  });
+
+  final num value;
+  final bool hasData;
+}
+
+_TrendValue _valueForTab({
   required TrendTab selectedTab,
   required DateTime date,
   required List<DailyMetrics> metrics,
@@ -90,22 +105,42 @@ num _valueForTab({
   required List<NoiseSample> noiseSamples,
 }) {
   final dateKey = _dayKey(date);
-  final dayMetrics = metrics.where((item) => _dayKey(item.date) == dateKey);
+  final dayMetrics = metrics
+      .where((item) => _dayKey(item.date) == dateKey)
+      .toList(growable: false);
   switch (selectedTab) {
     case TrendTab.steps:
-      return dayMetrics.fold<int>(0, (sum, item) => sum + item.stepCount);
+      return _TrendValue(
+        value: dayMetrics.fold<int>(0, (sum, item) => sum + item.stepCount),
+        hasData: dayMetrics.isNotEmpty,
+      );
     case TrendTab.sedentary:
-      return dayMetrics.fold<int>(
-        0,
-        (sum, item) => sum + item.sedentaryDuration.inMinutes,
+      return _TrendValue(
+        value: dayMetrics.fold<int>(
+          0,
+          (sum, item) => sum + item.sedentaryDuration.inMinutes,
+        ),
+        hasData: dayMetrics.isNotEmpty,
       );
     case TrendTab.screen:
-      return usageByDate[dateKey]?.screenOnDuration.inMinutes ?? 0;
+      final usage = usageByDate[dateKey];
+      return _TrendValue(
+        value: usage?.screenOnDuration.inMinutes ?? 0,
+        hasData: usage != null,
+      );
     case TrendTab.environment:
-      return _environmentScoreForDate(
-        dateKey: dateKey,
-        lightSamples: lightSamples,
-        noiseSamples: noiseSamples,
+      final dayLightSamples = lightSamples
+          .where((item) => _dayKey(item.capturedAt) == dateKey)
+          .toList(growable: false);
+      final dayNoiseSamples = noiseSamples
+          .where((item) => _dayKey(item.capturedAt) == dateKey)
+          .toList(growable: false);
+      return _TrendValue(
+        value: _environmentScoreForDate(
+          lightSamples: dayLightSamples,
+          noiseSamples: dayNoiseSamples,
+        ),
+        hasData: dayLightSamples.isNotEmpty || dayNoiseSamples.isNotEmpty,
       );
   }
 }
@@ -155,24 +190,29 @@ String _insightForTab(TrendTab tab, List<TrendPoint> points) {
   }
 }
 
+String _emptyStateForTab(TrendTab tab) {
+  if (tab == TrendTab.environment) {
+    return '最近 7 天还没有采集到环境光照或噪音数据，暂不生成环境健康分。';
+  }
+  return '最近 7 天还没有足够的可展示数据。';
+}
+
+String _emptyInsightForTab(TrendTab tab) {
+  if (tab == TrendTab.environment) {
+    return '采集到真实的光照或噪音样本后，这里会生成环境趋势洞察。';
+  }
+  return '采集到真实数据后，这里会生成对应的趋势洞察。';
+}
+
 int _environmentScoreForDate({
-  required String dateKey,
   required List<AmbientLightSample> lightSamples,
   required List<NoiseSample> noiseSamples,
 }) {
   final darkMinutes = lightSamples
-      .where(
-        (item) =>
-            _dayKey(item.capturedAt) == dateKey &&
-            item.level == AmbientLightLevel.dark,
-      )
+      .where((item) => item.level == AmbientLightLevel.dark)
       .fold<int>(0, (sum, item) => sum + item.duration.inMinutes);
   final loudMinutes = noiseSamples
-      .where(
-        (item) =>
-            _dayKey(item.capturedAt) == dateKey &&
-            item.level == NoiseLevel.loud,
-      )
+      .where((item) => item.level == NoiseLevel.loud)
       .fold<int>(0, (sum, item) => sum + item.duration.inMinutes);
 
   final score = 100 - (darkMinutes.clamp(0, 60)) - loudMinutes.clamp(0, 40);

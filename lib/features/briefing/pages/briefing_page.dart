@@ -281,10 +281,6 @@ class _DailyReportCard extends StatelessWidget {
           SizedBox(height: 14),
           _MetricGrid(),
           SizedBox(height: 14),
-          _SectionHeading(title: '三个核心指标'),
-          SizedBox(height: 10),
-          _MetricHighlights(),
-          SizedBox(height: 14),
           _SectionHeading(title: '建议'),
           SizedBox(height: 10),
           _SuggestionBanner(),
@@ -409,39 +405,6 @@ class _MetricGrid extends ConsumerWidget {
   }
 }
 
-class _MetricHighlights extends ConsumerWidget {
-  const _MetricHighlights();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final metrics = ref.watch(briefingMetricsProvider);
-    final selectedRange = ref.watch(briefingTimeRangeProvider);
-    return Column(
-      children: metrics.indexed
-          .map(
-            (entry) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _SummaryCard(
-                key: ValueKey<String>(
-                  'briefing-${entry.$1}-summary-card',
-                ),
-                title: entry.$2.label,
-                content:
-                    '本段${entry.$2.label}为 ${entry.$2.value} ${entry.$2.unit}。',
-                onTap: () => _showMetricDetailSheet(
-                  context,
-                  selectedRange,
-                  entry.$1,
-                  int.tryParse(entry.$2.value) ?? 0,
-                ),
-              ),
-            ),
-          )
-          .toList(growable: false),
-    );
-  }
-}
-
 class _MetricTile extends StatelessWidget {
   const _MetricTile({
     super.key,
@@ -484,14 +447,20 @@ class _MetricTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              Text(
-                '$value $unit',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontSize: 21,
-                  fontWeight: FontWeight.w700,
-                  color: _textPrimary,
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '$value $unit',
+                    maxLines: 1,
+                    style: const TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.w700,
+                      color: _textPrimary,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 4),
@@ -573,70 +542,46 @@ Future<void> _showScreenDetailSheet(
   );
 }
 
-Future<void> _showMetricDetailSheet(
-  BuildContext context,
-  BriefingTimeRange range,
-  int metricIndex,
-  int value,
-) {
-  return switch (metricIndex) {
-    0 => _showStepDetailSheet(context, range, value),
-    1 => _showSedentaryDetailSheet(context, range, value),
-    2 => _showScreenDetailSheet(context, range, value),
-    _ => Future<void>.value(),
-  };
-}
-
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({
-    super.key,
     required this.title,
     required this.content,
-    this.onTap,
   });
 
   final String title;
   final String content;
-  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _surfaceSoft,
         borderRadius: BorderRadius.circular(24),
-        child: Ink(
-          width: double.infinity,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: _surfaceSoft,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: _line),
+        border: Border.all(color: _line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: _textMuted,
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: _textMuted,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                content,
-                style: const TextStyle(
-                  fontSize: 13,
-                  color: _textSecondary,
-                  height: 1.55,
-                ),
-              ),
-            ],
+          const SizedBox(height: 8),
+          Text(
+            content,
+            style: const TextStyle(
+              fontSize: 13,
+              color: _textSecondary,
+              height: 1.55,
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

@@ -84,6 +84,44 @@ void main() {
     expect(find.text('更新后的步数趋势'), findsOneWidget);
     expect(find.text('今天的活动节奏更稳定。'), findsOneWidget);
   });
+
+  testWidgets('环境趋势缺失日期显示占位而不是 100 分', (
+    WidgetTester tester,
+  ) async {
+    final container = ProviderContainer(
+      overrides: <Override>[
+        trendAnalysisViewModelProvider.overrideWith((Ref ref) async {
+          return TrendSnapshot(
+            generatedAt: DateTime(2026, 6, 18, 9),
+            selectedTab: TrendTab.environment,
+            title: '近 7 天环境趋势',
+            unitLabel: '分',
+            points: const <TrendPoint>[
+              TrendPoint(label: '6/12', value: 0, hasData: false),
+              TrendPoint(label: '6/13', value: 82),
+            ],
+            insightText: '仅展示已采集日期。',
+          );
+        }),
+        trendSelectedTabProvider.overrideWith((Ref ref) {
+          return TrendTab.environment;
+        }),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: TrendAnalysisPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('--'), findsOneWidget);
+    expect(find.text('82'), findsOneWidget);
+    expect(find.text('100'), findsNothing);
+  });
 }
 
 TrendSnapshot _buildTrendSnapshot(TrendTab selectedTab) {

@@ -17,6 +17,26 @@ import 'package:health_monitor/storage/isar/collections/usage_summary_record.dar
 import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 
+const String appIsarName = 'health_monitor';
+
+final List<CollectionSchema<dynamic>> appIsarSchemas =
+    <CollectionSchema<dynamic>>[
+  ActivitySampleRecordSchema,
+  CaptureHealthEventRecordSchema,
+  CaptureCheckpointRecordSchema,
+  AmbientLightSampleRecordSchema,
+  PostureSampleRecordSchema,
+  LocationSummaryRecordSchema,
+  NoiseSampleRecordSchema,
+  UsageSummaryRecordSchema,
+  DailyMetricsRecordSchema,
+  NotificationPreferenceRecordSchema,
+  AiSuggestionCacheRecordSchema,
+  ReminderRecordEntitySchema,
+];
+
+final Map<String, Future<Isar>> _openingInstances = <String, Future<Isar>>{};
+
 final appWritableBaseDirectoryProvider = FutureProvider<Directory>((
   Ref ref,
 ) async {
@@ -32,41 +52,79 @@ final appWritableBaseDirectoryProvider = FutureProvider<Directory>((
 final appIsarDirectoryProvider = FutureProvider<String>((Ref ref) async {
   final baseDirectory =
       await ref.watch(appWritableBaseDirectoryProvider.future);
-  final isarDirectory = Directory(
-    '${baseDirectory.path}${Platform.pathSeparator}isar',
-  );
-
-  if (!await isarDirectory.exists()) {
-    // 首次启动时需要显式创建数据库目录。
-    // 这样可以避免 Isar 在移动端落到不存在或不可写的当前工作目录。
-    await isarDirectory.create(recursive: true);
-  }
-
-  return isarDirectory.path;
+  // 首次启动时显式创建数据库目录，避免落到不存在或不可写的工作目录。
+  return ensureAppIsarDirectory(baseDirectory);
 });
 
 final appIsarProvider = FutureProvider<Isar>((Ref ref) async {
   final directory = await ref.watch(appIsarDirectoryProvider.future);
-  final isar = await Isar.open(
-    <CollectionSchema>[
-      ActivitySampleRecordSchema,
-      CaptureHealthEventRecordSchema,
-      CaptureCheckpointRecordSchema,
-      AmbientLightSampleRecordSchema,
-      PostureSampleRecordSchema,
-      LocationSummaryRecordSchema,
-      NoiseSampleRecordSchema,
-      UsageSummaryRecordSchema,
-      DailyMetricsRecordSchema,
-      NotificationPreferenceRecordSchema,
-      AiSuggestionCacheRecordSchema,
-      ReminderRecordEntitySchema,
-    ],
-    name: 'health_monitor',
-    directory: directory,
-  );
-  ref.onDispose(() async {
-    await isar.close();
-  });
-  return isar;
+  return openAppIsar(directory: directory);
 });
+
+Future<Isar> initializeAppIsar() async {
+  final baseDirectory = await getApplicationSupportDirectory();
+  final directory = await ensureAppIsarDirectory(baseDirectory);
+  return openAppIsar(directory: directory);
+}
+
+Future<String> ensureAppIsarDirectory(Directory baseDirectory) async {
+  final isarDirectory = Directory(
+    '${baseDirectory.path}${Platform.pathSeparator}isar',
+  );
+  if (!await isarDirectory.exists()) {
+    await isarDirectory.create(recursive: true);
+  }
+  return isarDirectory.path;
+}
+
+Future<Isar> openAppIsar({
+  required String directory,
+  String name = appIsarName,
+}) {
+  final existing = Isar.getInstance(name);
+  if (existing != null && existing.isOpen) {
+    return Future<Isar>.value(existing);
+  }
+
+  final key = '$directory::$name';
+  return _openingInstances.putIfAbsent(
+    key,
+    () => _openAppIsarWithRetry(
+      directory: directory,
+      name: name,
+    ),
+  );
+}
+
+Future<Isar> _openAppIsarWithRetry({
+  required String directory,
+  required String name,
+}) async {
+  const retryDelays = <Duration>[
+    Duration(milliseconds: 120),
+    Duration(milliseconds: 360),
+    Duration(milliseconds: 900),
+  ];
+
+  for (var attempt = 0;; attempt += 1) {
+    final existing = Isar.getInstance(name);
+    if (existing != null && existing.isOpen) {
+      return existing;
+    }
+
+    try {
+      return await Isar.open(
+        appIsarSchemas,
+        name: name,
+        directory: directory,
+      );
+    } on IsarError catch (error) {
+      final canRetry = error.toString().contains('MdbxError (11)') &&
+          attempt < retryDelays.length;
+      if (!canRetry) {
+        rethrow;
+      }
+      await Future<void>.delayed(retryDelays[attempt]);
+    }
+  }
+}

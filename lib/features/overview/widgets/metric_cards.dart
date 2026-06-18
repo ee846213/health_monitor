@@ -23,41 +23,44 @@ class MetricCards extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: <Widget>[
-        Expanded(
-          child: _MetricCard(
-            key: const Key('metric-step-card'),
-            title: '步数',
-            value: const _StepValueText(),
-            caption: const _StepCaptionText(),
-            backgroundColor: _metricSurface,
-            onTap: onStepTap,
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Expanded(
+            child: _MetricCard(
+              key: const Key('metric-step-card'),
+              title: '步数',
+              value: const _StepValueText(),
+              caption: const _StepCaptionText(),
+              backgroundColor: _metricSurface,
+              onTap: onStepTap,
+            ),
           ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _MetricCard(
-            key: const Key('metric-sedentary-card'),
-            title: '久坐',
-            value: const _SedentaryValueText(),
-            caption: const _SedentaryCaptionText(),
-            backgroundColor: _metricSand,
-            onTap: onSedentaryTap,
+          const SizedBox(width: 10),
+          Expanded(
+            child: _MetricCard(
+              key: const Key('metric-sedentary-card'),
+              title: '久坐',
+              value: const _SedentaryValueText(),
+              caption: const _SedentaryCaptionText(),
+              backgroundColor: _metricSand,
+              onTap: onSedentaryTap,
+            ),
           ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _MetricCard(
-            key: const Key('metric-screen-card'),
-            title: '屏幕',
-            value: const _ScreenValueText(),
-            caption: const _ScreenCaptionText(),
-            backgroundColor: _metricBlue,
-            onTap: onScreenTap,
+          const SizedBox(width: 10),
+          Expanded(
+            child: _MetricCard(
+              key: const Key('metric-screen-card'),
+              title: '屏幕',
+              value: const _ScreenValueText(),
+              caption: const _ScreenCaptionText(),
+              backgroundColor: _metricBlue,
+              onTap: onScreenTap,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -200,12 +203,17 @@ class _MetricCaptionText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      caption,
-      style: const TextStyle(
-        fontSize: 12,
-        height: 1.5,
-        color: _metricMuted,
+    return SizedBox(
+      height: 36,
+      child: Text(
+        caption,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontSize: 12,
+          height: 1.5,
+          color: _metricMuted,
+        ),
       ),
     );
   }

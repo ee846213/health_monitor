@@ -18,7 +18,8 @@ class InMemoryNoiseSampleRepository implements NoiseSampleRepository {
 
   @override
   Future<List<NoiseSample>> listByWindow(QueryWindow window) async {
-    final result = _samples.where((sample) => window.contains(sample.capturedAt)).toList();
+    final result =
+        _samples.where((sample) => window.contains(sample.capturedAt)).toList();
     result.sort((left, right) => left.capturedAt.compareTo(right.capturedAt));
     return result;
   }
@@ -37,21 +38,26 @@ class IsarNoiseSampleRepository implements NoiseSampleRepository {
   @override
   Future<List<NoiseSample>> listByWindow(QueryWindow window) async {
     final isar = await _isarFuture;
-    final records = await isar.noiseSampleRecords.where().anyId().findAll();
-    final result = records
+    final records = await isar.noiseSampleRecords
+        .filter()
+        .capturedAtBetween(
+          window.startAt,
+          window.endAt,
+          includeLower: true,
+          includeUpper: false,
+        )
+        .sortByCapturedAt()
+        .findAll();
+    return records
         .map((NoiseSampleRecord record) => record.toDomain())
-        .where((sample) => window.contains(sample.capturedAt))
-        .toList();
-    result.sort((left, right) => left.capturedAt.compareTo(right.capturedAt));
-    return result;
+        .toList(growable: false);
   }
 
   @override
   Future<void> saveAll(Iterable<NoiseSample> samples) async {
     final isar = await _isarFuture;
-    final records = samples
-        .map(NoiseSampleRecord.fromDomain)
-        .toList(growable: false);
+    final records =
+        samples.map(NoiseSampleRecord.fromDomain).toList(growable: false);
     if (records.isEmpty) {
       return;
     }

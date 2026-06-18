@@ -357,6 +357,7 @@ class DataCollector {
     Future<void> Function(DateTime referenceTime)? persistRuleReminders,
     Future<void> Function(DateTime referenceTime)? deliverRuleReminders,
     Future<int> Function()? syncNativeRiskEvents,
+    Duration dailyMetricsRefreshInterval = const Duration(seconds: 2),
   })  : _motionCaptureService = motionCaptureService ?? MotionCaptureService(),
         ambientLightRepository = ambientLightRepository ??
             InMemoryAmbientLightSampleRepository(
@@ -388,7 +389,8 @@ class DataCollector {
         _onDayChanged = onDayChanged,
         _persistRuleReminders = persistRuleReminders,
         _deliverRuleReminders = deliverRuleReminders,
-        _syncNativeRiskEvents = syncNativeRiskEvents;
+        _syncNativeRiskEvents = syncNativeRiskEvents,
+        _dailyMetricsRefreshInterval = dailyMetricsRefreshInterval;
 
   final ActivityRepository activityRepository;
   final AmbientLightSampleRepository ambientLightRepository;
@@ -410,6 +412,7 @@ class DataCollector {
   final Future<void> Function(DateTime referenceTime)? _persistRuleReminders;
   final Future<void> Function(DateTime referenceTime)? _deliverRuleReminders;
   final Future<int> Function()? _syncNativeRiskEvents;
+  final Duration _dailyMetricsRefreshInterval;
   final List<StreamSubscription<dynamic>> _subscriptions =
       <StreamSubscription<dynamic>>[];
   bool _started = false;
@@ -417,8 +420,13 @@ class DataCollector {
   StepCountState? _latestStepCountState;
   StreamSubscription<DigitalUsageSummary>? _usageSummarySubscription;
   AndroidUsageCapabilityStatus? _latestUsageCapabilityStatus;
+  Future<void>? _usageSummarySyncFuture;
   final Map<String, DateTime> _lastSampleAtByStreamKey = <String, DateTime>{};
   final Set<String> _startedStreamKeys = <String>{};
+  final Map<String, DateTime> _pendingDailyMetricsRefreshes =
+      <String, DateTime>{};
+  Timer? _dailyMetricsRefreshTimer;
+  bool _dailyMetricsRefreshRunning = false;
 
   void start() {
     if (_started) {
@@ -439,7 +447,7 @@ class DataCollector {
         (ActivitySample sample) async {
           await _observeSample(streamMotion, sample.capturedAt);
           await activityRepository.saveAll(<ActivitySample>[sample]);
-          await _refreshDailyMetrics(sample.capturedAt);
+          _scheduleDailyMetricsRefresh(sample.capturedAt);
         },
         onError: (Object error, StackTrace stackTrace) {
           unawaited(
@@ -457,7 +465,7 @@ class DataCollector {
         (AmbientLightSample sample) async {
           await _observeSample(streamLight, sample.capturedAt);
           await ambientLightRepository.saveAll(<AmbientLightSample>[sample]);
-          await _refreshDailyMetrics(sample.capturedAt);
+          _scheduleDailyMetricsRefresh(sample.capturedAt);
         },
         onError: (Object error, StackTrace stackTrace) {
           unawaited(
@@ -478,7 +486,7 @@ class DataCollector {
           }
           _latestStepCountState = state;
           await _observeSample(streamSteps, state.capturedAt);
-          await _refreshDailyMetrics(state.capturedAt);
+          _scheduleDailyMetricsRefresh(state.capturedAt);
         },
         onError: (Object error, StackTrace stackTrace) {
           unawaited(
@@ -496,7 +504,7 @@ class DataCollector {
         (NoiseSample sample) async {
           await _observeSample(streamNoise, sample.capturedAt);
           await noiseRepository.saveAll(<NoiseSample>[sample]);
-          await _refreshDailyMetrics(sample.capturedAt);
+          _scheduleDailyMetricsRefresh(sample.capturedAt);
         },
         onError: (Object error, StackTrace stackTrace) {
           unawaited(
@@ -514,7 +522,7 @@ class DataCollector {
         (LocationSummary summary) async {
           await _observeSample(streamLocation, summary.date);
           await locationRepository.upsertSummary(summary);
-          await _refreshDailyMetrics(summary.date);
+          _scheduleDailyMetricsRefresh(summary.date);
         },
         onError: (Object error, StackTrace stackTrace) {
           unawaited(
@@ -531,11 +539,53 @@ class DataCollector {
   }
 
   Future<void> dispose() async {
+    _started = false;
+    _dailyMetricsRefreshTimer?.cancel();
+    _dailyMetricsRefreshTimer = null;
+    _pendingDailyMetricsRefreshes.clear();
     for (final StreamSubscription<dynamic> subscription in _subscriptions) {
       await subscription.cancel();
     }
     _subscriptions.clear();
-    _started = false;
+  }
+
+  void _scheduleDailyMetricsRefresh(DateTime referenceTime) {
+    final dayStart = _dayStart(referenceTime);
+    _pendingDailyMetricsRefreshes[_dayKey(dayStart)] = dayStart;
+    if (_dailyMetricsRefreshRunning || _dailyMetricsRefreshTimer != null) {
+      return;
+    }
+
+    _dailyMetricsRefreshTimer = Timer(
+      _dailyMetricsRefreshInterval,
+      () {
+        _dailyMetricsRefreshTimer = null;
+        unawaited(_drainScheduledDailyMetricsRefreshes());
+      },
+    );
+  }
+
+  Future<void> _drainScheduledDailyMetricsRefreshes() async {
+    if (_dailyMetricsRefreshRunning || _pendingDailyMetricsRefreshes.isEmpty) {
+      return;
+    }
+
+    _dailyMetricsRefreshRunning = true;
+    final pendingDates =
+        _pendingDailyMetricsRefreshes.values.toList(growable: false);
+    _pendingDailyMetricsRefreshes.clear();
+    try {
+      for (final referenceTime in pendingDates) {
+        await _refreshDailyMetrics(referenceTime);
+      }
+    } finally {
+      _dailyMetricsRefreshRunning = false;
+      if (_pendingDailyMetricsRefreshes.isNotEmpty && _started) {
+        _scheduleDailyMetricsRefresh(
+          _pendingDailyMetricsRefreshes.values.first,
+        );
+      }
+    }
   }
 
   Future<void> syncNativeRiskEvents() async {
@@ -558,6 +608,23 @@ class DataCollector {
 
   Future<void> syncUsageSummary({
     DateTime? referenceTime,
+  }) {
+    final runningSync = _usageSummarySyncFuture;
+    if (runningSync != null) {
+      return runningSync;
+    }
+
+    final syncFuture = _syncUsageSummary(referenceTime: referenceTime);
+    _usageSummarySyncFuture = syncFuture;
+    return syncFuture.whenComplete(() {
+      if (identical(_usageSummarySyncFuture, syncFuture)) {
+        _usageSummarySyncFuture = null;
+      }
+    });
+  }
+
+  Future<void> _syncUsageSummary({
+    DateTime? referenceTime,
   }) async {
     final now = referenceTime ?? DateTime.now();
     final capabilityStatus =
@@ -579,7 +646,7 @@ class DataCollector {
       }
       if (summaries.isNotEmpty) {
         final dedupedSummaries = _dedupeUsageSummaries(summaries);
-        await usageRepository.upsertAll(dedupedSummaries);
+        await _upsertUsageSummariesPreservingProgress(dedupedSummaries);
         await _captureHealthService.recordNativeSummaryDrained(
           streamDigitalUsageAndroid,
           detail: '已写入 ${dedupedSummaries.length} 条 Android 使用统计摘要。',
@@ -612,6 +679,19 @@ class DataCollector {
         );
         await _refreshDailyMetrics(normalizedSummary.date);
       }
+    }
+  }
+
+  Future<void> _upsertUsageSummariesPreservingProgress(
+    List<DigitalUsageSummary> summaries,
+  ) async {
+    for (final summary in summaries) {
+      final existing = await usageRepository.getByDate(summary.date);
+      await usageRepository.upsertSummary(
+        existing == null
+            ? summary
+            : mergeUsageSummaryPreservingProgress(existing, summary),
+      );
     }
   }
 
@@ -723,6 +803,10 @@ class DataCollector {
       referenceDate: dayStart,
     );
     final usageSummary = await usageRepository.getByDate(dayStart);
+    final existingMetrics = await metricsRepository.listRecentDays(
+      1,
+      referenceDate: dayStart,
+    );
 
     final sedentaryDuration = dayActivities
         .where(
@@ -731,12 +815,24 @@ class DataCollector {
           Duration.zero,
           (Duration total, ActivitySample sample) => total + sample.duration,
         );
-    final stepCount = _latestStepCountState?.isAvailable == true
-        ? _latestStepCountState!.stepCount
-        : dayActivities.fold<int>(
-            0,
-            (int total, ActivitySample sample) => total + sample.stepCount,
-          );
+    final activityStepCount = dayActivities.fold<int>(
+      0,
+      (int total, ActivitySample sample) => total + sample.stepCount,
+    );
+    final latestStepState = _latestStepCountState;
+    final liveStepCount = latestStepState?.isAvailable == true &&
+            _dayKey(latestStepState!.capturedAt) == _dayKey(dayStart)
+        ? latestStepState.stepCount
+        : 0;
+    final persistedStepCount =
+        existingMetrics.isEmpty ? 0 : existingMetrics.last.stepCount;
+    // 当日步数是累计值。其他传感器先于计步流刷新时，不能用活动样本中的占位 0
+    // 覆盖已经落库的系统步数；系统计步短暂回退时也保留当天已确认的最大值。
+    final stepCount = <int>[
+      persistedStepCount,
+      activityStepCount,
+      liveStepCount,
+    ].reduce((int left, int right) => left > right ? left : right);
     final highNoiseExposureDuration = dayNoises
         .where((NoiseSample sample) => sample.level == NoiseLevel.loud)
         .fold<Duration>(
@@ -989,7 +1085,11 @@ List<DigitalUsageSummary> _dedupeUsageSummaries(
 ) {
   final keyedSummaries = <String, DigitalUsageSummary>{};
   for (final summary in summaries) {
-    keyedSummaries[_dayKey(summary.date)] = summary;
+    final key = _dayKey(summary.date);
+    final existing = keyedSummaries[key];
+    keyedSummaries[key] = existing == null
+        ? summary
+        : mergeUsageSummaryPreservingProgress(existing, summary);
   }
   return keyedSummaries.values.toList(growable: false);
 }

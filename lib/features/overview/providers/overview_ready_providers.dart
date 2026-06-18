@@ -52,7 +52,8 @@ final overviewReadyDataProvider = FutureProvider<OverviewReadyData>(
       window: QueryWindow.recentDay(referenceTime: referenceTime),
       referenceTime: referenceTime,
     );
-    final dashboard = await dashboardService.build(referenceTime: referenceTime);
+    final dashboard =
+        await dashboardService.build(referenceTime: referenceTime);
 
     return OverviewReadyData(
       dashboard: dashboard,
@@ -81,6 +82,23 @@ final overviewReadyDataStateProvider = Provider<OverviewReadyData?>((Ref ref) {
 
 final overviewScreenStateProvider = Provider<AsyncValue<OverviewScreenState>>(
   (Ref ref) {
+    final cachedScreenState = ref.watch(
+      overviewReadyDataStateProvider.select(
+        (OverviewReadyData? data) => data == null
+            ? null
+            : resolveOverviewScreenState(
+                permissionStatuses: data.permissionStatuses,
+                hasRealData: data.dashboard.hasRealData,
+                hasReminderHistory: data.dashboard.hasReminderHistory,
+              ),
+      ),
+    );
+    if (cachedScreenState != null) {
+      // 首页已有内容后，外层只关心页面状态是否发生切换。
+      // 后续采集刷新由字段级 provider 消费，避免整页跟随每次数据版本重建。
+      return AsyncData<OverviewScreenState>(cachedScreenState);
+    }
+
     return ref.watch(overviewReadyDataProvider).whenData(
           (OverviewReadyData data) => resolveOverviewScreenState(
             permissionStatuses: data.permissionStatuses,
@@ -106,7 +124,8 @@ class _OverviewReadyDataStateNotifier extends Notifier<OverviewReadyData?> {
   OverviewReadyData? build() {
     ref.listen<AsyncValue<OverviewReadyData>>(
       overviewReadyDataProvider,
-      (AsyncValue<OverviewReadyData>? previous, AsyncValue<OverviewReadyData> next) {
+      (AsyncValue<OverviewReadyData>? previous,
+          AsyncValue<OverviewReadyData> next) {
         final nextValue = next.valueOrNull;
         if (nextValue != null) {
           state = nextValue;

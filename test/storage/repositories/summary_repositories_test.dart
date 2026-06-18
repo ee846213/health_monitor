@@ -65,6 +65,41 @@ void main() {
     expect(result?.topCategory, UsageCategory.social);
   });
 
+  test('数字生活摘要仓储不应被同日空刷新覆盖', () async {
+    final repository = InMemoryUsageSummaryRepository(
+      summaries: <DigitalUsageSummary>[
+        DigitalUsageSummary(
+          date: DateTime(2026, 6, 18),
+          screenOnDuration: const Duration(minutes: 521),
+          unlockCount: 42,
+          viewCount: 60,
+          nighttimeUsageDuration: const Duration(minutes: 38),
+          focusSessionBreakCount: 8,
+          topCategory: UsageCategory.social,
+          source: DigitalUsageSource.androidUsageStats,
+        ),
+      ],
+    );
+
+    await repository.upsertSummary(
+      DigitalUsageSummary(
+        date: DateTime(2026, 6, 18),
+        screenOnDuration: Duration.zero,
+        unlockCount: 0,
+        nighttimeUsageDuration: Duration.zero,
+        focusSessionBreakCount: 0,
+        topCategory: UsageCategory.unknown,
+        source: DigitalUsageSource.androidUsageStats,
+      ),
+    );
+
+    final result = await repository.getByDate(DateTime(2026, 6, 18));
+
+    expect(result?.screenOnDuration, const Duration(minutes: 521));
+    expect(result?.nighttimeUsageDuration, const Duration(minutes: 38));
+    expect(result?.topCategory, UsageCategory.social);
+  });
+
   test('每日指标仓储应支持读取最近 7 天稳定有序结果', () async {
     final repository = InMemoryMetricsRepository(
       metrics: <DailyMetrics>[

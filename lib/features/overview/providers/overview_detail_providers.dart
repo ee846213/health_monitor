@@ -1,15 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_monitor/domain/environment/ambient_light_sample.dart';
+import 'package:health_monitor/domain/environment/noise_sample.dart';
 import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/metrics/daily_metrics.dart';
-import 'package:health_monitor/domain/motion/activity_sample.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
-import 'package:health_monitor/features/overview/providers/overview_providers.dart';
+import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 import 'package:health_monitor/rules/input/rule_input.dart';
 import 'package:health_monitor/services/data_collector.dart';
 import 'package:health_monitor/storage/repositories/date_key.dart';
 import 'package:health_monitor/storage/repositories/query_window.dart';
-import 'package:health_monitor/domain/environment/noise_sample.dart';
 
 class OverviewStepTrendPoint {
   const OverviewStepTrendPoint({
@@ -110,6 +109,8 @@ final overviewStepDetailProvider =
   final metricsByKey = <String, int>{
     for (final item in metrics) DateKey.fromDate(item.date): item.stepCount,
   };
+  final dashboardTodaySteps =
+      ref.watch(overviewDashboardSnapshotProvider)?.stepCard.currentSteps;
 
   final points = <OverviewStepTrendPoint>[];
   for (var offset = 6; offset >= 0; offset -= 1) {
@@ -120,7 +121,9 @@ final overviewStepDetailProvider =
     points.add(
       OverviewStepTrendPoint(
         date: date,
-        steps: metricsByKey[key] ?? 0,
+        steps: key == todayKey && dashboardTodaySteps != null
+            ? dashboardTodaySteps
+            : metricsByKey[key] ?? 0,
         isToday: key == todayKey,
       ),
     );

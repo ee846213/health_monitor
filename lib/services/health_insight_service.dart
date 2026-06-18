@@ -437,7 +437,10 @@ List<DigitalUsageSummary> _dedupeUsageSummaries(
   for (final summary in summaries) {
     final dateKey =
         '${summary.date.year}-${summary.date.month}-${summary.date.day}';
-    keyed[dateKey] = summary;
+    final existing = keyed[dateKey];
+    keyed[dateKey] = existing == null
+        ? summary
+        : mergeUsageSummaryPreservingProgress(existing, summary);
   }
   return keyed.values.toList(growable: false);
 }

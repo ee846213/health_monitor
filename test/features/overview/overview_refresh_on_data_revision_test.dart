@@ -173,6 +173,7 @@ void main() {
       onDataChanged: () {
         revisionCount += 1;
       },
+      dailyMetricsRefreshInterval: const Duration(milliseconds: 1),
     );
     collector.start();
     addTearDown(collector.dispose);

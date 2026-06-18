@@ -94,7 +94,7 @@ class TrendChartPanel extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        point.value.round().toString(),
+                        point.hasData ? point.value.round().toString() : '--',
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
@@ -152,7 +152,14 @@ class _TrendChartPainter extends CustomPainter {
       return;
     }
 
-    final maxValue = points
+    final availablePoints = points
+        .where((TrendPoint point) => point.hasData)
+        .toList(growable: false);
+    if (availablePoints.isEmpty) {
+      return;
+    }
+
+    final maxValue = availablePoints
         .map((TrendPoint point) => point.value)
         .fold<num>(0, math.max)
         .toDouble();
@@ -174,6 +181,9 @@ class _TrendChartPainter extends CustomPainter {
 
     for (var index = 0; index < points.length; index++) {
       final point = points[index];
+      if (!point.hasData) {
+        continue;
+      }
       final ratio = point.value.toDouble() / safeMaxValue;
       final barHeight = math.max(8.0, chartRect.height * ratio * 0.82);
       final left =
@@ -209,10 +219,19 @@ class _TrendChartPainter extends CustomPainter {
       ).createShader(chartRect);
     final dotPaint = Paint()..color = _panelAccent;
 
+    final availableIndexes = <int>[
+      for (var index = 0; index < points.length; index++)
+        if (points[index].hasData) index,
+    ];
+    if (availableIndexes.isEmpty) {
+      return;
+    }
+
     final path = Path();
     final fillPath = Path();
 
-    for (var index = 0; index < points.length; index++) {
+    for (var position = 0; position < availableIndexes.length; position++) {
+      final index = availableIndexes[position];
       final point = points[index];
       final dx = chartRect.left +
           (chartRect.width * index / math.max(points.length - 1, 1));
@@ -220,7 +239,7 @@ class _TrendChartPainter extends CustomPainter {
       final ratio = point.value.toDouble() / safeMaxValue;
       final dy = chartRect.bottom - 12 - usableHeight * ratio;
 
-      if (index == 0) {
+      if (position == 0) {
         path.moveTo(dx, dy);
         fillPath
           ..moveTo(dx, chartRect.bottom - 8)
@@ -231,14 +250,17 @@ class _TrendChartPainter extends CustomPainter {
       }
     }
 
+    final lastIndex = availableIndexes.last;
+    final lastDx = chartRect.left +
+        (chartRect.width * lastIndex / math.max(points.length - 1, 1));
     fillPath
-      ..lineTo(chartRect.right, chartRect.bottom - 8)
+      ..lineTo(lastDx, chartRect.bottom - 8)
       ..close();
 
     canvas.drawPath(fillPath, fillPaint);
     canvas.drawPath(path, strokePaint);
 
-    for (var index = 0; index < points.length; index++) {
+    for (final index in availableIndexes) {
       final point = points[index];
       final dx = chartRect.left +
           (chartRect.width * index / math.max(points.length - 1, 1));
