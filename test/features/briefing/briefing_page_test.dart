@@ -152,7 +152,7 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('7200 步'), findsOneWidget);
+    expect(find.text('6000 步'), findsOneWidget);
   });
 }
 

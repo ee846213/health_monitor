@@ -192,18 +192,31 @@ QueryWindow _windowForRange(
   BriefingTimeRange range, {
   required DateTime referenceTime,
 }) {
+  final anchorDate = _anchorDateForRange(range, referenceTime);
   switch (range) {
     case BriefingTimeRange.today:
-      return QueryWindow.calendarDay(referenceDate: referenceTime);
+      return QueryWindow.calendarDay(referenceDate: anchorDate);
     case BriefingTimeRange.yesterday:
-      return QueryWindow.calendarDay(
-        referenceDate: referenceTime.subtract(const Duration(days: 1)),
-      );
+      return QueryWindow.calendarDay(referenceDate: anchorDate);
     case BriefingTimeRange.recent7Days:
+      // 最近 7 日简报只回顾已完成自然日，避免今日实时采集持续拉动页面刷新。
       return QueryWindow.recentCalendarDays(
         7,
-        referenceDate: referenceTime,
+        referenceDate: anchorDate,
       );
+  }
+}
+
+DateTime _anchorDateForRange(
+  BriefingTimeRange range,
+  DateTime referenceTime,
+) {
+  switch (range) {
+    case BriefingTimeRange.today:
+      return referenceTime;
+    case BriefingTimeRange.yesterday:
+    case BriefingTimeRange.recent7Days:
+      return referenceTime.subtract(const Duration(days: 1));
   }
 }
 

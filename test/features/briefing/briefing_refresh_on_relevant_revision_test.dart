@@ -70,6 +70,33 @@ void main() {
 
     expect(refreshCount, greaterThan(0));
   });
+
+  test('查看最近7日简报时，今日相关版本推进不应触发重新计算', () async {
+    final referenceTime = DateTime(2026, 6, 16, 10);
+    final today = DateTime(2026, 6, 16);
+    final container = _createContainer(referenceTime: referenceTime);
+    addTearDown(container.dispose);
+
+    container.read(briefingTimeRangeProvider.notifier).state =
+        BriefingTimeRange.recent7Days;
+    await container.read(briefingViewModelProvider.future);
+
+    var refreshCount = 0;
+    final subscription = container.listen<AsyncValue<BriefingViewModel>>(
+      briefingViewModelProvider,
+      (previous, next) {
+        refreshCount += 1;
+      },
+      fireImmediately: false,
+    );
+    addTearDown(subscription.close);
+
+    container.read(dataCollectorDailyRevisionProvider.notifier).state =
+        <String, int>{_dayKey(today): 1};
+    await container.read(briefingViewModelProvider.future);
+
+    expect(refreshCount, 0);
+  });
 }
 
 ProviderContainer _createContainer({required DateTime referenceTime}) {
