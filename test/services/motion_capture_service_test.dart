@@ -28,6 +28,28 @@ void main() {
     expect(sample.stepCount, 0);
   });
 
+  test('含重力的静置加速度应映射为静止样本', () async {
+    final service = MotionCaptureService(
+      sensorStreamFactory: ({
+        Duration samplingPeriod = const Duration(milliseconds: 200),
+      }) {
+        return Stream<MotionVectorSample>.value(
+          MotionVectorSample(
+            capturedAt: DateTime(2026, 6, 9, 18),
+            x: 0,
+            y: 0,
+            z: 9.80665,
+          ),
+        );
+      },
+    );
+
+    final sample = await service.watchActivitySamples().first;
+
+    expect(sample.type, ActivityType.stationary);
+    expect(sample.confidence, greaterThanOrEqualTo(0.7));
+  });
+
   test('中等强度加速度应映射为步行样本', () async {
     final service = MotionCaptureService(
       sensorStreamFactory: ({

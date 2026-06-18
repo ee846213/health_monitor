@@ -239,11 +239,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun handleGetStepCounter(result: MethodChannel.Result) {
-        val payload = if (backgroundCaptureScheduler.snapshot().isRunning) {
-            stepCounterReader.startListening()
-        } else {
-            stepCounterReader.readCurrent()
-        }
+        val payload = stepCounterReader.startListening()
         result.success(payload.toChannelMap())
     }
 

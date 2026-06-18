@@ -267,4 +267,90 @@ void main() {
     expect(summary.completeness, UsageDataCompleteness.degraded);
     expect(summary.screenOnDuration, const Duration(minutes: 20));
   });
+
+  test('同步原生风险事件后应触发提醒投递', () async {
+    final deliveredAt = <DateTime>[];
+    final collector = DataCollector(
+      activityRepository: SharedActivityRepository(),
+      noiseRepository: SharedNoiseRepository(),
+      locationRepository: SharedLocationRepository(),
+      usageRepository: InMemoryUsageSummaryRepository(
+        summaries: const <DigitalUsageSummary>[],
+      ),
+      metricsRepository: InMemoryMetricsRepository(metrics: const []),
+      motionCaptureService: MotionCaptureService(
+        sensorStreamFactory: ({
+          Duration samplingPeriod = const Duration(milliseconds: 200),
+        }) =>
+            const Stream<MotionVectorSample>.empty(),
+      ),
+      noiseCaptureService: NoiseCaptureService(
+        noiseStreamFactory: () => const Stream<NoiseReadingSample>.empty(),
+      ),
+      locationCaptureService: LocationCaptureService(
+        positionStreamFactory: ({
+          Duration samplingPeriod = const Duration(seconds: 30),
+        }) =>
+            const Stream<GeoPositionSample>.empty(),
+        isLocationServiceEnabled: () async => true,
+        checkPermission: () async => GeoPermissionStatus.allowed,
+        requestPermission: () async => GeoPermissionStatus.allowed,
+      ),
+      digitalUsageCaptureService: DigitalUsageCaptureService(
+        lifecycleEventStreamFactory: () => const Stream<AppUsageEvent>.empty(),
+      ),
+      syncNativeRiskEvents: () async => 1,
+      deliverRuleReminders: (DateTime referenceTime) async {
+        deliveredAt.add(referenceTime);
+      },
+    );
+    addTearDown(collector.dispose);
+
+    await collector.syncNativeRiskEvents();
+
+    expect(deliveredAt, hasLength(1));
+  });
+
+  test('没有原生风险事件时不应重复触发提醒投递', () async {
+    var deliveredCount = 0;
+    final collector = DataCollector(
+      activityRepository: SharedActivityRepository(),
+      noiseRepository: SharedNoiseRepository(),
+      locationRepository: SharedLocationRepository(),
+      usageRepository: InMemoryUsageSummaryRepository(
+        summaries: const <DigitalUsageSummary>[],
+      ),
+      metricsRepository: InMemoryMetricsRepository(metrics: const []),
+      motionCaptureService: MotionCaptureService(
+        sensorStreamFactory: ({
+          Duration samplingPeriod = const Duration(milliseconds: 200),
+        }) =>
+            const Stream<MotionVectorSample>.empty(),
+      ),
+      noiseCaptureService: NoiseCaptureService(
+        noiseStreamFactory: () => const Stream<NoiseReadingSample>.empty(),
+      ),
+      locationCaptureService: LocationCaptureService(
+        positionStreamFactory: ({
+          Duration samplingPeriod = const Duration(seconds: 30),
+        }) =>
+            const Stream<GeoPositionSample>.empty(),
+        isLocationServiceEnabled: () async => true,
+        checkPermission: () async => GeoPermissionStatus.allowed,
+        requestPermission: () async => GeoPermissionStatus.allowed,
+      ),
+      digitalUsageCaptureService: DigitalUsageCaptureService(
+        lifecycleEventStreamFactory: () => const Stream<AppUsageEvent>.empty(),
+      ),
+      syncNativeRiskEvents: () async => 0,
+      deliverRuleReminders: (DateTime referenceTime) async {
+        deliveredCount += 1;
+      },
+    );
+    addTearDown(collector.dispose);
+
+    await collector.syncNativeRiskEvents();
+
+    expect(deliveredCount, 0);
+  });
 }

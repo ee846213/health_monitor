@@ -211,7 +211,8 @@ final overviewViewModelProvider =
 final reminderListProvider =
     FutureProvider<List<ReminderRecord>>((Ref ref) async {
   ref.watch(dataCollectorRevisionProvider);
-  ref.watch(dataCollectorProvider);
+  final collector = ref.watch(dataCollectorProvider);
+  await collector.syncNativeRiskEvents();
   final repository = await ref.watch(reminderRepositoryProvider.future);
   return repository.listRecentDays(
     7,
@@ -221,6 +222,8 @@ final reminderListProvider =
 
 final latestReminderProvider = FutureProvider<ReminderRecord?>((Ref ref) async {
   ref.watch(dataCollectorRevisionProvider);
+  final collector = ref.watch(dataCollectorProvider);
+  await collector.syncNativeRiskEvents();
   final repository = await ref.watch(reminderRepositoryProvider.future);
   return repository.getLatest();
 });

@@ -356,7 +356,7 @@ class DataCollector {
     DataCollectorDayRevisionCallback? onDayChanged,
     Future<void> Function(DateTime referenceTime)? persistRuleReminders,
     Future<void> Function(DateTime referenceTime)? deliverRuleReminders,
-    Future<void> Function()? syncNativeRiskEvents,
+    Future<int> Function()? syncNativeRiskEvents,
   })  : _motionCaptureService = motionCaptureService ?? MotionCaptureService(),
         ambientLightRepository = ambientLightRepository ??
             InMemoryAmbientLightSampleRepository(
@@ -409,7 +409,7 @@ class DataCollector {
   final DataCollectorDayRevisionCallback? _onDayChanged;
   final Future<void> Function(DateTime referenceTime)? _persistRuleReminders;
   final Future<void> Function(DateTime referenceTime)? _deliverRuleReminders;
-  final Future<void> Function()? _syncNativeRiskEvents;
+  final Future<int> Function()? _syncNativeRiskEvents;
   final List<StreamSubscription<dynamic>> _subscriptions =
       <StreamSubscription<dynamic>>[];
   bool _started = false;
@@ -542,11 +542,17 @@ class DataCollector {
     if (_syncNativeRiskEvents == null) {
       return;
     }
-    await _syncNativeRiskEvents.call();
+    final syncedCount = await _syncNativeRiskEvents.call();
+    if (syncedCount == 0) {
+      return;
+    }
     await _captureHealthService.recordNativeSummaryDrained(
       streamNativeRisk,
       detail: '原生风险事件已同步到本地仓储。',
     );
+    if (_deliverRuleReminders != null) {
+      await _deliverRuleReminders.call(DateTime.now());
+    }
     _onDataChanged?.call();
   }
 
@@ -920,7 +926,8 @@ final dataCollectorProvider = Provider<DataCollector>((Ref ref) {
           platformBridgeService: PlatformBridgeService(),
         ),
       );
-      await insightService.syncNativeWalkingScreenRiskEvents();
+      final records = await insightService.syncNativeWalkingScreenRiskEvents();
+      return records.length;
     },
     deliverRuleReminders: (DateTime referenceTime) async {
       final isar = await ref.read(appIsarProvider.future);
