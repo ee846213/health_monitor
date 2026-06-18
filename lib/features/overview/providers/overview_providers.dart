@@ -208,6 +208,69 @@ final overviewViewModelProvider =
   );
 });
 
+final _profileViewModelCacheProvider = NotifierProvider<
+    _ProfileViewModelCacheNotifier, OverviewDashboardViewModel?>(
+  _ProfileViewModelCacheNotifier.new,
+);
+
+final profileViewModelStateProvider =
+    Provider<OverviewDashboardViewModel?>((Ref ref) {
+  return ref.watch(_profileViewModelCacheProvider);
+});
+
+final profilePageReadyProvider = Provider<AsyncValue<bool>>((Ref ref) {
+  final hasCachedData = ref.watch(
+    profileViewModelStateProvider.select(
+      (OverviewDashboardViewModel? viewModel) => viewModel != null,
+    ),
+  );
+  if (hasCachedData) {
+    return const AsyncData<bool>(true);
+  }
+  return ref.watch(overviewViewModelProvider).whenData((_) => true);
+});
+
+final profileRemindersProvider = Provider<List<ReminderRecord>>((Ref ref) {
+  return ref.watch(
+        profileViewModelStateProvider.select(
+          (OverviewDashboardViewModel? viewModel) => viewModel?.reminders,
+        ),
+      ) ??
+      const <ReminderRecord>[];
+});
+
+final profilePermissionStatusesProvider =
+    Provider<Map<PermissionType, PermissionGrantStatus>>((Ref ref) {
+  return ref.watch(
+        profileViewModelStateProvider.select(
+          (OverviewDashboardViewModel? viewModel) =>
+              viewModel?.permissionStatuses,
+        ),
+      ) ??
+      const <PermissionType, PermissionGrantStatus>{};
+});
+
+class _ProfileViewModelCacheNotifier
+    extends Notifier<OverviewDashboardViewModel?> {
+  @override
+  OverviewDashboardViewModel? build() {
+    ref.listen<AsyncValue<OverviewDashboardViewModel>>(
+      overviewViewModelProvider,
+      (
+        AsyncValue<OverviewDashboardViewModel>? previous,
+        AsyncValue<OverviewDashboardViewModel> next,
+      ) {
+        final viewModel = next.valueOrNull;
+        if (viewModel != null) {
+          state = viewModel;
+        }
+      },
+      fireImmediately: true,
+    );
+    return ref.read(overviewViewModelProvider).valueOrNull;
+  }
+}
+
 final reminderListProvider =
     FutureProvider<List<ReminderRecord>>((Ref ref) async {
   ref.watch(dataCollectorRevisionProvider);
@@ -219,6 +282,40 @@ final reminderListProvider =
     referenceDate: DateTime.now(),
   );
 });
+
+final _reminderListCacheProvider =
+    NotifierProvider<_ReminderListCacheNotifier, List<ReminderRecord>?>(
+  _ReminderListCacheNotifier.new,
+);
+
+final reminderListStateProvider =
+    Provider<AsyncValue<List<ReminderRecord>>>((Ref ref) {
+  final cachedRecords = ref.watch(_reminderListCacheProvider);
+  if (cachedRecords != null) {
+    return AsyncData<List<ReminderRecord>>(cachedRecords);
+  }
+  return ref.watch(reminderListProvider);
+});
+
+class _ReminderListCacheNotifier extends Notifier<List<ReminderRecord>?> {
+  @override
+  List<ReminderRecord>? build() {
+    ref.listen<AsyncValue<List<ReminderRecord>>>(
+      reminderListProvider,
+      (
+        AsyncValue<List<ReminderRecord>>? previous,
+        AsyncValue<List<ReminderRecord>> next,
+      ) {
+        final records = next.valueOrNull;
+        if (records != null) {
+          state = records;
+        }
+      },
+      fireImmediately: true,
+    );
+    return ref.read(reminderListProvider).valueOrNull;
+  }
+}
 
 final latestReminderProvider = FutureProvider<ReminderRecord?>((Ref ref) async {
   ref.watch(dataCollectorRevisionProvider);

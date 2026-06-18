@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -31,6 +33,56 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('近 7 天久坐趋势'), findsOneWidget);
+  });
+
+  testWidgets('趋势数据刷新时保留当前卡片，不回退为整页加载', (
+    WidgetTester tester,
+  ) async {
+    var completer = Completer<TrendSnapshot>();
+    final container = ProviderContainer(
+      overrides: <Override>[
+        trendAnalysisViewModelProvider.overrideWith(
+          (Ref ref) => completer.future,
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: TrendAnalysisPage()),
+      ),
+    );
+
+    completer.complete(_buildTrendSnapshot(TrendTab.steps));
+    await tester.pumpAndSettle();
+    expect(find.text('近 7 天步数趋势'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+
+    completer = Completer<TrendSnapshot>();
+    container.invalidate(trendAnalysisViewModelProvider);
+    await tester.pump();
+
+    expect(find.text('近 7 天步数趋势'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+
+    completer.complete(
+      TrendSnapshot(
+        generatedAt: DateTime(2026, 6, 18, 9),
+        selectedTab: TrendTab.steps,
+        title: '更新后的步数趋势',
+        unitLabel: '步',
+        points: const <TrendPoint>[
+          TrendPoint(label: '6/18', value: 7200),
+        ],
+        insightText: '今天的活动节奏更稳定。',
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('更新后的步数趋势'), findsOneWidget);
+    expect(find.text('今天的活动节奏更稳定。'), findsOneWidget);
   });
 }
 

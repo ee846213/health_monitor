@@ -21,7 +21,7 @@ class ProfilePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final asyncViewModel = ref.watch(overviewViewModelProvider);
+    final pageReady = ref.watch(profilePageReadyProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F3EE),
@@ -37,22 +37,22 @@ class ProfilePage extends ConsumerWidget {
         backgroundColor: _surface,
         elevation: 0,
       ),
-      body: asyncViewModel.when(
+      body: pageReady.when(
         skipLoadingOnRefresh: true,
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (Object error, StackTrace _) =>
             const Center(child: Text('加载我的页面失败')),
-        data: (OverviewDashboardViewModel viewModel) {
-          return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(18, 6, 18, 24),
+        data: (_) {
+          return const SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(18, 6, 18, 24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                _MyRemindersCard(viewModel: viewModel),
-                const SizedBox(height: 20),
-                const DoNotDisturbSection(),
-                const SizedBox(height: 20),
-                _PermissionStatusCard(viewModel: viewModel),
+                _MyRemindersCard(),
+                SizedBox(height: 20),
+                DoNotDisturbSection(),
+                SizedBox(height: 20),
+                _PermissionStatusCard(),
               ],
             ),
           );
@@ -62,15 +62,13 @@ class ProfilePage extends ConsumerWidget {
   }
 }
 
-class _MyRemindersCard extends StatelessWidget {
-  const _MyRemindersCard({required this.viewModel});
-
-  final OverviewDashboardViewModel viewModel;
+class _MyRemindersCard extends ConsumerWidget {
+  const _MyRemindersCard();
 
   @override
-  Widget build(BuildContext context) {
-    final latestReminder =
-        viewModel.reminders.isEmpty ? null : viewModel.reminders.first;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reminders = ref.watch(profileRemindersProvider);
+    final latestReminder = reminders.isEmpty ? null : reminders.first;
 
     return Container(
       width: double.infinity,
@@ -93,7 +91,7 @@ class _MyRemindersCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '今天提醒 ${viewModel.reminders.length} 次',
+            '今天提醒 ${reminders.length} 次',
             style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w700,
@@ -121,36 +119,35 @@ class _MyRemindersCard extends StatelessWidget {
 }
 
 class _PermissionStatusCard extends ConsumerWidget {
-  const _PermissionStatusCard({required this.viewModel});
-
-  final OverviewDashboardViewModel viewModel;
+  const _PermissionStatusCard();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final permissionStatuses = ref.watch(profilePermissionStatusesProvider);
     final permissionRows = <_PermissionRowData>[
       _PermissionRowData(
         type: PermissionType.motion,
         title: '活动识别',
         subtitle: '用于步行、久坐和活动节律判断。',
-        status: viewModel.permissionStatuses[PermissionType.motion],
+        status: permissionStatuses[PermissionType.motion],
       ),
       _PermissionRowData(
         type: PermissionType.location,
         title: '位置',
         subtitle: '用于判断室内外和活动范围。',
-        status: viewModel.permissionStatuses[PermissionType.location],
+        status: permissionStatuses[PermissionType.location],
       ),
       _PermissionRowData(
         type: PermissionType.microphone,
         title: '麦克风环境噪音',
         subtitle: '用于环境噪音等级评估，不保存原始音频。',
-        status: viewModel.permissionStatuses[PermissionType.microphone],
+        status: permissionStatuses[PermissionType.microphone],
       ),
       _PermissionRowData(
         type: PermissionType.usageAccess,
         title: '数字生活习惯分析',
         subtitle: '用于判断看屏频率和碎片化查看时段。',
-        status: viewModel.permissionStatuses[PermissionType.usageAccess],
+        status: permissionStatuses[PermissionType.usageAccess],
       ),
     ].where((_PermissionRowData row) {
       if (row.type == PermissionType.usageAccess &&

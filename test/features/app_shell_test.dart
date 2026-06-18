@@ -9,6 +9,7 @@ import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/domain/scoring/health_score_calculator.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
+import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 import 'package:health_monitor/features/reminders/pages/reminder_pages.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
 import 'package:health_monitor/storage/repositories/reminder_repository.dart';
@@ -22,6 +23,9 @@ void main() {
         overrides: <Override>[
           overviewViewModelProvider
               .overrideWith((Ref ref) async => overviewViewModel),
+          overviewReadyDataProvider.overrideWith(
+            (Ref ref) async => _buildOverviewReadyData(overviewViewModel),
+          ),
         ],
         child: const HealthMonitorApp(),
       ),
@@ -37,6 +41,9 @@ void main() {
         overrides: <Override>[
           overviewViewModelProvider
               .overrideWith((Ref ref) async => overviewViewModel),
+          overviewReadyDataProvider.overrideWith(
+            (Ref ref) async => _buildOverviewReadyData(overviewViewModel),
+          ),
         ],
         child: const HealthMonitorApp(),
       ),
@@ -153,6 +160,18 @@ void main() {
     expect(find.text('历史提醒'), findsOneWidget);
     expect(find.text('抬高手肘'), findsNothing);
   });
+}
+
+OverviewReadyData _buildOverviewReadyData(
+  OverviewDashboardViewModel viewModel,
+) {
+  return OverviewReadyData(
+    dashboard: viewModel.dashboard,
+    permissionStatuses: viewModel.permissionStatuses,
+    missingDimensions: viewModel.missingDimensions,
+    reminders: viewModel.reminders,
+    preciseDetectionNotice: viewModel.preciseDetectionNotice,
+  );
 }
 
 OverviewDashboardViewModel _buildOverviewViewModel({

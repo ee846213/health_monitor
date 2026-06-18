@@ -359,3 +359,37 @@ final diagnosticsSnapshotProvider =
     captureCheckpoints: captureCheckpoints,
   );
 });
+
+final _diagnosticsSnapshotCacheProvider =
+    NotifierProvider<_DiagnosticsSnapshotCacheNotifier, DiagnosticsSnapshot?>(
+  _DiagnosticsSnapshotCacheNotifier.new,
+);
+
+final diagnosticsSnapshotStateProvider =
+    Provider<AsyncValue<DiagnosticsSnapshot>>((Ref ref) {
+  final cachedSnapshot = ref.watch(_diagnosticsSnapshotCacheProvider);
+  if (cachedSnapshot != null) {
+    return AsyncData<DiagnosticsSnapshot>(cachedSnapshot);
+  }
+  return ref.watch(diagnosticsSnapshotProvider);
+});
+
+class _DiagnosticsSnapshotCacheNotifier extends Notifier<DiagnosticsSnapshot?> {
+  @override
+  DiagnosticsSnapshot? build() {
+    ref.listen<AsyncValue<DiagnosticsSnapshot>>(
+      diagnosticsSnapshotProvider,
+      (
+        AsyncValue<DiagnosticsSnapshot>? previous,
+        AsyncValue<DiagnosticsSnapshot> next,
+      ) {
+        final snapshot = next.valueOrNull;
+        if (snapshot != null) {
+          state = snapshot;
+        }
+      },
+      fireImmediately: true,
+    );
+    return ref.read(diagnosticsSnapshotProvider).valueOrNull;
+  }
+}

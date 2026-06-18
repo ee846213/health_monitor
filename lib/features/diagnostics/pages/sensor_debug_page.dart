@@ -21,109 +21,106 @@ class SensorDebugPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final snapshotAsync = ref.watch(diagnosticsSnapshotProvider);
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('采集调试'),
       ),
-      body: snapshotAsync.when(
-        data: (DiagnosticsSnapshot snapshot) {
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: <Widget>[
-              _SectionCard(
-                title: '权限状态',
-                child: Text(_permissionSummary(snapshot.permissionStatuses)),
-              ),
-              _SectionCard(
-                title: '实时活动样本',
-                child: Text(_activitySummary(snapshot.liveActivity)),
-              ),
-              _SectionCard(
-                title: '最近活动样本',
-                child: Text(_activitySummary(snapshot.latestActivity)),
-              ),
-              _SectionCard(
-                title: '最近位置摘要',
-                child: Text(_locationSummary(snapshot.latestLocationSummary)),
-              ),
-              _SectionCard(
-                title: '最近环境噪音',
-                child: Text(_noiseSummary(snapshot.latestNoise)),
-              ),
-              _SectionCard(
-                title: '最近环境光照',
-                child: Text(_lightSummary(snapshot.latestLight)),
-              ),
-              _SectionCard(
-                title: '实时数字生活入口',
-                child: Text(_usageSummary(snapshot.liveUsageSummary)),
-              ),
-              _SectionCard(
-                title: '最近数字生活',
-                child: Text(_usageSummary(snapshot.latestUsageSummary)),
-              ),
-              _SectionCard(
-                title: '后台采集状态',
-                child:
-                    Text(_backgroundSummary(snapshot.backgroundCaptureState)),
-              ),
-              _SectionCard(
-                title: 'Android 宿主状态',
-                child: Text(_androidHostSummary(snapshot.androidHostStatus)),
-              ),
-              _SectionCard(
-                title: 'iPhone 宿主状态',
-                child: Text(_iosHostSummary(snapshot.iosHostStatus)),
-              ),
-              _SectionCard(
-                title: 'Android 前台服务策略',
-                child: Text(
-                  _foregroundServiceSummary(
-                    snapshot.androidForegroundServiceStrategy,
-                  ),
-                ),
-              ),
-              _SectionCard(
-                title: 'iPhone 后台刷新策略',
-                child: Text(
-                  _iosBackgroundStrategySummary(
-                    snapshot.iosBackgroundCaptureStrategy,
-                  ),
-                ),
-              ),
-              _SectionCard(
-                title: '本地写入状态',
-                child: Text(snapshot.storageStatus.label),
-              ),
-              _SectionCard(
-                title: '数字生活数据源',
-                child: Text(_digitalUsageSourceSummary(snapshot)),
-              ),
-              _SectionCard(
-                title: '最近检查点',
-                child: Text(_checkpointSummary(snapshot.captureCheckpoints)),
-              ),
-              _SectionCard(
-                title: '最近健康事件',
-                child: Text(_healthEventSummary(snapshot.captureHealthEvents)),
-              ),
-            ],
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (Object error, StackTrace stackTrace) {
-          return Center(
-            child: Text('调试页加载失败：$error'),
-          );
-        },
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: <Widget>[
+          _DiagnosticsSection<Map<PermissionType, PermissionGrantStatus>>(
+            title: '权限状态',
+            selector: (snapshot) => snapshot.permissionStatuses,
+            formatter: _permissionSummary,
+          ),
+          _DiagnosticsSection<ActivitySample?>(
+            title: '实时活动样本',
+            selector: (snapshot) => snapshot.liveActivity,
+            formatter: _activitySummary,
+          ),
+          _DiagnosticsSection<ActivitySample?>(
+            title: '最近活动样本',
+            selector: (snapshot) => snapshot.latestActivity,
+            formatter: _activitySummary,
+          ),
+          _DiagnosticsSection<LocationSummary?>(
+            title: '最近位置摘要',
+            selector: (snapshot) => snapshot.latestLocationSummary,
+            formatter: _locationSummary,
+          ),
+          _DiagnosticsSection<NoiseSample?>(
+            title: '最近环境噪音',
+            selector: (snapshot) => snapshot.latestNoise,
+            formatter: _noiseSummary,
+          ),
+          _DiagnosticsSection<AmbientLightSample?>(
+            title: '最近环境光照',
+            selector: (snapshot) => snapshot.latestLight,
+            formatter: _lightSummary,
+          ),
+          _DiagnosticsSection<DigitalUsageSummary?>(
+            title: '实时数字生活入口',
+            selector: (snapshot) => snapshot.liveUsageSummary,
+            formatter: _usageSummary,
+          ),
+          _DiagnosticsSection<DigitalUsageSummary?>(
+            title: '最近数字生活',
+            selector: (snapshot) => snapshot.latestUsageSummary,
+            formatter: _usageSummary,
+          ),
+          _DiagnosticsSection<BackgroundCaptureState>(
+            title: '后台采集状态',
+            selector: (snapshot) => snapshot.backgroundCaptureState,
+            formatter: _backgroundSummary,
+          ),
+          _DiagnosticsSection<AndroidBackgroundCaptureHostStatus?>(
+            title: 'Android 宿主状态',
+            selector: (snapshot) => snapshot.androidHostStatus,
+            formatter: _androidHostSummary,
+          ),
+          _DiagnosticsSection<IosBackgroundCaptureHostStatus?>(
+            title: 'iPhone 宿主状态',
+            selector: (snapshot) => snapshot.iosHostStatus,
+            formatter: _iosHostSummary,
+          ),
+          _DiagnosticsSection<AndroidForegroundServiceStrategy>(
+            title: 'Android 前台服务策略',
+            selector: (snapshot) => snapshot.androidForegroundServiceStrategy,
+            formatter: _foregroundServiceSummary,
+          ),
+          _DiagnosticsSection<IosBackgroundCaptureStrategy>(
+            title: 'iPhone 后台刷新策略',
+            selector: (snapshot) => snapshot.iosBackgroundCaptureStrategy,
+            formatter: _iosBackgroundStrategySummary,
+          ),
+          _DiagnosticsSection<String>(
+            title: '本地写入状态',
+            selector: (snapshot) => snapshot.storageStatus.label,
+            formatter: (label) => label,
+          ),
+          _DiagnosticsSection<DigitalUsageSummary?>(
+            title: '数字生活数据源',
+            selector: (snapshot) => snapshot.latestUsageSummary,
+            formatter: _digitalUsageSourceSummary,
+          ),
+          _DiagnosticsSection<List<CaptureCheckpoint>>(
+            title: '最近检查点',
+            selector: (snapshot) => snapshot.captureCheckpoints,
+            formatter: _checkpointSummary,
+          ),
+          _DiagnosticsSection<List<CaptureHealthEvent>>(
+            title: '最近健康事件',
+            selector: (snapshot) => snapshot.captureHealthEvents,
+            formatter: _healthEventSummary,
+          ),
+        ],
       ),
     );
   }
 
   String _permissionSummary(
-      Map<PermissionType, PermissionGrantStatus> statuses) {
+    Map<PermissionType, PermissionGrantStatus> statuses,
+  ) {
     if (statuses.isEmpty) {
       return '暂无权限状态';
     }
@@ -174,8 +171,7 @@ class SensorDebugPage extends ConsumerWidget {
     return '$sourceLabel · ${summary.topCategory.name} · 亮屏 ${summary.screenOnDuration.inMinutes} 分钟';
   }
 
-  String _digitalUsageSourceSummary(DiagnosticsSnapshot snapshot) {
-    final summary = snapshot.latestUsageSummary;
+  String _digitalUsageSourceSummary(DigitalUsageSummary? summary) {
     if (summary == null) {
       return '暂无可用的数字生活摘要。';
     }
@@ -254,6 +250,45 @@ class SensorDebugPage extends ConsumerWidget {
       return '$stateLabel · $restrictedLabel · $modeLabel · ${strategy.title} · ${strategy.body}';
     }
     return '$stateLabel · $restrictedLabel · $modeLabel · ${strategy.reasons.join('；')}';
+  }
+}
+
+class _DiagnosticsSection<T> extends ConsumerWidget {
+  const _DiagnosticsSection({
+    required this.title,
+    required this.selector,
+    required this.formatter,
+  });
+
+  final String title;
+  final T Function(DiagnosticsSnapshot snapshot) selector;
+  final String Function(T value) formatter;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final value = ref.watch(
+      diagnosticsSnapshotStateProvider.select(
+        (AsyncValue<DiagnosticsSnapshot> snapshot) {
+          return snapshot.whenData(selector);
+        },
+      ),
+    );
+
+    return _SectionCard(
+      title: title,
+      child: value.when(
+        skipLoadingOnRefresh: true,
+        data: (T data) => Text(formatter(data)),
+        loading: () => const Align(
+          alignment: Alignment.centerLeft,
+          child: SizedBox.square(
+            dimension: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+        error: (Object error, StackTrace _) => const Text('当前卡片加载失败'),
+      ),
+    );
   }
 }
 

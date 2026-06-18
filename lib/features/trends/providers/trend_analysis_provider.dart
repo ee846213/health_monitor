@@ -29,3 +29,49 @@ final trendAnalysisViewModelProvider = FutureProvider<TrendSnapshot>((
     selectedTab: selectedTab,
   );
 });
+
+final _trendSnapshotCacheProvider =
+    NotifierProvider<_TrendSnapshotCacheNotifier, TrendSnapshot?>(
+  _TrendSnapshotCacheNotifier.new,
+);
+
+final trendSnapshotStateProvider =
+    Provider<AsyncValue<TrendSnapshot>>((Ref ref) {
+  final selectedTab = ref.watch(trendSelectedTabProvider);
+  final cachedSnapshot = ref.watch(_trendSnapshotCacheProvider);
+  if (cachedSnapshot?.selectedTab == selectedTab) {
+    return AsyncData<TrendSnapshot>(cachedSnapshot!);
+  }
+  return ref.watch(trendAnalysisViewModelProvider);
+});
+
+final trendChartSnapshotProvider =
+    Provider<AsyncValue<TrendSnapshot>>((Ref ref) {
+  return ref.watch(trendSnapshotStateProvider);
+});
+
+final trendInsightTextProvider = Provider<AsyncValue<String>>((Ref ref) {
+  return ref.watch(trendSnapshotStateProvider).whenData(
+        (TrendSnapshot snapshot) => snapshot.insightText,
+      );
+});
+
+class _TrendSnapshotCacheNotifier extends Notifier<TrendSnapshot?> {
+  @override
+  TrendSnapshot? build() {
+    ref.listen<AsyncValue<TrendSnapshot>>(
+      trendAnalysisViewModelProvider,
+      (
+        AsyncValue<TrendSnapshot>? previous,
+        AsyncValue<TrendSnapshot> next,
+      ) {
+        final snapshot = next.valueOrNull;
+        if (snapshot != null) {
+          state = snapshot;
+        }
+      },
+      fireImmediately: true,
+    );
+    return ref.read(trendAnalysisViewModelProvider).valueOrNull;
+  }
+}

@@ -13,8 +13,6 @@ class ReminderListPage extends ConsumerWidget {
     final theme = Theme.of(context);
     final tokens =
         theme.extension<HealthMonitorTheme>() ?? HealthMonitorTheme.fallback();
-    final asyncRecords = ref.watch(reminderListProvider);
-    final preciseNotice = ref.watch(walkingScreenRiskNoticeProvider);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -31,59 +29,103 @@ class ReminderListPage extends ConsumerWidget {
         title: const Text('提醒记录'),
         backgroundColor: theme.colorScheme.surface,
       ),
-      body: asyncRecords.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (Object error, StackTrace _) =>
-            Center(child: Text('加载提醒失败', style: tokens.bodyStyle)),
-        data: (List<ReminderRecord> records) {
-          return ListView(
-            padding: EdgeInsets.all(tokens.spacingXl),
-            children: <Widget>[
-              preciseNotice.when(
-                data: (String? message) {
-                  if (message == null || message.isEmpty) {
-                    return const SizedBox.shrink();
-                  }
-                  return Padding(
-                    padding: EdgeInsets.only(bottom: tokens.spacingSm),
-                    child: Card(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      child: Padding(
-                        padding: EdgeInsets.all(tokens.spacingLg),
-                        child: Text(message, style: tokens.bodyStyle),
-                      ),
-                    ),
-                  );
-                },
-                loading: () => const SizedBox.shrink(),
-                error: (_, __) => const SizedBox.shrink(),
-              ),
-              if (records.isEmpty)
-                Padding(
-                  padding: EdgeInsets.only(top: tokens.spacingXl),
-                  child: Center(
-                    child: Text('今天还没有触发提醒记录', style: tokens.bodyStyle),
-                  ),
-                )
-              else
-                ...records.map((ReminderRecord record) {
-                  return Card(
-                    margin: EdgeInsets.only(bottom: tokens.spacingSm),
-                    child: ListTile(
-                      onTap: () => context.push('/reminders/detail', extra: record),
-                      title: Text(record.title, style: tokens.sectionTitleStyle),
-                      subtitle: Text(record.reasonSummary, style: tokens.bodyStyle),
-                      trailing: Text(
-                        _timeLabel(record.triggeredAt),
-                        style: tokens.bodyStyle.copyWith(fontSize: 12),
-                      ),
-                    ),
-                  );
-                }),
-            ],
-          );
-        },
+      body: ListView(
+        padding: EdgeInsets.all(tokens.spacingXl),
+        children: const <Widget>[
+          _PreciseNoticeSection(),
+          _ReminderRecordsSection(),
+        ],
       ),
+    );
+  }
+}
+
+class _PreciseNoticeSection extends ConsumerWidget {
+  const _PreciseNoticeSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<HealthMonitorTheme>() ?? HealthMonitorTheme.fallback();
+    final preciseNotice = ref.watch(walkingScreenRiskNoticeProvider);
+
+    return preciseNotice.when(
+      skipLoadingOnRefresh: true,
+      data: (String? message) {
+        if (message == null || message.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        return Padding(
+          padding: EdgeInsets.only(bottom: tokens.spacingSm),
+          child: Card(
+            color: theme.colorScheme.surfaceContainerHighest,
+            child: Padding(
+              padding: EdgeInsets.all(tokens.spacingLg),
+              child: Text(message, style: tokens.bodyStyle),
+            ),
+          ),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+}
+
+class _ReminderRecordsSection extends ConsumerWidget {
+  const _ReminderRecordsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final tokens =
+        theme.extension<HealthMonitorTheme>() ?? HealthMonitorTheme.fallback();
+    final asyncRecords = ref.watch(reminderListStateProvider);
+
+    return asyncRecords.when(
+      skipLoadingOnRefresh: true,
+      loading: () => Padding(
+        padding: EdgeInsets.all(tokens.spacingXl),
+        child: const Center(
+          child: SizedBox.square(
+            dimension: 24,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+      ),
+      error: (Object error, StackTrace _) => Card(
+        child: Padding(
+          padding: EdgeInsets.all(tokens.spacingLg),
+          child: Text('加载提醒失败', style: tokens.bodyStyle),
+        ),
+      ),
+      data: (List<ReminderRecord> records) {
+        if (records.isEmpty) {
+          return Padding(
+            padding: EdgeInsets.only(top: tokens.spacingXl),
+            child: Center(
+              child: Text('今天还没有触发提醒记录', style: tokens.bodyStyle),
+            ),
+          );
+        }
+        return Column(
+          children: records.map((ReminderRecord record) {
+            return Card(
+              margin: EdgeInsets.only(bottom: tokens.spacingSm),
+              child: ListTile(
+                onTap: () => context.push('/reminders/detail', extra: record),
+                title: Text(record.title, style: tokens.sectionTitleStyle),
+                subtitle: Text(record.reasonSummary, style: tokens.bodyStyle),
+                trailing: Text(
+                  _timeLabel(record.triggeredAt),
+                  style: tokens.bodyStyle.copyWith(fontSize: 12),
+                ),
+              ),
+            );
+          }).toList(growable: false),
+        );
+      },
     );
   }
 }
@@ -111,7 +153,8 @@ class ReminderDetailPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             _Section(label: '消息', content: record.message, tokens: tokens),
-            _Section(label: '原因', content: record.reasonSummary, tokens: tokens),
+            _Section(
+                label: '原因', content: record.reasonSummary, tokens: tokens),
             _Section(
               label: '建议',
               content: record.actionSuggestion,
