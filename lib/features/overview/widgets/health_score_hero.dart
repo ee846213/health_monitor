@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
 import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 
 const Color _heroSurface = Color(0xFFEEF3EA);
@@ -21,38 +22,40 @@ class HealthScoreHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(28),
-        child: Ink(
-          width: double.infinity,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: _heroSurface,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: _heroLine),
-          ),
+    return HealthPressableSurface(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(28),
+      child: Container(
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: _heroSurface,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: _heroLine),
+        ),
+        child: const Padding(
+          padding: EdgeInsets.all(20),
           child: Row(
             children: <Widget>[
-              SizedBox(
-                width: 120,
-                height: 120,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: <Widget>[
-                    const _ScoreRing(),
-                    const _HealthScoreValue(),
-                  ],
+              Hero(
+                tag: 'health-score-hero',
+                child: Material(
+                  color: Colors.transparent,
+                  child: SizedBox(
+                    width: 120,
+                    height: 120,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: <Widget>[_ScoreRing(), _HealthScoreValue()],
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(width: 18),
+              SizedBox(width: 18),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    const Text(
+                    Text(
                       '当日聚合数据',
                       style: TextStyle(
                         fontSize: 12,
@@ -60,8 +63,8 @@ class HealthScoreHero extends StatelessWidget {
                         color: _heroMuted,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
+                    SizedBox(height: 8),
+                    Text(
                       '步数 40% · 久坐 40% · 屏幕 20%',
                       style: TextStyle(
                         fontSize: 15,
@@ -69,10 +72,10 @@ class HealthScoreHero extends StatelessWidget {
                         color: _heroText,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    const _HealthScoreSummaryText(),
-                    const SizedBox(height: 12),
-                    const Wrap(
+                    SizedBox(height: 8),
+                    _HealthScoreSummaryText(),
+                    SizedBox(height: 12),
+                    Wrap(
                       spacing: 8,
                       runSpacing: 8,
                       children: <Widget>[
@@ -98,9 +101,15 @@ class _ScoreRing extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final progress = ref.watch(overviewHealthScoreProgressProvider);
-    return CustomPaint(
-      size: const Size.square(120),
-      painter: _ScoreRingPainter(progress: progress),
+    return HealthAnimatedValue(
+      value: progress,
+      builder: (BuildContext context, double value, Widget? child) {
+        return CustomPaint(
+          key: const Key('health-score-ring'),
+          size: const Size.square(120),
+          painter: _ScoreRingPainter(progress: value),
+        );
+      },
     );
   }
 }
@@ -122,8 +131,8 @@ class _HealthScoreValue extends ConsumerWidget {
             color: _heroMuted,
           ),
         ),
-        Text(
-          value,
+        HealthAnimatedNumberText(
+          value: value,
           style: const TextStyle(
             fontSize: 36,
             fontWeight: FontWeight.w800,
@@ -141,12 +150,15 @@ class _HealthScoreSummaryText extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final summary = ref.watch(overviewHealthScoreSummaryProvider);
-    return Text(
-      summary,
-      style: const TextStyle(
-        fontSize: 13,
-        height: 1.6,
-        color: _heroMuted,
+    return HealthAnimatedSwitcher(
+      childKey: ValueKey<String>(summary),
+      child: Text(
+        summary,
+        style: const TextStyle(
+          fontSize: 13,
+          height: 1.6,
+          color: _heroMuted,
+        ),
       ),
     );
   }
@@ -165,8 +177,8 @@ class _MetricPill extends StatelessWidget {
         color: Colors.white.withValues(alpha: 0.78),
         borderRadius: BorderRadius.circular(18),
       ),
-      child: Text(
-        value,
+      child: HealthAnimatedNumberText(
+        value: value,
         style: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w700,

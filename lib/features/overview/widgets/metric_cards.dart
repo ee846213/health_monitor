@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
 import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 
 const Color _metricSurface = Color(0xFFF8F3EA);
@@ -83,35 +84,32 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Ink(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: _metricLine),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: _metricText,
-                ),
+    return HealthPressableSurface(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: _metricLine),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: _metricText,
               ),
-              const SizedBox(height: 12),
-              value,
-              const SizedBox(height: 6),
-              caption,
-            ],
-          ),
+            ),
+            const SizedBox(height: 12),
+            value,
+            const SizedBox(height: 6),
+            caption,
+          ],
         ),
       ),
     );
@@ -185,8 +183,8 @@ class _MetricValueText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      value,
+    return HealthAnimatedNumberText(
+      value: value,
       style: const TextStyle(
         fontSize: 28,
         fontWeight: FontWeight.w800,

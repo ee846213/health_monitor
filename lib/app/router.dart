@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:health_monitor/app/theme/health_motion_tokens.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/features/briefing/pages/briefing_page.dart';
 import 'package:health_monitor/features/diagnostics/pages/sensor_debug_page.dart';
@@ -23,7 +24,10 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: child,
+      body: _PrimaryTabTransition(
+        location: GoRouterState.of(context).uri.path,
+        child: child,
+      ),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         color: const Color(0xFFF5F3EE),
@@ -51,6 +55,7 @@ class _TabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final motion = context.healthMotion;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
@@ -65,28 +70,64 @@ class _TabBar extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: <Widget>[
-          _TabItem(
-            icon: '今日',
-            label: '首页',
-            isActive: selectedIndex == 0,
-            onTap: () => context.go('/overview'),
-          ),
-          _TabItem(
-            icon: '回顾',
-            label: '简报',
-            isActive: selectedIndex == 1,
-            onTap: () => context.go('/briefing'),
-          ),
-          _TabItem(
-            icon: '设置',
-            label: '我的',
-            isActive: selectedIndex == 2,
-            onTap: () => context.go('/profile'),
-          ),
-        ],
+      child: SizedBox(
+        key: const Key('health-bottom-nav-track'),
+        height: 50,
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            return Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                AnimatedAlign(
+                  alignment: Alignment(
+                    -1 + selectedIndex * 1.0,
+                    0,
+                  ),
+                  duration: context.motionDuration(motion.base),
+                  curve: motion.standardCurve,
+                  child: FractionallySizedBox(
+                    widthFactor: 1 / 3,
+                    child: Container(
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: _sageSoft,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: _TabItem(
+                        icon: '今日',
+                        label: '首页',
+                        isActive: selectedIndex == 0,
+                        onTap: () => context.go('/overview'),
+                      ),
+                    ),
+                    Expanded(
+                      child: _TabItem(
+                        icon: '回顾',
+                        label: '简报',
+                        isActive: selectedIndex == 1,
+                        onTap: () => context.go('/briefing'),
+                      ),
+                    ),
+                    Expanded(
+                      child: _TabItem(
+                        icon: '设置',
+                        label: '我的',
+                        isActive: selectedIndex == 2,
+                        onTap: () => context.go('/profile'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -107,32 +148,38 @@ class _TabItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    final motion = context.healthMotion;
+    return InkWell(
       onTap: onTap,
-      child: Container(
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: isActive ? _sageSoft : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            Text(
-              icon,
+            AnimatedDefaultTextStyle(
+              duration: context.motionDuration(motion.fast),
+              curve: motion.standardCurve,
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
                 color: isActive ? _sageDeep : _textMuted,
               ),
+              child: Text(
+                icon,
+              ),
             ),
             const SizedBox(height: 4),
-            Text(
-              label,
+            AnimatedDefaultTextStyle(
+              duration: context.motionDuration(motion.fast),
+              curve: motion.standardCurve,
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                 color: isActive ? _sageDeep : _textMuted,
+              ),
+              child: Text(
+                label,
               ),
             ),
           ],
@@ -140,6 +187,77 @@ class _TabItem extends StatelessWidget {
       ),
     );
   }
+}
+
+class _PrimaryTabTransition extends StatelessWidget {
+  const _PrimaryTabTransition({
+    required this.location,
+    required this.child,
+  });
+
+  final String location;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final motion = context.healthMotion;
+    final reduceMotion = context.reduceMotion;
+    return AnimatedSwitcher(
+      duration: context.motionDuration(const Duration(milliseconds: 180)),
+      switchInCurve: motion.standardCurve,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (Widget child, Animation<double> animation) {
+        if (reduceMotion) {
+          return FadeTransition(opacity: animation, child: child);
+        }
+        return FadeTransition(
+          opacity: animation,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.99, end: 1).animate(animation),
+            child: child,
+          ),
+        );
+      },
+      child: KeyedSubtree(key: ValueKey<String>(location), child: child),
+    );
+  }
+}
+
+CustomTransitionPage<void> _secondaryPage({
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return CustomTransitionPage<void>(
+    key: state.pageKey,
+    transitionDuration: const Duration(milliseconds: 260),
+    reverseTransitionDuration: const Duration(milliseconds: 220),
+    child: child,
+    transitionsBuilder: (
+      BuildContext context,
+      Animation<double> animation,
+      Animation<double> secondaryAnimation,
+      Widget child,
+    ) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      if (context.reduceMotion) {
+        return FadeTransition(opacity: curved, child: child);
+      }
+      return FadeTransition(
+        opacity: curved,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0.032, 0),
+            end: Offset.zero,
+          ).animate(curved),
+          child: child,
+        ),
+      );
+    },
+  );
 }
 
 final GoRouter appRouter = GoRouter(
@@ -166,39 +284,60 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/trends',
-      builder: (_, __) => const TrendAnalysisPage(),
+      pageBuilder: (_, GoRouterState state) => _secondaryPage(
+        state: state,
+        child: const TrendAnalysisPage(),
+      ),
     ),
     GoRoute(
       path: '/reminders',
-      builder: (_, __) => const ReminderListPage(),
+      pageBuilder: (_, GoRouterState state) => _secondaryPage(
+        state: state,
+        child: const ReminderListPage(),
+      ),
       routes: <RouteBase>[
         GoRoute(
           path: 'detail',
-          builder: (BuildContext context, GoRouterState state) {
+          pageBuilder: (BuildContext context, GoRouterState state) {
             final record = state.extra as ReminderRecord;
-            return ReminderDetailPage(record: record);
+            return _secondaryPage(
+              state: state,
+              child: ReminderDetailPage(record: record),
+            );
           },
         ),
         GoRoute(
           path: 'explanation',
-          builder: (BuildContext context, GoRouterState state) {
+          pageBuilder: (BuildContext context, GoRouterState state) {
             final record = state.extra as ReminderRecord;
-            return ReminderExplanationPage(record: record);
+            return _secondaryPage(
+              state: state,
+              child: ReminderExplanationPage(record: record),
+            );
           },
         ),
       ],
     ),
     GoRoute(
       path: '/diagnostics',
-      builder: (_, __) => const SensorDebugPage(),
+      pageBuilder: (_, GoRouterState state) => _secondaryPage(
+        state: state,
+        child: const SensorDebugPage(),
+      ),
     ),
     GoRoute(
       path: '/permission-denied',
-      builder: (_, __) => const PermissionDeniedPage(),
+      pageBuilder: (_, GoRouterState state) => _secondaryPage(
+        state: state,
+        child: const PermissionDeniedPage(),
+      ),
     ),
     GoRoute(
       path: '/data-insufficient',
-      builder: (_, __) => const DataInsufficientPage(),
+      pageBuilder: (_, GoRouterState state) => _secondaryPage(
+        state: state,
+        child: const DataInsufficientPage(),
+      ),
     ),
   ],
 );

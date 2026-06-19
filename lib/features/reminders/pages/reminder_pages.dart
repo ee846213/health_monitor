@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:health_monitor/app/theme/app_theme_extension.dart';
+import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
 
@@ -110,8 +111,10 @@ class _ReminderRecordsSection extends ConsumerWidget {
           );
         }
         return Column(
-          children: records.map((ReminderRecord record) {
-            return Card(
+          children: records.asMap().entries.map((entry) {
+            final index = entry.key;
+            final record = entry.value;
+            final card = Card(
               margin: EdgeInsets.only(bottom: tokens.spacingSm),
               child: ListTile(
                 onTap: () => context.push('/reminders/detail', extra: record),
@@ -123,6 +126,10 @@ class _ReminderRecordsSection extends ConsumerWidget {
                 ),
               ),
             );
+            if (index >= 6) {
+              return card;
+            }
+            return HealthStaggeredEntrance(index: index, child: card);
           }).toList(growable: false),
         );
       },
@@ -152,17 +159,36 @@ class ReminderDetailPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            _Section(label: '消息', content: record.message, tokens: tokens),
-            _Section(
-                label: '原因', content: record.reasonSummary, tokens: tokens),
-            _Section(
-              label: '建议',
-              content: record.actionSuggestion,
-              tokens: tokens,
+            HealthStaggeredEntrance(
+              index: 0,
+              child: _Section(
+                label: '消息',
+                content: record.message,
+                tokens: tokens,
+              ),
             ),
-            Text(
-              '状态：${_responseLabel(record.response)}',
-              style: tokens.sectionTitleStyle,
+            HealthStaggeredEntrance(
+              index: 1,
+              child: _Section(
+                label: '原因',
+                content: record.reasonSummary,
+                tokens: tokens,
+              ),
+            ),
+            HealthStaggeredEntrance(
+              index: 2,
+              child: _Section(
+                label: '建议',
+                content: record.actionSuggestion,
+                tokens: tokens,
+              ),
+            ),
+            HealthStaggeredEntrance(
+              index: 3,
+              child: Text(
+                '状态：${_responseLabel(record.response)}',
+                style: tokens.sectionTitleStyle,
+              ),
             ),
           ],
         ),

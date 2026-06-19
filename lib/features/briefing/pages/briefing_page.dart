@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_monitor/app/theme/app_icons.dart';
+import 'package:health_monitor/app/theme/health_motion_tokens.dart';
+import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
 import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
 import 'package:health_monitor/features/briefing/providers/briefing_providers.dart';
 import 'package:health_monitor/features/overview/widgets/metric_detail_sheets.dart';
@@ -44,38 +46,25 @@ class BriefingPage extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const _PageHeader(),
-                const SizedBox(height: 14),
-                _TimeRangeSegment(
-                  selectedRange: selectedRange,
+                const HealthStaggeredEntrance(
+                  index: 0,
+                  child: _PageHeader(),
                 ),
                 const SizedBox(height: 14),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 240),
-                  switchInCurve: Curves.easeOutCubic,
-                  switchOutCurve: Curves.easeInCubic,
-                  transitionBuilder: (
-                    Widget child,
-                    Animation<double> animation,
-                  ) {
-                    final fade = CurvedAnimation(
-                      parent: animation,
-                      curve: Curves.easeOut,
-                    );
-                    final slide = Tween<Offset>(
-                      begin: const Offset(0, 0.03),
-                      end: Offset.zero,
-                    ).animate(fade);
-                    return FadeTransition(
-                      opacity: fade,
-                      child: SlideTransition(
-                        position: slide,
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: _DailyReportCard(
-                    key: ValueKey<String>(selectedRange.name),
+                HealthStaggeredEntrance(
+                  index: 1,
+                  child: _TimeRangeSegment(
+                    selectedRange: selectedRange,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                HealthStaggeredEntrance(
+                  index: 2,
+                  child: HealthAnimatedSwitcher(
+                    duration: context.healthMotion.base,
+                    child: _DailyReportCard(
+                      key: ValueKey<String>(selectedRange.name),
+                    ),
                   ),
                 ),
               ],

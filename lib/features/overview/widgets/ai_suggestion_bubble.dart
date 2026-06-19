@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
 import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 
 const Color _bubbleSurface = Color(0xFF222A25);
@@ -53,12 +54,15 @@ class _AdviceSourceText extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final text = ref.watch(overviewAdviceSourceTextProvider);
-    return Text(
-      text,
-      style: const TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w700,
-        color: _bubbleTag,
+    return HealthAnimatedSwitcher(
+      childKey: ValueKey<String>(text),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: _bubbleTag,
+        ),
       ),
     );
   }
@@ -70,12 +74,16 @@ class _AdviceBodyText extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final text = ref.watch(overviewAdviceBodyTextProvider);
-    return Text(
-      text,
-      style: const TextStyle(
-        fontSize: 15,
-        height: 1.7,
-        color: _bubbleText,
+    return HealthAnimatedSwitcher(
+      childKey: ValueKey<String>(text),
+      duration: const Duration(milliseconds: 320),
+      child: Text(
+        text,
+        style: const TextStyle(
+          fontSize: 15,
+          height: 1.7,
+          color: _bubbleText,
+        ),
       ),
     );
   }

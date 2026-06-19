@@ -35,6 +35,33 @@ void main() {
     expect(find.text('今日仪表盘'), findsOneWidget);
   });
 
+  testWidgets('底部导航轨道应保持固定高度并停留在屏幕底部', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          overviewViewModelProvider
+              .overrideWith((Ref ref) async => overviewViewModel),
+          overviewReadyDataProvider.overrideWith(
+            (Ref ref) async => _buildOverviewReadyData(overviewViewModel),
+          ),
+        ],
+        child: const HealthMonitorApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final track = find.byKey(const Key('health-bottom-nav-track'));
+    expect(tester.getSize(track).height, 50);
+    expect(
+      tester.getBottomLeft(track).dy,
+      greaterThan(tester.view.physicalSize.height /
+          tester.view.devicePixelRatio *
+          0.75),
+    );
+  });
+
   testWidgets('应用壳应提供采集调试入口', (WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
 import 'package:health_monitor/domain/trends/trend_snapshot.dart';
 
 const Color _panelSurface = Color(0xFFFFFCF8);
@@ -68,15 +69,33 @@ class TrendChartPanel extends StatelessWidget {
               ),
             ),
           ] else ...<Widget>[
-            SizedBox(
-              height: 200,
-              child: CustomPaint(
-                painter: _TrendChartPainter(
-                  points: snapshot.points,
-                  isBarChart: isBarChart,
+            HealthAnimatedValue(
+              key: ValueKey<int>(
+                Object.hash(
+                  snapshot.selectedTab,
+                  Object.hashAll(snapshot.points),
                 ),
-                child: const SizedBox.expand(),
               ),
+              value: 1,
+              duration: const Duration(milliseconds: 500),
+              builder: (
+                BuildContext context,
+                double progress,
+                Widget? child,
+              ) {
+                return SizedBox(
+                  height: 200,
+                  child: CustomPaint(
+                    key: const Key('trend-chart-canvas'),
+                    painter: _TrendChartPainter(
+                      points: snapshot.points,
+                      isBarChart: isBarChart,
+                      progress: progress,
+                    ),
+                    child: const SizedBox.expand(),
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 10),
             Row(
@@ -117,10 +136,12 @@ class _TrendChartPainter extends CustomPainter {
   _TrendChartPainter({
     required this.points,
     required this.isBarChart,
+    required this.progress,
   });
 
   final List<TrendPoint> points;
   final bool isBarChart;
+  final double progress;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -166,13 +187,18 @@ class _TrendChartPainter extends CustomPainter {
     final safeMaxValue = (maxValue <= 0 ? 1 : maxValue).toDouble();
 
     if (isBarChart) {
-      _drawBars(canvas, chartRect, safeMaxValue);
+      _drawBars(canvas, chartRect, safeMaxValue, progress);
       return;
     }
-    _drawLine(canvas, chartRect, safeMaxValue);
+    _drawLine(canvas, chartRect, safeMaxValue, progress);
   }
 
-  void _drawBars(Canvas canvas, Rect chartRect, double safeMaxValue) {
+  void _drawBars(
+    Canvas canvas,
+    Rect chartRect,
+    double safeMaxValue,
+    double progress,
+  ) {
     final slotWidth = chartRect.width / points.length;
     final barWidth = math.min(24.0, slotWidth * 0.54);
     final barPaint = Paint()
@@ -185,7 +211,8 @@ class _TrendChartPainter extends CustomPainter {
         continue;
       }
       final ratio = point.value.toDouble() / safeMaxValue;
-      final barHeight = math.max(8.0, chartRect.height * ratio * 0.82);
+      final barHeight =
+          math.max(8.0, chartRect.height * ratio * 0.82 * progress);
       final left =
           chartRect.left + slotWidth * index + (slotWidth - barWidth) / 2;
       final rect = Rect.fromLTWH(
@@ -201,7 +228,12 @@ class _TrendChartPainter extends CustomPainter {
     }
   }
 
-  void _drawLine(Canvas canvas, Rect chartRect, double safeMaxValue) {
+  void _drawLine(
+    Canvas canvas,
+    Rect chartRect,
+    double safeMaxValue,
+    double progress,
+  ) {
     final strokePaint = Paint()
       ..color = _panelAccent
       ..style = PaintingStyle.stroke
@@ -257,10 +289,28 @@ class _TrendChartPainter extends CustomPainter {
       ..lineTo(lastDx, chartRect.bottom - 8)
       ..close();
 
+    canvas.saveLayer(
+      chartRect,
+      Paint()..color = Colors.white.withValues(alpha: progress),
+    );
     canvas.drawPath(fillPath, fillPaint);
-    canvas.drawPath(path, strokePaint);
+    final metrics = path.computeMetrics().toList(growable: false);
+    if (metrics.isNotEmpty) {
+      final metric = metrics.first;
+      canvas.drawPath(
+        metric.extractPath(0, metric.length * progress),
+        strokePaint,
+      );
+    }
 
-    for (final index in availableIndexes) {
+    for (var position = 0; position < availableIndexes.length; position++) {
+      final index = availableIndexes[position];
+      final revealAt = availableIndexes.length <= 1
+          ? 0.0
+          : position / (availableIndexes.length - 1);
+      if (revealAt > progress) {
+        continue;
+      }
       final point = points[index];
       final dx = chartRect.left +
           (chartRect.width * index / math.max(points.length - 1, 1));
@@ -269,10 +319,13 @@ class _TrendChartPainter extends CustomPainter {
       final dy = chartRect.bottom - 12 - usableHeight * ratio;
       canvas.drawCircle(Offset(dx, dy), 4, dotPaint);
     }
+    canvas.restore();
   }
 
   @override
   bool shouldRepaint(covariant _TrendChartPainter oldDelegate) {
-    return oldDelegate.points != points || oldDelegate.isBarChart != isBarChart;
+    return oldDelegate.points != points ||
+        oldDelegate.isBarChart != isBarChart ||
+        oldDelegate.progress != progress;
   }
 }

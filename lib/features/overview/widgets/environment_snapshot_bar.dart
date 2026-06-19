@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
 import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 
 const Color _envSurface = Color(0xFFF4EFE7);
@@ -96,7 +97,10 @@ class _EnvironmentItem extends StatelessWidget {
       ),
       child: Row(
         children: <Widget>[
-          Text(icon, style: const TextStyle(fontSize: 20)),
+          HealthAnimatedSwitcher(
+            childKey: ValueKey<String>(icon),
+            child: Text(icon, style: const TextStyle(fontSize: 20)),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -111,12 +115,15 @@ class _EnvironmentItem extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: _envText,
+                HealthAnimatedSwitcher(
+                  childKey: ValueKey<String>(value),
+                  child: Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: _envText,
+                    ),
                   ),
                 ),
               ],

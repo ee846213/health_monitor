@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:health_monitor/app/theme/health_motion_tokens.dart';
+import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
 import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 import 'package:health_monitor/features/overview/widgets/ai_suggestion_bubble.dart';
@@ -57,23 +59,38 @@ class _OverviewDashboardBody extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          const _PageHeader(),
+          const HealthStaggeredEntrance(
+            index: 0,
+            child: _PageHeader(),
+          ),
           const SizedBox(height: 20),
-          HealthScoreHero(
-            onTap: () => context.push('/trends'),
+          HealthStaggeredEntrance(
+            index: 1,
+            child: HealthScoreHero(
+              onTap: () => context.push('/trends'),
+            ),
           ),
           const _PreciseDetectionNoticeSection(),
           const _MissingDimensionsSection(),
           const SizedBox(height: 18),
-          MetricCards(
-            onStepTap: () => _showStepDetailSheet(context, ref),
-            onSedentaryTap: () => _showSedentaryDetailSheet(context, ref),
-            onScreenTap: () => _showScreenDetailSheet(context, ref),
+          HealthStaggeredEntrance(
+            index: 2,
+            child: MetricCards(
+              onStepTap: () => _showStepDetailSheet(context, ref),
+              onSedentaryTap: () => _showSedentaryDetailSheet(context, ref),
+              onScreenTap: () => _showScreenDetailSheet(context, ref),
+            ),
           ),
           const SizedBox(height: 18),
-          const EnvironmentSnapshotBar(),
+          const HealthStaggeredEntrance(
+            index: 3,
+            child: EnvironmentSnapshotBar(),
+          ),
           const SizedBox(height: 18),
-          const AiSuggestionBubble(),
+          const HealthStaggeredEntrance(
+            index: 4,
+            child: AiSuggestionBubble(),
+          ),
         ],
       ),
     );
@@ -158,14 +175,18 @@ class _PreciseDetectionNoticeSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final message = ref.watch(overviewPreciseDetectionNoticeTextProvider);
-    if (message == null || message.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Column(
-      children: <Widget>[
-        const SizedBox(height: 14),
-        _InfoBanner(message: message),
-      ],
+    return AnimatedSize(
+      duration: context.motionDuration(context.healthMotion.base),
+      curve: context.healthMotion.standardCurve,
+      alignment: Alignment.topCenter,
+      child: message == null || message.isEmpty
+          ? const SizedBox.shrink()
+          : Column(
+              children: <Widget>[
+                const SizedBox(height: 14),
+                _InfoBanner(message: message),
+              ],
+            ),
     );
   }
 }
@@ -176,14 +197,18 @@ class _MissingDimensionsSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final message = ref.watch(overviewMissingDimensionsTextProvider);
-    if (message == null || message.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Column(
-      children: <Widget>[
-        const SizedBox(height: 14),
-        _InfoBanner(message: message),
-      ],
+    return AnimatedSize(
+      duration: context.motionDuration(context.healthMotion.base),
+      curve: context.healthMotion.standardCurve,
+      alignment: Alignment.topCenter,
+      child: message == null || message.isEmpty
+          ? const SizedBox.shrink()
+          : Column(
+              children: <Widget>[
+                const SizedBox(height: 14),
+                _InfoBanner(message: message),
+              ],
+            ),
     );
   }
 }

@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:health_monitor/app/theme/health_motion_tokens.dart';
+import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
 import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
 import 'package:health_monitor/features/overview/providers/overview_detail_providers.dart';
 
@@ -158,13 +160,17 @@ class _StepBarChart extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      Container(
+                      HealthAnimatedValue(
                         key: ValueKey<String>('step-bar-${point.label}'),
-                        height: math.max(8, 120 * ratio),
-                        decoration: BoxDecoration(
-                          color: point.isToday ? _sheetSage : _sheetSageSoft,
-                          borderRadius: const BorderRadius.vertical(
-                            top: Radius.circular(8),
+                        value: ratio,
+                        duration: const Duration(milliseconds: 500),
+                        builder: (_, double value, __) => Container(
+                          height: math.max(8, 120 * value),
+                          decoration: BoxDecoration(
+                            color: point.isToday ? _sheetSage : _sheetSageSoft,
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(8),
+                            ),
                           ),
                         ),
                       ),
@@ -233,14 +239,18 @@ class _SedentaryTimeline extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: LinearProgressIndicator(
-                  key: ValueKey<DateTime>(item.startedAt),
-                  minHeight: 12,
-                  value: widthFactor,
-                  color: _sheetSand,
-                  backgroundColor: const Color(0xFFF2E9DE),
+              HealthAnimatedValue(
+                key: ValueKey<DateTime>(item.startedAt),
+                value: widthFactor,
+                duration: const Duration(milliseconds: 500),
+                builder: (_, double value, __) => ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    minHeight: 12,
+                    value: value,
+                    color: _sheetSand,
+                    backgroundColor: const Color(0xFFF2E9DE),
+                  ),
                 ),
               ),
             ],
@@ -289,14 +299,18 @@ class _ScreenUsageBars extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: LinearProgressIndicator(
-                    key: ValueKey<String>('screen-${bucket.label}'),
-                    minHeight: 12,
-                    value: ratio,
-                    color: bucket.label == '夜间' ? _sheetSage : _sheetBlue,
-                    backgroundColor: const Color(0xFFE8EEF0),
+                HealthAnimatedValue(
+                  key: ValueKey<String>('screen-${bucket.label}'),
+                  value: ratio,
+                  duration: const Duration(milliseconds: 500),
+                  builder: (_, double value, __) => ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      minHeight: 12,
+                      value: value,
+                      color: bucket.label == '夜间' ? _sheetSage : _sheetBlue,
+                      backgroundColor: const Color(0xFFE8EEF0),
+                    ),
                   ),
                 ),
               ],
@@ -360,33 +374,42 @@ class _DetailScaffold extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 16),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: _sheetText,
+              HealthStaggeredEntrance(
+                index: 0,
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: _sheetText,
+                  ),
                 ),
               ),
               const SizedBox(height: 10),
-              Text(
-                summary,
-                style: const TextStyle(
-                  fontSize: 14,
-                  height: 1.6,
-                  color: _sheetMuted,
+              HealthStaggeredEntrance(
+                index: 1,
+                child: Text(
+                  summary,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    height: 1.6,
+                    color: _sheetMuted,
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: _sheetLine),
+              HealthStaggeredEntrance(
+                index: 2,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: _sheetLine),
+                  ),
+                  child: child,
                 ),
-                child: child,
               ),
             ],
           ),
@@ -478,10 +501,19 @@ Future<void> showMetricDetailSheet(
   BuildContext context,
   Widget child,
 ) {
+  final duration = context.reduceMotion
+      ? const Duration(milliseconds: 80)
+      : context.healthMotion.emphasized;
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
+    sheetAnimationStyle: AnimationStyle(
+      duration: duration,
+      reverseDuration: context.reduceMotion
+          ? const Duration(milliseconds: 80)
+          : context.healthMotion.base,
+    ),
     builder: (BuildContext context) => child,
   );
 }

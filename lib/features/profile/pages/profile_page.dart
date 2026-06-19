@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/features/diagnostics/providers/diagnostics_providers.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
@@ -48,11 +49,20 @@ class ProfilePage extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                _MyRemindersCard(),
+                HealthStaggeredEntrance(
+                  index: 0,
+                  child: _MyRemindersCard(),
+                ),
                 SizedBox(height: 20),
-                DoNotDisturbSection(),
+                HealthStaggeredEntrance(
+                  index: 1,
+                  child: DoNotDisturbSection(),
+                ),
                 SizedBox(height: 20),
-                _PermissionStatusCard(),
+                HealthStaggeredEntrance(
+                  index: 2,
+                  child: _PermissionStatusCard(),
+                ),
               ],
             ),
           );
@@ -351,12 +361,15 @@ class _ActionRow extends StatelessWidget {
                 ],
               ),
             ),
-            Text(
-              actionLabel,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: _textMuted,
+            HealthAnimatedSwitcher(
+              childKey: ValueKey<String>(actionLabel),
+              child: Text(
+                actionLabel,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: _textMuted,
+                ),
               ),
             ),
           ],

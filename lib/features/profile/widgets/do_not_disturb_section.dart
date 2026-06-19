@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
 import 'package:health_monitor/domain/notification/notification_preference.dart';
 import 'package:health_monitor/features/profile/providers/notification_preference_provider.dart';
 
@@ -177,12 +178,15 @@ class _SettingRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    height: 1.5,
-                    color: _textSecondary,
+                HealthAnimatedSwitcher(
+                  childKey: ValueKey<String>(subtitle),
+                  child: Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: _textSecondary,
+                    ),
                   ),
                 ),
               ],
@@ -230,12 +234,15 @@ class _TimeSettingRow extends StatelessWidget {
                 ),
               ),
             ),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: _textSecondary,
+            HealthAnimatedSwitcher(
+              childKey: ValueKey<String>(value),
+              child: Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: _textSecondary,
+                ),
               ),
             ),
             const SizedBox(width: 8),

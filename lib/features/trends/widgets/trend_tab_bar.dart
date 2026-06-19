@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:health_monitor/app/theme/health_motion_tokens.dart';
 import 'package:health_monitor/domain/trends/trend_snapshot.dart';
 
 const Color _tabActive = Color(0xFF5F775F);
@@ -19,32 +20,62 @@ class TrendTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: TrendTab.values.map((TrendTab tab) {
-        final isSelected = tab == selectedTab;
-        return InkWell(
-          onTap: () => onSelected(tab),
-          borderRadius: BorderRadius.circular(18),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: isSelected ? _tabActiveSurface : _tabInactiveSurface,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: isSelected ? _tabActive : _tabLine),
+    final motion = context.healthMotion;
+    final selectedIndex = TrendTab.values.indexOf(selectedTab);
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: _tabInactiveSurface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _tabLine),
+      ),
+      child: Stack(
+        children: <Widget>[
+          AnimatedAlign(
+            alignment: Alignment(
+              -1 + selectedIndex * (2 / (TrendTab.values.length - 1)),
+              0,
             ),
-            child: Text(
-              _labelForTab(tab),
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: isSelected ? _tabActive : _tabInactiveText,
+            duration: context.motionDuration(motion.base),
+            curve: motion.standardCurve,
+            child: FractionallySizedBox(
+              widthFactor: 1 / TrendTab.values.length,
+              child: Container(
+                margin: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: _tabActiveSurface,
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: _tabActive),
+                ),
               ),
             ),
           ),
-        );
-      }).toList(growable: false),
+          Row(
+            children: TrendTab.values.map((TrendTab tab) {
+              final isSelected = tab == selectedTab;
+              return Expanded(
+                child: InkWell(
+                  key: ValueKey<String>('trend-tab-${tab.name}'),
+                  onTap: () => onSelected(tab),
+                  borderRadius: BorderRadius.circular(18),
+                  child: Center(
+                    child: AnimatedDefaultTextStyle(
+                      duration: context.motionDuration(motion.fast),
+                      curve: motion.standardCurve,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: isSelected ? _tabActive : _tabInactiveText,
+                      ),
+                      child: Text(_labelForTab(tab)),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(growable: false),
+          ),
+        ],
+      ),
     );
   }
 }

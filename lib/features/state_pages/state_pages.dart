@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
 
 const Color _surface = Color(0xFFFFFDF8);
@@ -33,56 +34,58 @@ class PermissionDeniedPage extends StatelessWidget {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(18, 6, 18, 24),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-          decoration: BoxDecoration(
-            color: _surface,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: _line),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              const Text(
-                '权限未开启',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: _dangerSoft,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                '还不能稳定判断你的活动节律。',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: _textPrimary,
-                  height: 1.15,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                '如果没有开启活动、位置或麦克风相关权限，应用仍能继续运行，但不会生成完整的久坐、姿势和环境相关建议。',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: _textSecondary,
-                  height: 1.55,
-                ),
-              ),
-              const SizedBox(height: 18),
-              _ActionBlock(
-                children: <Widget>[
-                  _ActionRow(
-                    title: '返回我的页面',
-                    subtitle: '先查看哪些能力未开启，再决定是否补开权限。',
-                    actionLabel: '去查看',
-                    onTap: () => context.go('/profile'),
+        child: HealthStaggeredEntrance(
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+            decoration: BoxDecoration(
+              color: _surface,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: _line),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                const Text(
+                  '权限未开启',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _dangerSoft,
                   ),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  '还不能稳定判断你的活动节律。',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: _textPrimary,
+                    height: 1.15,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '如果没有开启活动、位置或麦克风相关权限，应用仍能继续运行，但不会生成完整的久坐、姿势和环境相关建议。',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: _textSecondary,
+                    height: 1.55,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                _ActionBlock(
+                  children: <Widget>[
+                    _ActionRow(
+                      title: '返回我的页面',
+                      subtitle: '先查看哪些能力未开启，再决定是否补开权限。',
+                      actionLabel: '去查看',
+                      onTap: () => context.go('/profile'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -111,64 +114,66 @@ class DataInsufficientPage extends StatelessWidget {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(18, 6, 18, 24),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-          decoration: BoxDecoration(
-            color: _surface,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: _line),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Container(
-                height: 120,
-                decoration: BoxDecoration(
-                  color: _sageSoft,
-                  borderRadius: BorderRadius.circular(24),
+        child: HealthStaggeredEntrance(
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+            decoration: BoxDecoration(
+              color: _surface,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: _line),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Container(
+                  height: 120,
+                  decoration: BoxDecoration(
+                    color: _sageSoft,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Text(
+                    '今日样本仍在积累',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: _sageDeep,
+                    ),
+                  ),
                 ),
-                alignment: Alignment.center,
-                child: const Text(
-                  '今日样本仍在积累',
+                const SizedBox(height: 16),
+                const Text(
+                  '今天的数据还不够，我们先不急着下结论。',
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: 24,
                     fontWeight: FontWeight.w700,
-                    color: _sageDeep,
+                    color: _textPrimary,
+                    height: 1.15,
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                '今天的数据还不够，我们先不急着下结论。',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: _textPrimary,
-                  height: 1.15,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                '继续正常使用手机，让活动、姿势、位置和看屏样本再积累一段时间，首页和简报会自动切换成真实结果。',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: _textSecondary,
-                  height: 1.55,
-                ),
-              ),
-              const SizedBox(height: 16),
-              _ActionBlock(
-                children: <Widget>[
-                  _ActionRow(
-                    title: '查看采集调试页',
-                    subtitle: '如果想确认采集链路是否正常，可以直接看实时样本和写入状态。',
-                    actionLabel: '去诊断',
-                    onTap: () => context.go('/diagnostics'),
+                const SizedBox(height: 8),
+                const Text(
+                  '继续正常使用手机，让活动、姿势、位置和看屏样本再积累一段时间，首页和简报会自动切换成真实结果。',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: _textSecondary,
+                    height: 1.55,
                   ),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: 16),
+                _ActionBlock(
+                  children: <Widget>[
+                    _ActionRow(
+                      title: '查看采集调试页',
+                      subtitle: '如果想确认采集链路是否正常，可以直接看实时样本和写入状态。',
+                      actionLabel: '去诊断',
+                      onTap: () => context.go('/diagnostics'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -211,45 +216,48 @@ class ReminderExplanationPage extends StatelessWidget {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(18, 6, 18, 24),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: _surface,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: _line),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                timeLabel,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: _textMuted,
+        child: HealthStaggeredEntrance(
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: _surface,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(color: _line),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  timeLabel,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: _textMuted,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                record.message,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: _textPrimary,
-                  height: 1.18,
+                const SizedBox(height: 4),
+                Text(
+                  record.message,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: _textPrimary,
+                    height: 1.18,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              _ExplanationBlock(title: '触发依据', content: record.reasonSummary),
-              const SizedBox(height: 8),
-              const _ExplanationBlock(
-                title: '为什么是现在',
-                content: '这条提醒来自本轮规则计算中最靠前的提醒结论，页面会优先展示当前最值得处理的风险。',
-              ),
-              const SizedBox(height: 8),
-              _ExplanationBlock(title: '建议动作', content: record.actionSuggestion),
-            ],
+                const SizedBox(height: 14),
+                _ExplanationBlock(title: '触发依据', content: record.reasonSummary),
+                const SizedBox(height: 8),
+                const _ExplanationBlock(
+                  title: '为什么是现在',
+                  content: '这条提醒来自本轮规则计算中最靠前的提醒结论，页面会优先展示当前最值得处理的风险。',
+                ),
+                const SizedBox(height: 8),
+                _ExplanationBlock(
+                    title: '建议动作', content: record.actionSuggestion),
+              ],
+            ),
           ),
         ),
       ),

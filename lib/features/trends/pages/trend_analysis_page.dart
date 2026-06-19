@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
 import 'package:health_monitor/domain/trends/trend_snapshot.dart';
 import 'package:health_monitor/features/trends/providers/trend_analysis_provider.dart';
 import 'package:health_monitor/features/trends/widgets/trend_chart_panel.dart';
@@ -20,13 +21,38 @@ class TrendAnalysisPage extends ConsumerWidget {
     return Scaffold(
       backgroundColor: _pageSurface,
       appBar: AppBar(
-        title: const Text(
-          '趋势分析',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: _pageText,
-          ),
+        title: Row(
+          children: <Widget>[
+            Hero(
+              tag: 'health-score-hero',
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEEF3EA),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: const Color(0xFF5E775F)),
+                  ),
+                  child: const Icon(
+                    Icons.insights_rounded,
+                    size: 19,
+                    color: Color(0xFF5E775F),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              '趋势分析',
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: _pageText,
+              ),
+            ),
+          ],
         ),
         backgroundColor: _pageSurface,
         surfaceTintColor: Colors.transparent,
@@ -37,25 +63,37 @@ class TrendAnalysisPage extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              const Text(
-                '近 7 天趋势会默认从步数开始，你也可以切换查看久坐、屏幕与环境健康分。',
-                style: TextStyle(
-                  fontSize: 14,
-                  height: 1.7,
-                  color: _pageMuted,
+              const HealthStaggeredEntrance(
+                index: 0,
+                child: Text(
+                  '近 7 天趋势会默认从步数开始，你也可以切换查看久坐、屏幕与环境健康分。',
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.7,
+                    color: _pageMuted,
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
-              TrendTabBar(
-                selectedTab: selectedTab,
-                onSelected: (TrendTab tab) {
-                  ref.read(trendSelectedTabProvider.notifier).state = tab;
-                },
+              HealthStaggeredEntrance(
+                index: 1,
+                child: TrendTabBar(
+                  selectedTab: selectedTab,
+                  onSelected: (TrendTab tab) {
+                    ref.read(trendSelectedTabProvider.notifier).state = tab;
+                  },
+                ),
               ),
               const SizedBox(height: 18),
-              const _TrendChartSection(),
+              const HealthStaggeredEntrance(
+                index: 2,
+                child: _TrendChartSection(),
+              ),
               const SizedBox(height: 18),
-              const _TrendInsightSection(),
+              const HealthStaggeredEntrance(
+                index: 3,
+                child: _TrendInsightSection(),
+              ),
             ],
           ),
         ),
@@ -77,7 +115,10 @@ class _TrendChartSection extends ConsumerWidget {
         message: '趋势图加载失败',
         height: 160,
       ),
-      data: (TrendSnapshot value) => TrendChartPanel(snapshot: value),
+      data: (TrendSnapshot value) => HealthAnimatedSwitcher(
+        childKey: ValueKey<TrendTab>(value.selectedTab),
+        child: TrendChartPanel(snapshot: value),
+      ),
     );
   }
 }
@@ -95,7 +136,11 @@ class _TrendInsightSection extends ConsumerWidget {
         message: '洞察加载失败',
         height: 120,
       ),
-      data: (String text) => TrendInsightPanel(text: text),
+      data: (String text) => HealthAnimatedSwitcher(
+        childKey: ValueKey<String>(text),
+        duration: const Duration(milliseconds: 320),
+        child: TrendInsightPanel(text: text),
+      ),
     );
   }
 }
