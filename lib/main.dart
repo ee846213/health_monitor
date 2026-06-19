@@ -5,11 +5,11 @@ import 'package:health_monitor/storage/isar/app_isar.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final isar = await initializeAppIsar();
+  final isarFuture = initializeAppIsar();
   runApp(
     ProviderScope(
       overrides: <Override>[
-        appIsarProvider.overrideWith((Ref ref) async => isar),
+        appIsarProvider.overrideWith((Ref ref) => isarFuture),
       ],
       child: const HealthMonitorApp(),
     ),

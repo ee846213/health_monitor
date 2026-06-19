@@ -4,6 +4,8 @@ import 'package:health_monitor/storage/repositories/date_key.dart';
 import 'package:isar/isar.dart';
 
 abstract class MetricsRepository {
+  Future<DailyMetrics?> getByDate(DateTime date);
+
   Future<List<DailyMetrics>> listRecentDays(
     int days, {
     required DateTime referenceDate,
@@ -16,10 +18,21 @@ class InMemoryMetricsRepository implements MetricsRepository {
   InMemoryMetricsRepository({
     required List<DailyMetrics> metrics,
   }) : _metrics = <DailyMetrics>[
-         ...metrics,
-       ];
+          ...metrics,
+        ];
 
   final List<DailyMetrics> _metrics;
+
+  @override
+  Future<DailyMetrics?> getByDate(DateTime date) async {
+    final key = DateKey.fromDate(date);
+    for (final item in _metrics) {
+      if (DateKey.fromDate(item.date) == key) {
+        return item;
+      }
+    }
+    return null;
+  }
 
   @override
   Future<List<DailyMetrics>> listRecentDays(
@@ -27,7 +40,9 @@ class InMemoryMetricsRepository implements MetricsRepository {
     required DateTime referenceDate,
   }) async {
     final keys = DateKey.recentDays(days, referenceDate: referenceDate).toSet();
-    final result = _metrics.where((item) => keys.contains(DateKey.fromDate(item.date))).toList();
+    final result = _metrics
+        .where((item) => keys.contains(DateKey.fromDate(item.date)))
+        .toList();
     result.sort((left, right) => left.date.compareTo(right.date));
     return result;
   }
@@ -46,15 +61,30 @@ class IsarMetricsRepository implements MetricsRepository {
   final Future<Isar> _isarFuture;
 
   @override
+  Future<DailyMetrics?> getByDate(DateTime date) async {
+    final isar = await _isarFuture;
+    final record = await isar.dailyMetricsRecords
+        .filter()
+        .dateKeyEqualTo(DateKey.fromDate(date))
+        .findFirst();
+    return record?.toDomain();
+  }
+
+  @override
   Future<List<DailyMetrics>> listRecentDays(
     int days, {
     required DateTime referenceDate,
   }) async {
     final isar = await _isarFuture;
     final keys = DateKey.recentDays(days, referenceDate: referenceDate);
-    final records = await isar.dailyMetricsRecords.where().anyId().findAll();
+    final records = await isar.dailyMetricsRecords
+        .filter()
+        .anyOf(
+          keys,
+          (query, String key) => query.dateKeyEqualTo(key),
+        )
+        .findAll();
     final result = records
-        .where((record) => keys.contains(record.dateKey))
         .map((DailyMetricsRecord record) => record.toDomain())
         .toList(growable: false);
     result.sort((left, right) => left.date.compareTo(right.date));
@@ -65,14 +95,15 @@ class IsarMetricsRepository implements MetricsRepository {
   Future<void> upsertMetrics(DailyMetrics metrics) async {
     final isar = await _isarFuture;
     final record = DailyMetricsRecord.fromDomain(metrics);
-    final existing = await isar.dailyMetricsRecords
-        .filter()
-        .dateKeyEqualTo(record.dateKey)
-        .findAll();
-
     await isar.writeTxn(() async {
+      final existing = await isar.dailyMetricsRecords
+          .filter()
+          .dateKeyEqualTo(record.dateKey)
+          .findAll();
       if (existing.isNotEmpty) {
-        await isar.dailyMetricsRecords.deleteAll(existing.map((item) => item.id).toList(growable: false));
+        await isar.dailyMetricsRecords.deleteAll(
+          existing.map((item) => item.id).toList(growable: false),
+        );
       }
       await isar.dailyMetricsRecords.put(record);
     });

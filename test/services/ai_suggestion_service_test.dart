@@ -129,6 +129,14 @@ void main() {
       'gpt-5.5',
     );
     expect(
+      (requestData as Map<String, dynamic>)['input'] as String,
+      contains('建议要优先围绕步数、整体活动、久坐、屏幕使用、环境噪音这些可解释的日常指标。'),
+    );
+    expect(
+      (requestData as Map<String, dynamic>)['input'] as String,
+      contains('本次优先关注：步数、整体活动、久坐、屏幕使用、环境噪音。'),
+    );
+    expect(
       await cacheRepository.readForDate(DateTime(2026, 6, 16, 18)),
       '今天的节奏不错，晚饭后散步 15 分钟会更稳。',
     );

@@ -59,7 +59,21 @@ const DailyMetricsRecordSchema = CollectionSchema(
   deserialize: _dailyMetricsRecordDeserialize,
   deserializeProp: _dailyMetricsRecordDeserializeProp,
   idName: r'id',
-  indexes: {},
+  indexes: {
+    r'dateKey': IndexSchema(
+      id: 7975223786082927131,
+      name: r'dateKey',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'dateKey',
+          type: IndexType.hash,
+          caseSensitive: true,
+        )
+      ],
+    )
+  },
   links: {},
   embeddedSchemas: {},
   getId: _dailyMetricsRecordGetId,
@@ -227,6 +241,51 @@ extension DailyMetricsRecordQueryWhere
         upper: upperId,
         includeUpper: includeUpper,
       ));
+    });
+  }
+
+  QueryBuilder<DailyMetricsRecord, DailyMetricsRecord, QAfterWhereClause>
+      dateKeyEqualTo(String dateKey) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'dateKey',
+        value: [dateKey],
+      ));
+    });
+  }
+
+  QueryBuilder<DailyMetricsRecord, DailyMetricsRecord, QAfterWhereClause>
+      dateKeyNotEqualTo(String dateKey) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'dateKey',
+              lower: [],
+              upper: [dateKey],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'dateKey',
+              lower: [dateKey],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'dateKey',
+              lower: [dateKey],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'dateKey',
+              lower: [],
+              upper: [dateKey],
+              includeUpper: false,
+            ));
+      }
     });
   }
 }

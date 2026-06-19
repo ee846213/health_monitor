@@ -44,7 +44,21 @@ const AmbientLightSampleRecordSchema = CollectionSchema(
   deserialize: _ambientLightSampleRecordDeserialize,
   deserializeProp: _ambientLightSampleRecordDeserializeProp,
   idName: r'id',
-  indexes: {},
+  indexes: {
+    r'capturedAt': IndexSchema(
+      id: 7947551681198035194,
+      name: r'capturedAt',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'capturedAt',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
+    )
+  },
   links: {},
   embeddedSchemas: {},
   getId: _ambientLightSampleRecordGetId,
@@ -132,6 +146,15 @@ extension AmbientLightSampleRecordQueryWhereSort on QueryBuilder<
       return query.addWhereClause(const IdWhereClause.any());
     });
   }
+
+  QueryBuilder<AmbientLightSampleRecord, AmbientLightSampleRecord, QAfterWhere>
+      anyCapturedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'capturedAt'),
+      );
+    });
+  }
 }
 
 extension AmbientLightSampleRecordQueryWhere on QueryBuilder<
@@ -199,6 +222,99 @@ extension AmbientLightSampleRecordQueryWhere on QueryBuilder<
         lower: lowerId,
         includeLower: includeLower,
         upper: upperId,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<AmbientLightSampleRecord, AmbientLightSampleRecord,
+      QAfterWhereClause> capturedAtEqualTo(DateTime capturedAt) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'capturedAt',
+        value: [capturedAt],
+      ));
+    });
+  }
+
+  QueryBuilder<AmbientLightSampleRecord, AmbientLightSampleRecord,
+      QAfterWhereClause> capturedAtNotEqualTo(DateTime capturedAt) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'capturedAt',
+              lower: [],
+              upper: [capturedAt],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'capturedAt',
+              lower: [capturedAt],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'capturedAt',
+              lower: [capturedAt],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'capturedAt',
+              lower: [],
+              upper: [capturedAt],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<AmbientLightSampleRecord, AmbientLightSampleRecord,
+      QAfterWhereClause> capturedAtGreaterThan(
+    DateTime capturedAt, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'capturedAt',
+        lower: [capturedAt],
+        includeLower: include,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<AmbientLightSampleRecord, AmbientLightSampleRecord,
+      QAfterWhereClause> capturedAtLessThan(
+    DateTime capturedAt, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'capturedAt',
+        lower: [],
+        upper: [capturedAt],
+        includeUpper: include,
+      ));
+    });
+  }
+
+  QueryBuilder<AmbientLightSampleRecord, AmbientLightSampleRecord,
+      QAfterWhereClause> capturedAtBetween(
+    DateTime lowerCapturedAt,
+    DateTime upperCapturedAt, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'capturedAt',
+        lower: [lowerCapturedAt],
+        includeLower: includeLower,
+        upper: [upperCapturedAt],
         includeUpper: includeUpper,
       ));
     });

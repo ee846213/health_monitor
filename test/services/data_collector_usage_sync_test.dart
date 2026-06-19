@@ -2,7 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:health_monitor/domain/environment/ambient_light_sample.dart';
+import 'package:health_monitor/domain/environment/noise_sample.dart';
 import 'package:health_monitor/domain/metrics/daily_metrics.dart';
+import 'package:health_monitor/domain/motion/activity_sample.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
 import 'package:health_monitor/services/ambient_light_capture_service.dart';
 import 'package:health_monitor/services/android_usage_stats_bridge.dart';
@@ -14,6 +17,7 @@ import 'package:health_monitor/services/noise_capture_service.dart';
 import 'package:health_monitor/services/platform_bridge_service.dart';
 import 'package:health_monitor/services/step_counter_service.dart';
 import 'package:health_monitor/storage/repositories/metrics_repository.dart';
+import 'package:health_monitor/storage/repositories/query_window.dart';
 import 'package:health_monitor/storage/repositories/usage_summary_repository.dart';
 
 void main() {
@@ -584,10 +588,173 @@ void main() {
     );
     expect(metrics.single.stepCount, 4321);
   });
+
+  test('高频采集缓冲区达到上限时保持有界且记录丢弃计数', () async {
+    final motionController = StreamController<MotionVectorSample>();
+    final collector = DataCollector(
+      activityRepository: SharedActivityRepository(),
+      ambientLightRepository: SharedAmbientLightRepository(),
+      noiseRepository: SharedNoiseRepository(),
+      locationRepository: SharedLocationRepository(),
+      usageRepository: SharedUsageRepository(),
+      metricsRepository: SharedMetricsRepository(),
+      motionCaptureService: MotionCaptureService(
+        sensorStreamFactory: ({
+          Duration samplingPeriod = const Duration(milliseconds: 200),
+        }) =>
+            motionController.stream,
+      ),
+      ambientLightCaptureService:
+          AmbientLightCaptureService(isAndroid: () => false),
+      stepCounterService: StepCounterService(isAndroid: () => false),
+      noiseCaptureService: NoiseCaptureService(
+        noiseStreamFactory: () => const Stream<NoiseReadingSample>.empty(),
+      ),
+      locationCaptureService: LocationCaptureService(
+        positionStreamFactory: ({
+          Duration samplingPeriod = const Duration(seconds: 30),
+        }) =>
+            const Stream<GeoPositionSample>.empty(),
+        isLocationServiceEnabled: () async => true,
+        checkPermission: () async => GeoPermissionStatus.allowed,
+        requestPermission: () async => GeoPermissionStatus.allowed,
+      ),
+      androidUsageStatsBridge: AndroidUsageStatsBridge(isAndroid: () => false),
+      digitalUsageCaptureService: DigitalUsageCaptureService(
+        lifecycleEventStreamFactory: () => const Stream<AppUsageEvent>.empty(),
+      ),
+      dailyMetricsRefreshInterval: const Duration(days: 1),
+      maxBufferedSamplesPerStream: 3,
+    );
+    addTearDown(collector.dispose);
+    addTearDown(motionController.close);
+
+    collector.start();
+    final start = DateTime(2026, 6, 18, 10);
+    for (var index = 0; index < 8; index += 1) {
+      motionController.add(
+        MotionVectorSample(
+          capturedAt: start.add(Duration(seconds: index)),
+          x: 0,
+          y: 0,
+          z: 9.8,
+        ),
+      );
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+
+    expect(collector.performanceStats.bufferedSamples, 3);
+    expect(collector.performanceStats.droppedSamples, greaterThan(0));
+  });
+
+  test('启动后清理超过 9 天的活动、噪音和光照原始样本', () async {
+    final now = DateTime.now();
+    final oldAt = now.subtract(const Duration(days: 10));
+    final recentAt = now.subtract(const Duration(days: 8));
+    final activityRepository = SharedActivityRepository()
+      ..addSample(
+        ActivitySample(
+          capturedAt: oldAt,
+          duration: const Duration(seconds: 1),
+          type: ActivityType.walking,
+          confidence: 0.9,
+          stepCount: 0,
+          source: MotionSampleSource.sensorFusion,
+        ),
+      )
+      ..addSample(
+        ActivitySample(
+          capturedAt: recentAt,
+          duration: const Duration(seconds: 1),
+          type: ActivityType.walking,
+          confidence: 0.9,
+          stepCount: 0,
+          source: MotionSampleSource.sensorFusion,
+        ),
+      );
+    final noiseRepository = SharedNoiseRepository()
+      ..addSample(
+        NoiseSample.fromDecibel(
+          capturedAt: oldAt,
+          duration: const Duration(seconds: 1),
+          decibel: 45,
+        ),
+      )
+      ..addSample(
+        NoiseSample.fromDecibel(
+          capturedAt: recentAt,
+          duration: const Duration(seconds: 1),
+          decibel: 45,
+        ),
+      );
+    final lightRepository = SharedAmbientLightRepository()
+      ..addSample(
+        AmbientLightSample.fromLux(
+          capturedAt: oldAt,
+          duration: const Duration(seconds: 1),
+          lux: 100,
+        ),
+      )
+      ..addSample(
+        AmbientLightSample.fromLux(
+          capturedAt: recentAt,
+          duration: const Duration(seconds: 1),
+          lux: 100,
+        ),
+      );
+    final collector = DataCollector(
+      activityRepository: activityRepository,
+      ambientLightRepository: lightRepository,
+      noiseRepository: noiseRepository,
+      locationRepository: SharedLocationRepository(),
+      usageRepository: SharedUsageRepository(),
+      metricsRepository: SharedMetricsRepository(),
+      motionCaptureService: MotionCaptureService(
+        sensorStreamFactory: ({
+          Duration samplingPeriod = const Duration(milliseconds: 200),
+        }) =>
+            const Stream<MotionVectorSample>.empty(),
+      ),
+      ambientLightCaptureService:
+          AmbientLightCaptureService(isAndroid: () => false),
+      stepCounterService: StepCounterService(isAndroid: () => false),
+      noiseCaptureService: NoiseCaptureService(
+        noiseStreamFactory: () => const Stream<NoiseReadingSample>.empty(),
+      ),
+      locationCaptureService: LocationCaptureService(
+        positionStreamFactory: ({
+          Duration samplingPeriod = const Duration(seconds: 30),
+        }) =>
+            const Stream<GeoPositionSample>.empty(),
+        isLocationServiceEnabled: () async => true,
+        checkPermission: () async => GeoPermissionStatus.allowed,
+        requestPermission: () async => GeoPermissionStatus.allowed,
+      ),
+      androidUsageStatsBridge: AndroidUsageStatsBridge(isAndroid: () => false),
+      digitalUsageCaptureService: DigitalUsageCaptureService(
+        lifecycleEventStreamFactory: () => const Stream<AppUsageEvent>.empty(),
+      ),
+    );
+    addTearDown(collector.dispose);
+
+    collector.start();
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    final window = QueryWindow.recentCalendarDays(
+      20,
+      referenceDate: now,
+    );
+
+    expect(await activityRepository.listByWindow(window), hasLength(1));
+    expect(await noiseRepository.listByWindow(window), hasLength(1));
+    expect(await lightRepository.listByWindow(window), hasLength(1));
+  });
 }
 
 class _CountingMetricsRepository implements MetricsRepository {
   int upsertCount = 0;
+
+  @override
+  Future<DailyMetrics?> getByDate(DateTime date) async => null;
 
   @override
   Future<List<DailyMetrics>> listRecentDays(

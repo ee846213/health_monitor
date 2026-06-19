@@ -39,6 +39,16 @@ class DashboardService {
       window: QueryWindow.recentDay(referenceTime: referenceTime),
       referenceTime: referenceTime,
     );
+    return buildFromInsight(
+      insight: insight,
+      referenceTime: referenceTime,
+    );
+  }
+
+  Future<DashboardSnapshot> buildFromInsight({
+    required HealthInsightSnapshot insight,
+    required DateTime referenceTime,
+  }) async {
     final healthScore = calculateHealthScore(
       stepCount: insight.metrics.stepCount,
       sedentaryMinutes: insight.metrics.sedentaryMinutes,

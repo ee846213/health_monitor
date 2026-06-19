@@ -55,6 +55,13 @@ class SharedActivityRepository extends InMemoryActivityRepository {
     result.sort((left, right) => left.capturedAt.compareTo(right.capturedAt));
     return result;
   }
+
+  @override
+  Future<int> deleteBefore(DateTime cutoff) async {
+    final before = _buffer.length;
+    _buffer.removeWhere((sample) => sample.capturedAt.isBefore(cutoff));
+    return before - _buffer.length;
+  }
 }
 
 class SharedNoiseRepository extends InMemoryNoiseSampleRepository {
@@ -72,6 +79,13 @@ class SharedNoiseRepository extends InMemoryNoiseSampleRepository {
         _buffer.where((sample) => window.contains(sample.capturedAt)).toList();
     result.sort((left, right) => left.capturedAt.compareTo(right.capturedAt));
     return result;
+  }
+
+  @override
+  Future<int> deleteBefore(DateTime cutoff) async {
+    final before = _buffer.length;
+    _buffer.removeWhere((sample) => sample.capturedAt.isBefore(cutoff));
+    return before - _buffer.length;
   }
 }
 
@@ -96,6 +110,13 @@ class SharedAmbientLightRepository
           left.capturedAt.compareTo(right.capturedAt),
     );
     return result;
+  }
+
+  @override
+  Future<int> deleteBefore(DateTime cutoff) async {
+    final before = _buffer.length;
+    _buffer.removeWhere((sample) => sample.capturedAt.isBefore(cutoff));
+    return before - _buffer.length;
   }
 }
 
@@ -141,6 +162,15 @@ class SharedUsageRepository extends InMemoryUsageSummaryRepository {
   Future<DigitalUsageSummary?> getByDate(DateTime date) async {
     return _dailySummaries[_dayKey(date)];
   }
+
+  @override
+  Future<List<DigitalUsageSummary>> listByWindow(QueryWindow window) async {
+    final summaries = _dailySummaries.values
+        .where((summary) => window.contains(summary.date))
+        .toList(growable: false);
+    summaries.sort((left, right) => left.date.compareTo(right.date));
+    return summaries;
+  }
 }
 
 class SharedMetricsRepository extends InMemoryMetricsRepository {
@@ -153,6 +183,11 @@ class SharedMetricsRepository extends InMemoryMetricsRepository {
   }
 
   final Map<String, DailyMetrics> _dailyMetrics = <String, DailyMetrics>{};
+
+  @override
+  Future<DailyMetrics?> getByDate(DateTime date) async {
+    return _dailyMetrics[_dayKey(date)];
+  }
 
   @override
   Future<List<DailyMetrics>> listRecentDays(
@@ -201,6 +236,12 @@ final usageSummaryRepositoryProvider = sharedUsageRepo;
 final metricsRepositoryProvider = sharedMetricsRepo;
 
 final dataCollectorRevisionProvider = StateProvider<int>((Ref ref) => 0);
+final dataCollectorMetricsRevisionProvider = StateProvider<int>((Ref ref) => 0);
+final dataCollectorEnvironmentRevisionProvider =
+    StateProvider<int>((Ref ref) => 0);
+final dataCollectorUsageRevisionProvider = StateProvider<int>((Ref ref) => 0);
+final dataCollectorReminderRevisionProvider =
+    StateProvider<int>((Ref ref) => 0);
 final dataCollectorDailyRevisionProvider =
     StateProvider<Map<String, int>>((Ref ref) => <String, int>{});
 
@@ -334,6 +375,20 @@ class _DailyMetricsSignature {
       );
 }
 
+class DataCollectorPerformanceStats {
+  const DataCollectorPerformanceStats({
+    required this.bufferedSamples,
+    required this.droppedSamples,
+    required this.completedFlushes,
+    required this.flushRunning,
+  });
+
+  final int bufferedSamples;
+  final int droppedSamples;
+  final int completedFlushes;
+  final bool flushRunning;
+}
+
 class DataCollector {
   DataCollector({
     required this.activityRepository,
@@ -354,10 +409,16 @@ class DataCollector {
     CaptureHealthService? captureHealthService,
     DataCollectorRevisionCallback? onDataChanged,
     DataCollectorDayRevisionCallback? onDayChanged,
+    DataCollectorRevisionCallback? onMetricsChanged,
+    DataCollectorRevisionCallback? onEnvironmentChanged,
+    DataCollectorRevisionCallback? onUsageChanged,
+    DataCollectorRevisionCallback? onRemindersChanged,
     Future<void> Function(DateTime referenceTime)? persistRuleReminders,
     Future<void> Function(DateTime referenceTime)? deliverRuleReminders,
     Future<int> Function()? syncNativeRiskEvents,
-    Duration dailyMetricsRefreshInterval = const Duration(seconds: 2),
+    Duration dailyMetricsRefreshInterval = const Duration(seconds: 30),
+    int maxBufferedSamplesPerStream = 120,
+    Duration rawSampleRetention = const Duration(days: 9),
   })  : _motionCaptureService = motionCaptureService ?? MotionCaptureService(),
         ambientLightRepository = ambientLightRepository ??
             InMemoryAmbientLightSampleRepository(
@@ -387,10 +448,16 @@ class DataCollector {
             ),
         _onDataChanged = onDataChanged,
         _onDayChanged = onDayChanged,
+        _onMetricsChanged = onMetricsChanged,
+        _onEnvironmentChanged = onEnvironmentChanged,
+        _onUsageChanged = onUsageChanged,
+        _onRemindersChanged = onRemindersChanged,
         _persistRuleReminders = persistRuleReminders,
         _deliverRuleReminders = deliverRuleReminders,
         _syncNativeRiskEvents = syncNativeRiskEvents,
-        _dailyMetricsRefreshInterval = dailyMetricsRefreshInterval;
+        _batchFlushInterval = dailyMetricsRefreshInterval,
+        _maxBufferedSamplesPerStream = maxBufferedSamplesPerStream,
+        _rawSampleRetention = rawSampleRetention;
 
   final ActivityRepository activityRepository;
   final AmbientLightSampleRepository ambientLightRepository;
@@ -409,24 +476,52 @@ class DataCollector {
   final CaptureHealthService _captureHealthService;
   final DataCollectorRevisionCallback? _onDataChanged;
   final DataCollectorDayRevisionCallback? _onDayChanged;
+  final DataCollectorRevisionCallback? _onMetricsChanged;
+  final DataCollectorRevisionCallback? _onEnvironmentChanged;
+  final DataCollectorRevisionCallback? _onUsageChanged;
+  final DataCollectorRevisionCallback? _onRemindersChanged;
   final Future<void> Function(DateTime referenceTime)? _persistRuleReminders;
   final Future<void> Function(DateTime referenceTime)? _deliverRuleReminders;
   final Future<int> Function()? _syncNativeRiskEvents;
-  final Duration _dailyMetricsRefreshInterval;
-  final List<StreamSubscription<dynamic>> _subscriptions =
+  final Duration _batchFlushInterval;
+  final int _maxBufferedSamplesPerStream;
+  final Duration _rawSampleRetention;
+  final List<StreamSubscription<dynamic>> _captureSubscriptions =
       <StreamSubscription<dynamic>>[];
+  final List<ActivitySample> _activityBuffer = <ActivitySample>[];
+  final List<NoiseSample> _noiseBuffer = <NoiseSample>[];
+  final List<AmbientLightSample> _lightBuffer = <AmbientLightSample>[];
+  final Map<String, LocationSummary> _locationBuffer =
+      <String, LocationSummary>{};
   bool _started = false;
+  bool _foregroundCaptureActive = false;
   _DailyMetricsSignature? _lastDailyMetricsSignature;
   StepCountState? _latestStepCountState;
   StreamSubscription<DigitalUsageSummary>? _usageSummarySubscription;
   AndroidUsageCapabilityStatus? _latestUsageCapabilityStatus;
   Future<void>? _usageSummarySyncFuture;
+  Future<void>? _riskEventSyncFuture;
   final Map<String, DateTime> _lastSampleAtByStreamKey = <String, DateTime>{};
   final Set<String> _startedStreamKeys = <String>{};
-  final Map<String, DateTime> _pendingDailyMetricsRefreshes =
-      <String, DateTime>{};
-  Timer? _dailyMetricsRefreshTimer;
-  bool _dailyMetricsRefreshRunning = false;
+  Timer? _batchFlushTimer;
+  Future<void> _flushSerial = Future<void>.value();
+  bool _flushRunning = false;
+  int _droppedSamples = 0;
+  int _completedFlushes = 0;
+  bool _overflowReported = false;
+  String? _lastCleanupDateKey;
+  DateTime? _lastReminderEvaluationAt;
+  final Map<String, String> _lastLocationSignatureByDay = <String, String>{};
+
+  DataCollectorPerformanceStats get performanceStats {
+    return DataCollectorPerformanceStats(
+      bufferedSamples:
+          _activityBuffer.length + _noiseBuffer.length + _lightBuffer.length,
+      droppedSamples: _droppedSamples,
+      completedFlushes: _completedFlushes,
+      flushRunning: _flushRunning,
+    );
+  }
 
   void start() {
     if (_started) {
@@ -441,13 +536,22 @@ class DataCollector {
     _markStreamStarted(streamNativeRisk);
     unawaited(syncNativeRiskEvents());
     unawaited(syncUsageSummary());
+    unawaited(_rebuildDailyMetrics(DateTime.now()));
+    unawaited(_runRetentionCleanupIfNeeded(DateTime.now()));
+    resumeForegroundCapture();
+    unawaited(_ensureUsageCollectionInitialized());
+  }
 
-    _subscriptions.add(
+  void resumeForegroundCapture() {
+    if (!_started || _foregroundCaptureActive) {
+      return;
+    }
+    _foregroundCaptureActive = true;
+    _captureSubscriptions.add(
       _motionCaptureService.watchActivitySamples().listen(
-        (ActivitySample sample) async {
-          await _observeSample(streamMotion, sample.capturedAt);
-          await activityRepository.saveAll(<ActivitySample>[sample]);
-          _scheduleDailyMetricsRefresh(sample.capturedAt);
+        (ActivitySample sample) {
+          _addBounded(_activityBuffer, sample, streamMotion);
+          _scheduleBatchFlush();
         },
         onError: (Object error, StackTrace stackTrace) {
           unawaited(
@@ -460,12 +564,11 @@ class DataCollector {
         },
       ),
     );
-    _subscriptions.add(
+    _captureSubscriptions.add(
       _ambientLightCaptureService.watchAmbientLightSamples().listen(
-        (AmbientLightSample sample) async {
-          await _observeSample(streamLight, sample.capturedAt);
-          await ambientLightRepository.saveAll(<AmbientLightSample>[sample]);
-          _scheduleDailyMetricsRefresh(sample.capturedAt);
+        (AmbientLightSample sample) {
+          _addBounded(_lightBuffer, sample, streamLight);
+          _scheduleBatchFlush();
         },
         onError: (Object error, StackTrace stackTrace) {
           unawaited(
@@ -478,15 +581,14 @@ class DataCollector {
         },
       ),
     );
-    _subscriptions.add(
+    _captureSubscriptions.add(
       _stepCounterService.watchStepCounts().listen(
-        (StepCountState state) async {
+        (StepCountState state) {
           if (!state.isAvailable) {
             return;
           }
           _latestStepCountState = state;
-          await _observeSample(streamSteps, state.capturedAt);
-          _scheduleDailyMetricsRefresh(state.capturedAt);
+          _scheduleBatchFlush();
         },
         onError: (Object error, StackTrace stackTrace) {
           unawaited(
@@ -499,12 +601,11 @@ class DataCollector {
         },
       ),
     );
-    _subscriptions.add(
+    _captureSubscriptions.add(
       _noiseCaptureService.watchNoiseSamples().listen(
-        (NoiseSample sample) async {
-          await _observeSample(streamNoise, sample.capturedAt);
-          await noiseRepository.saveAll(<NoiseSample>[sample]);
-          _scheduleDailyMetricsRefresh(sample.capturedAt);
+        (NoiseSample sample) {
+          _addBounded(_noiseBuffer, sample, streamNoise);
+          _scheduleBatchFlush();
         },
         onError: (Object error, StackTrace stackTrace) {
           unawaited(
@@ -517,12 +618,11 @@ class DataCollector {
         },
       ),
     );
-    _subscriptions.add(
+    _captureSubscriptions.add(
       _locationCaptureService.watchLocationSummaries().listen(
-        (LocationSummary summary) async {
-          await _observeSample(streamLocation, summary.date);
-          await locationRepository.upsertSummary(summary);
-          _scheduleDailyMetricsRefresh(summary.date);
+        (LocationSummary summary) {
+          _locationBuffer[_dayKey(summary.date)] = summary;
+          _scheduleBatchFlush();
         },
         onError: (Object error, StackTrace stackTrace) {
           unawaited(
@@ -535,60 +635,310 @@ class DataCollector {
         },
       ),
     );
-    unawaited(_ensureUsageCollectionInitialized());
+  }
+
+  Future<void> pauseForegroundCapture() async {
+    if (!_foregroundCaptureActive) {
+      return;
+    }
+    _foregroundCaptureActive = false;
+    _batchFlushTimer?.cancel();
+    _batchFlushTimer = null;
+    for (final subscription in _captureSubscriptions) {
+      await subscription.cancel();
+    }
+    _captureSubscriptions.clear();
+    await flushPendingSamples();
   }
 
   Future<void> dispose() async {
     _started = false;
-    _dailyMetricsRefreshTimer?.cancel();
-    _dailyMetricsRefreshTimer = null;
-    _pendingDailyMetricsRefreshes.clear();
-    for (final StreamSubscription<dynamic> subscription in _subscriptions) {
-      await subscription.cancel();
-    }
-    _subscriptions.clear();
+    await pauseForegroundCapture();
+    await _stopLifecycleUsageCollection();
+    await _flushSerial;
   }
 
-  void _scheduleDailyMetricsRefresh(DateTime referenceTime) {
-    final dayStart = _dayStart(referenceTime);
-    _pendingDailyMetricsRefreshes[_dayKey(dayStart)] = dayStart;
-    if (_dailyMetricsRefreshRunning || _dailyMetricsRefreshTimer != null) {
+  void _addBounded<T>(List<T> buffer, T sample, String streamKey) {
+    if (buffer.length >= _maxBufferedSamplesPerStream) {
+      buffer.removeAt(0);
+      _droppedSamples += 1;
+      if (!_overflowReported) {
+        _overflowReported = true;
+        unawaited(
+          _captureHealthService.recordStateRebuilt(
+            'capture_buffer',
+            detail: '$streamKey 缓冲区达到上限，已合并为最新样本以避免任务堆积。',
+          ),
+        );
+      }
+    }
+    buffer.add(sample);
+  }
+
+  void _scheduleBatchFlush() {
+    if (_batchFlushTimer != null) {
       return;
     }
-
-    _dailyMetricsRefreshTimer = Timer(
-      _dailyMetricsRefreshInterval,
+    _batchFlushTimer = Timer(
+      _batchFlushInterval,
       () {
-        _dailyMetricsRefreshTimer = null;
-        unawaited(_drainScheduledDailyMetricsRefreshes());
+        _batchFlushTimer = null;
+        unawaited(
+          flushPendingSamples().catchError((Object _, StackTrace __) {}),
+        );
       },
     );
   }
 
-  Future<void> _drainScheduledDailyMetricsRefreshes() async {
-    if (_dailyMetricsRefreshRunning || _pendingDailyMetricsRefreshes.isEmpty) {
+  Future<void> flushPendingSamples() {
+    _flushSerial = _flushSerial
+        .catchError((Object _, StackTrace __) {})
+        .then((_) => _flushPendingSamplesOnce());
+    return _flushSerial;
+  }
+
+  Future<void> _flushPendingSamplesOnce() async {
+    if (_flushRunning) {
+      return;
+    }
+    final activities = List<ActivitySample>.from(_activityBuffer);
+    final noises = List<NoiseSample>.from(_noiseBuffer);
+    final lights = List<AmbientLightSample>.from(_lightBuffer);
+    final locations = List<LocationSummary>.from(_locationBuffer.values);
+    _activityBuffer.clear();
+    _noiseBuffer.clear();
+    _lightBuffer.clear();
+    _locationBuffer.clear();
+    final stepState = _latestStepCountState;
+
+    if (activities.isEmpty &&
+        noises.isEmpty &&
+        lights.isEmpty &&
+        locations.isEmpty &&
+        stepState == null) {
       return;
     }
 
-    _dailyMetricsRefreshRunning = true;
-    final pendingDates =
-        _pendingDailyMetricsRefreshes.values.toList(growable: false);
-    _pendingDailyMetricsRefreshes.clear();
+    _flushRunning = true;
     try {
-      for (final referenceTime in pendingDates) {
-        await _refreshDailyMetrics(referenceTime);
+      await Future.wait<void>(<Future<void>>[
+        activityRepository.saveAll(activities),
+        noiseRepository.saveAll(noises),
+        ambientLightRepository.saveAll(lights),
+        _saveLocations(locations),
+      ]);
+      final locationsChanged = _locationsChanged(locations);
+      if (activities.isNotEmpty) {
+        await _observeSample(streamMotion, activities.last.capturedAt);
       }
+      if (noises.isNotEmpty) {
+        await _observeSample(streamNoise, noises.last.capturedAt);
+      }
+      if (lights.isNotEmpty) {
+        await _observeSample(streamLight, lights.last.capturedAt);
+      }
+      if (locations.isNotEmpty) {
+        await _observeSample(streamLocation, locations.last.date);
+      }
+      if (stepState?.isAvailable == true) {
+        await _observeSample(streamSteps, stepState!.capturedAt);
+      }
+
+      final metricsChanged = await _applyMetricsDelta(
+        activities: activities,
+        noises: noises,
+        locations: locations,
+        stepState: stepState,
+      );
+      if (activities.isNotEmpty && !metricsChanged) {
+        _onMetricsChanged?.call();
+      }
+      if (lights.isNotEmpty || noises.isNotEmpty) {
+        _onEnvironmentChanged?.call();
+      }
+      if (activities.isNotEmpty ||
+          noises.isNotEmpty ||
+          lights.isNotEmpty ||
+          locationsChanged ||
+          metricsChanged) {
+        _onDataChanged?.call();
+      }
+      _completedFlushes += 1;
+      _overflowReported = false;
+      await _runRetentionCleanupIfNeeded(DateTime.now());
+    } catch (error, stackTrace) {
+      _restoreFailedBatch(
+        activities: activities,
+        noises: noises,
+        lights: lights,
+        locations: locations,
+      );
+      await _captureHealthService.recordStreamError(
+        'batch_flush',
+        errorMessage: error.toString(),
+        detail: '批量写入失败，已保留待重试样本。',
+      );
+      Error.throwWithStackTrace(error, stackTrace);
     } finally {
-      _dailyMetricsRefreshRunning = false;
-      if (_pendingDailyMetricsRefreshes.isNotEmpty && _started) {
-        _scheduleDailyMetricsRefresh(
-          _pendingDailyMetricsRefreshes.values.first,
-        );
+      _flushRunning = false;
+      if (_started &&
+          (_activityBuffer.isNotEmpty ||
+              _noiseBuffer.isNotEmpty ||
+              _lightBuffer.isNotEmpty ||
+              _locationBuffer.isNotEmpty)) {
+        _scheduleBatchFlush();
       }
     }
   }
 
-  Future<void> syncNativeRiskEvents() async {
+  Future<void> _saveLocations(List<LocationSummary> locations) async {
+    for (final summary in locations) {
+      await locationRepository.upsertSummary(summary);
+    }
+  }
+
+  bool _locationsChanged(List<LocationSummary> locations) {
+    var changed = false;
+    for (final summary in locations) {
+      final key = _dayKey(summary.date);
+      final signature = [
+        summary.distanceMeters.toStringAsFixed(1),
+        summary.outdoorDuration.inSeconds,
+        summary.visitCount,
+        summary.commuteCount,
+      ].join('|');
+      if (_lastLocationSignatureByDay[key] != signature) {
+        _lastLocationSignatureByDay[key] = signature;
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
+  void _restoreFailedBatch({
+    required List<ActivitySample> activities,
+    required List<NoiseSample> noises,
+    required List<AmbientLightSample> lights,
+    required List<LocationSummary> locations,
+  }) {
+    for (final sample in activities.reversed) {
+      if (_activityBuffer.length < _maxBufferedSamplesPerStream) {
+        _activityBuffer.insert(0, sample);
+      }
+    }
+    for (final sample in noises.reversed) {
+      if (_noiseBuffer.length < _maxBufferedSamplesPerStream) {
+        _noiseBuffer.insert(0, sample);
+      }
+    }
+    for (final sample in lights.reversed) {
+      if (_lightBuffer.length < _maxBufferedSamplesPerStream) {
+        _lightBuffer.insert(0, sample);
+      }
+    }
+    for (final summary in locations) {
+      _locationBuffer.putIfAbsent(_dayKey(summary.date), () => summary);
+    }
+  }
+
+  Future<bool> _applyMetricsDelta({
+    required List<ActivitySample> activities,
+    required List<NoiseSample> noises,
+    required List<LocationSummary> locations,
+    required StepCountState? stepState,
+  }) async {
+    final dayKeys = <String>{
+      ...activities.map((sample) => _dayKey(sample.capturedAt)),
+      ...noises.map((sample) => _dayKey(sample.capturedAt)),
+      ...locations.map((summary) => _dayKey(summary.date)),
+      if (stepState?.isAvailable == true) _dayKey(stepState!.capturedAt),
+    };
+    var changed = false;
+    for (final dayKey in dayKeys) {
+      final referenceTime = _dateFromDayKey(dayKey);
+      final existing = await metricsRepository.getByDate(referenceTime) ??
+          DailyMetrics(
+            date: referenceTime,
+            stepCount: 0,
+            sedentaryDuration: Duration.zero,
+            screenOnDuration: Duration.zero,
+            outdoorDuration: Duration.zero,
+            postureRiskCount: 0,
+            highNoiseExposureDuration: Duration.zero,
+          );
+      final dayActivities = activities
+          .where((sample) => _dayKey(sample.capturedAt) == dayKey)
+          .toList(growable: false);
+      final dayNoises = noises
+          .where((sample) => _dayKey(sample.capturedAt) == dayKey)
+          .toList(growable: false);
+      final dayLocations = locations
+          .where((summary) => _dayKey(summary.date) == dayKey)
+          .toList(growable: false);
+      final dayLocation = dayLocations.isEmpty ? null : dayLocations.last;
+      final liveSteps = stepState?.isAvailable == true &&
+              _dayKey(stepState!.capturedAt) == dayKey
+          ? stepState.stepCount
+          : 0;
+      final next = DailyMetrics(
+        date: referenceTime,
+        stepCount:
+            existing.stepCount > liveSteps ? existing.stepCount : liveSteps,
+        sedentaryDuration: existing.sedentaryDuration +
+            dayActivities
+                .where((sample) => sample.type == ActivityType.stationary)
+                .fold<Duration>(
+                  Duration.zero,
+                  (total, sample) => total + sample.duration,
+                ),
+        screenOnDuration: existing.screenOnDuration,
+        outdoorDuration:
+            dayLocation?.outdoorDuration ?? existing.outdoorDuration,
+        postureRiskCount: existing.postureRiskCount +
+            dayActivities.where((sample) => sample.isSedentary).length,
+        highNoiseExposureDuration: existing.highNoiseExposureDuration +
+            dayNoises
+                .where((sample) => sample.level == NoiseLevel.loud)
+                .fold<Duration>(
+                  Duration.zero,
+                  (total, sample) => total + sample.duration,
+                ),
+      );
+      await metricsRepository.upsertMetrics(next);
+      changed = await _publishMetricsChanged(next, referenceTime) || changed;
+    }
+    return changed;
+  }
+
+  Future<void> _runRetentionCleanupIfNeeded(DateTime now) async {
+    final todayKey = _dayKey(now);
+    if (_lastCleanupDateKey == todayKey) {
+      return;
+    }
+    final cutoff = _dayStart(now).subtract(_rawSampleRetention);
+    await Future.wait<int>(<Future<int>>[
+      activityRepository.deleteBefore(cutoff),
+      noiseRepository.deleteBefore(cutoff),
+      ambientLightRepository.deleteBefore(cutoff),
+    ]);
+    _lastCleanupDateKey = todayKey;
+  }
+
+  Future<void> syncNativeRiskEvents() {
+    final runningSync = _riskEventSyncFuture;
+    if (runningSync != null) {
+      return runningSync;
+    }
+    final syncFuture = _syncNativeRiskEventsOnce();
+    _riskEventSyncFuture = syncFuture;
+    return syncFuture.whenComplete(() {
+      if (identical(_riskEventSyncFuture, syncFuture)) {
+        _riskEventSyncFuture = null;
+      }
+    });
+  }
+
+  Future<void> _syncNativeRiskEventsOnce() async {
     if (_syncNativeRiskEvents == null) {
       return;
     }
@@ -603,6 +953,7 @@ class DataCollector {
     if (_deliverRuleReminders != null) {
       await _deliverRuleReminders.call(DateTime.now());
     }
+    _onRemindersChanged?.call();
     _onDataChanged?.call();
   }
 
@@ -652,8 +1003,10 @@ class DataCollector {
           detail: '已写入 ${dedupedSummaries.length} 条 Android 使用统计摘要。',
         );
         for (final summary in dedupedSummaries) {
-          await _refreshDailyMetrics(summary.date);
+          await _updateMetricsFromUsage(summary);
         }
+        _onUsageChanged?.call();
+        _onDataChanged?.call();
       } else {
         await _captureHealthService.recordGapDetected(
           streamDigitalUsageAndroid,
@@ -677,7 +1030,9 @@ class DataCollector {
           streamDigitalUsageAlternative,
           detail: '已基于本地替代指标重建数字生活摘要。',
         );
-        await _refreshDailyMetrics(normalizedSummary.date);
+        await _updateMetricsFromUsage(normalizedSummary);
+        _onUsageChanged?.call();
+        _onDataChanged?.call();
       }
     }
   }
@@ -685,14 +1040,7 @@ class DataCollector {
   Future<void> _upsertUsageSummariesPreservingProgress(
     List<DigitalUsageSummary> summaries,
   ) async {
-    for (final summary in summaries) {
-      final existing = await usageRepository.getByDate(summary.date);
-      await usageRepository.upsertSummary(
-        existing == null
-            ? summary
-            : mergeUsageSummaryPreservingProgress(existing, summary),
-      );
-    }
+    await usageRepository.upsertAll(summaries);
   }
 
   Future<void> _ensureUsageCollectionInitialized({
@@ -730,7 +1078,9 @@ class DataCollector {
         await _observeSample(streamDigitalUsageAlternative, summary.date);
         final normalizedSummary = _normalizeLifecycleSummary(summary);
         await usageRepository.upsertSummary(normalizedSummary);
-        await _refreshDailyMetrics(normalizedSummary.date);
+        await _updateMetricsFromUsage(normalizedSummary);
+        _onUsageChanged?.call();
+        _onDataChanged?.call();
       },
       onError: (Object error, StackTrace stackTrace) {
         unawaited(
@@ -743,7 +1093,6 @@ class DataCollector {
       },
     );
     _usageSummarySubscription = subscription;
-    _subscriptions.add(subscription);
   }
 
   Future<void> _stopLifecycleUsageCollection() async {
@@ -752,7 +1101,6 @@ class DataCollector {
       return;
     }
     _usageSummarySubscription = null;
-    _subscriptions.remove(subscription);
     await subscription.cancel();
   }
 
@@ -786,27 +1134,54 @@ class DataCollector {
     );
   }
 
-  Future<void> _refreshDailyMetrics(DateTime referenceTime) async {
+  Future<void> _updateMetricsFromUsage(DigitalUsageSummary summary) async {
+    final dayStart = _dayStart(summary.date);
+    final existing = await metricsRepository.getByDate(dayStart) ??
+        DailyMetrics(
+          date: dayStart,
+          stepCount: 0,
+          sedentaryDuration: Duration.zero,
+          screenOnDuration: Duration.zero,
+          outdoorDuration: Duration.zero,
+          postureRiskCount: 0,
+          highNoiseExposureDuration: Duration.zero,
+        );
+    final next = DailyMetrics(
+      date: dayStart,
+      stepCount: existing.stepCount,
+      sedentaryDuration: existing.sedentaryDuration,
+      screenOnDuration: summary.screenOnDuration,
+      outdoorDuration: existing.outdoorDuration,
+      postureRiskCount: existing.postureRiskCount,
+      highNoiseExposureDuration: existing.highNoiseExposureDuration,
+    );
+    await metricsRepository.upsertMetrics(next);
+    await _publishMetricsChanged(next, dayStart);
+  }
+
+  Future<void> _rebuildDailyMetrics(DateTime referenceTime) async {
     final dayStart = DateTime(
       referenceTime.year,
       referenceTime.month,
       referenceTime.day,
     );
-    final dayActivities = await activityRepository.listByWindow(
+    final activitiesFuture = activityRepository.listByWindow(
       QueryWindow.calendarDay(referenceDate: dayStart),
     );
-    final dayNoises = await noiseRepository.listByWindow(
+    final noisesFuture = noiseRepository.listByWindow(
       QueryWindow.calendarDay(referenceDate: dayStart),
     );
-    final locationSummary = await locationRepository.listRecentDays(
+    final locationFuture = locationRepository.listRecentDays(
       1,
       referenceDate: dayStart,
     );
-    final usageSummary = await usageRepository.getByDate(dayStart);
-    final existingMetrics = await metricsRepository.listRecentDays(
-      1,
-      referenceDate: dayStart,
-    );
+    final usageFuture = usageRepository.getByDate(dayStart);
+    final existingFuture = metricsRepository.getByDate(dayStart);
+    final dayActivities = await activitiesFuture;
+    final dayNoises = await noisesFuture;
+    final locationSummary = await locationFuture;
+    final usageSummary = await usageFuture;
+    final existingMetrics = await existingFuture;
 
     final sedentaryDuration = dayActivities
         .where(
@@ -824,8 +1199,7 @@ class DataCollector {
             _dayKey(latestStepState!.capturedAt) == _dayKey(dayStart)
         ? latestStepState.stepCount
         : 0;
-    final persistedStepCount =
-        existingMetrics.isEmpty ? 0 : existingMetrics.last.stepCount;
+    final persistedStepCount = existingMetrics?.stepCount ?? 0;
     // 当日步数是累计值。其他传感器先于计步流刷新时，不能用活动样本中的占位 0
     // 覆盖已经落库的系统步数；系统计步短暂回退时也保留当天已确认的最大值。
     final stepCount = <int>[
@@ -854,11 +1228,17 @@ class DataCollector {
       highNoiseExposureDuration: highNoiseExposureDuration,
     );
     await metricsRepository.upsertMetrics(nextMetrics);
+    await _publishMetricsChanged(nextMetrics, referenceTime);
+  }
 
+  Future<bool> _publishMetricsChanged(
+    DailyMetrics nextMetrics,
+    DateTime referenceTime,
+  ) async {
     final nextSignature = _DailyMetricsSignature.fromMetrics(nextMetrics);
     if (_lastDailyMetricsSignature != null &&
         _lastDailyMetricsSignature == nextSignature) {
-      return;
+      return false;
     }
 
     _lastDailyMetricsSignature = nextSignature;
@@ -866,14 +1246,21 @@ class DataCollector {
       'daily_metrics',
       detail: '已重建当日汇总指标。',
     );
-    if (_persistRuleReminders != null) {
-      await _persistRuleReminders.call(referenceTime);
+    final now = DateTime.now();
+    final lastEvaluationAt = _lastReminderEvaluationAt;
+    if (lastEvaluationAt == null ||
+        now.difference(lastEvaluationAt) >= const Duration(minutes: 5)) {
+      _lastReminderEvaluationAt = now;
+      if (_persistRuleReminders != null) {
+        await _persistRuleReminders.call(referenceTime);
+      }
+      if (_deliverRuleReminders != null) {
+        await _deliverRuleReminders.call(referenceTime);
+      }
     }
-    if (_deliverRuleReminders != null) {
-      await _deliverRuleReminders.call(referenceTime);
-    }
-    _onDayChanged?.call(dayStart);
-    _onDataChanged?.call();
+    _onDayChanged?.call(_dayStart(referenceTime));
+    _onMetricsChanged?.call();
+    return true;
   }
 
   void _markStreamStarted(String streamKey) {
@@ -952,13 +1339,37 @@ class DataCollector {
 
 final dataCollectorProvider = Provider<DataCollector>((Ref ref) {
   final revisionThrottle = _RevisionThrottle(
-    interval: const Duration(seconds: 2),
+    interval: const Duration(seconds: 30),
     onThrottledTick: () {
       ref.read(dataCollectorRevisionProvider.notifier).state += 1;
     },
   );
+  final metricsRevisionThrottle = _RevisionThrottle(
+    interval: const Duration(seconds: 30),
+    onThrottledTick: () {
+      ref.read(dataCollectorMetricsRevisionProvider.notifier).state += 1;
+    },
+  );
+  final environmentRevisionThrottle = _RevisionThrottle(
+    interval: const Duration(seconds: 30),
+    onThrottledTick: () {
+      ref.read(dataCollectorEnvironmentRevisionProvider.notifier).state += 1;
+    },
+  );
+  final usageRevisionThrottle = _RevisionThrottle(
+    interval: const Duration(seconds: 30),
+    onThrottledTick: () {
+      ref.read(dataCollectorUsageRevisionProvider.notifier).state += 1;
+    },
+  );
+  final reminderRevisionThrottle = _RevisionThrottle(
+    interval: const Duration(seconds: 30),
+    onThrottledTick: () {
+      ref.read(dataCollectorReminderRevisionProvider.notifier).state += 1;
+    },
+  );
   final dayRevisionThrottle = _DayRevisionThrottle(
-    interval: const Duration(seconds: 2),
+    interval: const Duration(seconds: 30),
     onThrottledTick: (DateTime changedAt) {
       final dayKey = _dayKey(changedAt);
       final notifier = ref.read(dataCollectorDailyRevisionProvider.notifier);
@@ -982,6 +1393,10 @@ final dataCollectorProvider = Provider<DataCollector>((Ref ref) {
     captureHealthService: ref.watch(captureHealthServiceProvider),
     onDataChanged: revisionThrottle.markChanged,
     onDayChanged: dayRevisionThrottle.markChanged,
+    onMetricsChanged: metricsRevisionThrottle.markChanged,
+    onEnvironmentChanged: environmentRevisionThrottle.markChanged,
+    onUsageChanged: usageRevisionThrottle.markChanged,
+    onRemindersChanged: reminderRevisionThrottle.markChanged,
     persistRuleReminders: (DateTime referenceTime) async {
       final insightService = HealthInsightService(
         activityRepository: ref.read(sharedActivityRepo),
@@ -1064,6 +1479,10 @@ final dataCollectorProvider = Provider<DataCollector>((Ref ref) {
   collector.start();
   ref.onDispose(() {
     revisionThrottle.dispose();
+    metricsRevisionThrottle.dispose();
+    environmentRevisionThrottle.dispose();
+    usageRevisionThrottle.dispose();
+    reminderRevisionThrottle.dispose();
     dayRevisionThrottle.dispose();
     collector.dispose();
   });
@@ -1078,6 +1497,15 @@ String _dayKey(DateTime dateTime) {
 
 DateTime _dayStart(DateTime dateTime) {
   return DateTime(dateTime.year, dateTime.month, dateTime.day);
+}
+
+DateTime _dateFromDayKey(String dayKey) {
+  final parts = dayKey.split('-');
+  return DateTime(
+    int.parse(parts[0]),
+    int.parse(parts[1]),
+    int.parse(parts[2]),
+  );
 }
 
 List<DigitalUsageSummary> _dedupeUsageSummaries(

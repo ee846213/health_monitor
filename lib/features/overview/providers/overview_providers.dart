@@ -6,6 +6,7 @@ import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
 import 'package:health_monitor/domain/environment/environment_overview.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
+import 'package:health_monitor/features/overview/overview_advice_builder.dart';
 import 'package:health_monitor/rules/engine/rule_verdict.dart';
 import 'package:health_monitor/rules/input/rule_input.dart';
 import 'package:health_monitor/services/ai_suggestion_service.dart';
@@ -75,7 +76,7 @@ final aiSuggestionServiceProvider = FutureProvider<AiSuggestionService>(
         List<RuleVerdict> verdicts,
         EnvironmentOverview? environmentOverview,
       ) {
-        return _buildDashboardFallbackAdvice(
+        return buildDashboardFallbackAdvice(
           metrics: metrics,
           verdicts: verdicts,
           environmentOverview: environmentOverview,
@@ -176,7 +177,10 @@ final walkingScreenRiskNoticeProvider =
 
 final overviewViewModelProvider =
     FutureProvider<OverviewDashboardViewModel>((Ref ref) async {
-  ref.watch(dataCollectorRevisionProvider);
+  ref.watch(dataCollectorMetricsRevisionProvider);
+  ref.watch(dataCollectorEnvironmentRevisionProvider);
+  ref.watch(dataCollectorUsageRevisionProvider);
+  ref.watch(dataCollectorReminderRevisionProvider);
   ref.watch(dataCollectorProvider);
 
   final permissionStatuses = await ref.watch(permissionStatusProvider.future);
@@ -186,7 +190,10 @@ final overviewViewModelProvider =
   final insight = await insightService.buildSnapshot(
     window: QueryWindow.recentDay(referenceTime: referenceTime),
   );
-  final dashboard = await dashboardService.build(referenceTime: referenceTime);
+  final dashboard = await dashboardService.buildFromInsight(
+    insight: insight,
+    referenceTime: referenceTime,
+  );
 
   return OverviewDashboardViewModel(
     screenState: resolveOverviewScreenState(
@@ -273,9 +280,7 @@ class _ProfileViewModelCacheNotifier
 
 final reminderListProvider =
     FutureProvider<List<ReminderRecord>>((Ref ref) async {
-  ref.watch(dataCollectorRevisionProvider);
-  final collector = ref.watch(dataCollectorProvider);
-  await collector.syncNativeRiskEvents();
+  ref.watch(dataCollectorReminderRevisionProvider);
   final repository = await ref.watch(reminderRepositoryProvider.future);
   return repository.listRecentDays(
     7,
@@ -318,9 +323,7 @@ class _ReminderListCacheNotifier extends Notifier<List<ReminderRecord>?> {
 }
 
 final latestReminderProvider = FutureProvider<ReminderRecord?>((Ref ref) async {
-  ref.watch(dataCollectorRevisionProvider);
-  final collector = ref.watch(dataCollectorProvider);
-  await collector.syncNativeRiskEvents();
+  ref.watch(dataCollectorReminderRevisionProvider);
   final repository = await ref.watch(reminderRepositoryProvider.future);
   return repository.getLatest();
 });

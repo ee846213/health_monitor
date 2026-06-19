@@ -42,7 +42,7 @@ class MotionCaptureService {
   Stream<ActivitySample> watchActivitySamples({
     Duration samplingPeriod = const Duration(milliseconds: 200),
   }) {
-    return _sensorStreamFactory(samplingPeriod: samplingPeriod)
+    final samples = _sensorStreamFactory(samplingPeriod: samplingPeriod)
         .transform<ActivitySample>(
       StreamTransformer<MotionVectorSample, ActivitySample>.fromHandlers(
         handleData:
@@ -58,6 +58,54 @@ class MotionCaptureService {
         },
       ),
     );
+    return _aggregatePerSecond(samples);
+  }
+
+  Stream<ActivitySample> _aggregatePerSecond(
+    Stream<ActivitySample> samples,
+  ) async* {
+    DateTime? windowStart;
+    final counts = <ActivityType, int>{};
+    var confidenceTotal = 0.0;
+    var sampleCount = 0;
+    MotionSampleSource source = MotionSampleSource.sensorFusion;
+
+    ActivitySample buildSample() {
+      final type = counts.entries
+          .reduce(
+            (left, right) => left.value >= right.value ? left : right,
+          )
+          .key;
+      return ActivitySample(
+        capturedAt: windowStart!,
+        duration: const Duration(seconds: 1),
+        type: type,
+        confidence: confidenceTotal / sampleCount,
+        stepCount: 0,
+        source: source,
+      );
+    }
+
+    await for (final sample in samples) {
+      final second = DateTime.fromMillisecondsSinceEpoch(
+        (sample.capturedAt.millisecondsSinceEpoch ~/ 1000) * 1000,
+      );
+      if (windowStart != null && second != windowStart) {
+        yield buildSample();
+        counts.clear();
+        confidenceTotal = 0;
+        sampleCount = 0;
+      }
+      windowStart = second;
+      counts[sample.type] = (counts[sample.type] ?? 0) + 1;
+      confidenceTotal += sample.confidence;
+      sampleCount += 1;
+      source = sample.source;
+    }
+
+    if (windowStart != null && sampleCount > 0) {
+      yield buildSample();
+    }
   }
 
   static Stream<MotionVectorSample> _defaultSensorStreamFactory({

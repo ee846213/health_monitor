@@ -7,6 +7,7 @@ part 'ambient_light_sample_record.g.dart';
 class AmbientLightSampleRecord {
   Id id = Isar.autoIncrement;
 
+  @Index()
   late DateTime capturedAt;
   late int durationSeconds;
   late double lux;

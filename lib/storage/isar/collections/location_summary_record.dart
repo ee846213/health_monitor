@@ -7,6 +7,7 @@ part 'location_summary_record.g.dart';
 class LocationSummaryRecord {
   Id id = Isar.autoIncrement;
 
+  @Index()
   late String dateKey;
   late double distanceMeters;
   late int outdoorDurationSeconds;

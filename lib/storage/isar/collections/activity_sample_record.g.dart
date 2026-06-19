@@ -54,7 +54,21 @@ const ActivitySampleRecordSchema = CollectionSchema(
   deserialize: _activitySampleRecordDeserialize,
   deserializeProp: _activitySampleRecordDeserializeProp,
   idName: r'id',
-  indexes: {},
+  indexes: {
+    r'capturedAt': IndexSchema(
+      id: 7947551681198035194,
+      name: r'capturedAt',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'capturedAt',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
+    )
+  },
   links: {},
   embeddedSchemas: {},
   getId: _activitySampleRecordGetId,
@@ -151,6 +165,15 @@ extension ActivitySampleRecordQueryWhereSort
       return query.addWhereClause(const IdWhereClause.any());
     });
   }
+
+  QueryBuilder<ActivitySampleRecord, ActivitySampleRecord, QAfterWhere>
+      anyCapturedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'capturedAt'),
+      );
+    });
+  }
 }
 
 extension ActivitySampleRecordQueryWhere
@@ -218,6 +241,99 @@ extension ActivitySampleRecordQueryWhere
         lower: lowerId,
         includeLower: includeLower,
         upper: upperId,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<ActivitySampleRecord, ActivitySampleRecord, QAfterWhereClause>
+      capturedAtEqualTo(DateTime capturedAt) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'capturedAt',
+        value: [capturedAt],
+      ));
+    });
+  }
+
+  QueryBuilder<ActivitySampleRecord, ActivitySampleRecord, QAfterWhereClause>
+      capturedAtNotEqualTo(DateTime capturedAt) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'capturedAt',
+              lower: [],
+              upper: [capturedAt],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'capturedAt',
+              lower: [capturedAt],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'capturedAt',
+              lower: [capturedAt],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'capturedAt',
+              lower: [],
+              upper: [capturedAt],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<ActivitySampleRecord, ActivitySampleRecord, QAfterWhereClause>
+      capturedAtGreaterThan(
+    DateTime capturedAt, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'capturedAt',
+        lower: [capturedAt],
+        includeLower: include,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<ActivitySampleRecord, ActivitySampleRecord, QAfterWhereClause>
+      capturedAtLessThan(
+    DateTime capturedAt, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'capturedAt',
+        lower: [],
+        upper: [capturedAt],
+        includeUpper: include,
+      ));
+    });
+  }
+
+  QueryBuilder<ActivitySampleRecord, ActivitySampleRecord, QAfterWhereClause>
+      capturedAtBetween(
+    DateTime lowerCapturedAt,
+    DateTime upperCapturedAt, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'capturedAt',
+        lower: [lowerCapturedAt],
+        includeLower: includeLower,
+        upper: [upperCapturedAt],
         includeUpper: includeUpper,
       ));
     });

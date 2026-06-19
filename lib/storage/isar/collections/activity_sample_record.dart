@@ -7,6 +7,7 @@ part 'activity_sample_record.g.dart';
 class ActivitySampleRecord {
   Id id = Isar.autoIncrement;
 
+  @Index()
   late DateTime capturedAt;
   late int durationSeconds;
   late String typeKey;

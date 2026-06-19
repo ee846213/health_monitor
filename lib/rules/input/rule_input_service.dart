@@ -51,56 +51,62 @@ class RuleInputService {
   }) async {
     final missingDimensions = <String>[...disabledDimensions];
 
-    final activitySamples = disabledDimensions.contains('activity')
-        ? <ActivitySample>[]
-        : await _activityRepository.listByWindow(window);
+    final activityFuture = disabledDimensions.contains('activity')
+        ? Future<List<ActivitySample>>.value(const <ActivitySample>[])
+        : _activityRepository.listByWindow(window);
+    final locationFuture = disabledDimensions.contains('location')
+        ? Future<List<LocationSummary>>.value(const <LocationSummary>[])
+        : _locationRepository.listRecentDays(
+            _daysForWindow(window),
+            referenceDate: _referenceDateForWindow(window),
+          );
+    final noiseFuture = disabledDimensions.contains('noise')
+        ? Future<List<NoiseSample>>.value(const <NoiseSample>[])
+        : _noiseRepository.listByWindow(window);
+    final lightFuture = disabledDimensions.contains('light')
+        ? Future<List<AmbientLightSample>>.value(
+            const <AmbientLightSample>[],
+          )
+        : _ambientLightRepository.listByWindow(window);
+    final usageFuture = disabledDimensions.contains('digital_usage')
+        ? Future<List<DigitalUsageSummary>>.value(
+            const <DigitalUsageSummary>[],
+          )
+        : _usageRepository.listByWindow(window);
+    final metricsFuture = disabledDimensions.contains('daily_metrics')
+        ? Future<List<DailyMetrics>>.value(const <DailyMetrics>[])
+        : _metricsRepository.listRecentDays(
+            _daysForWindow(window),
+            referenceDate: _referenceDateForWindow(window),
+          );
+
+    final activitySamples = await activityFuture;
     if (activitySamples.isEmpty && !disabledDimensions.contains('activity')) {
       missingDimensions.add('activity');
     }
 
-    final locationSummaries = disabledDimensions.contains('location')
-        ? <LocationSummary>[]
-        : await _locationRepository.listRecentDays(
-            _daysForWindow(window),
-            referenceDate: _referenceDateForWindow(window),
-          );
+    final locationSummaries = await locationFuture;
     if (locationSummaries.isEmpty && !disabledDimensions.contains('location')) {
       missingDimensions.add('location');
     }
 
-    final noiseSamples = disabledDimensions.contains('noise')
-        ? <NoiseSample>[]
-        : await _noiseRepository.listByWindow(window);
+    final noiseSamples = await noiseFuture;
     if (noiseSamples.isEmpty && !disabledDimensions.contains('noise')) {
       missingDimensions.add('noise');
     }
 
-    final ambientLightSamples = disabledDimensions.contains('light')
-        ? <AmbientLightSample>[]
-        : await _ambientLightRepository.listByWindow(window);
+    final ambientLightSamples = await lightFuture;
     if (ambientLightSamples.isEmpty && !disabledDimensions.contains('light')) {
       missingDimensions.add('light');
     }
 
-    final usageSummaries = <DigitalUsageSummary>[];
-    if (!disabledDimensions.contains('digital_usage')) {
-      for (final DateTime date in _datesForUsage(window)) {
-        final summary = await _usageRepository.getByDate(date);
-        if (summary != null) {
-          usageSummaries.add(summary);
-        }
-      }
-      if (usageSummaries.isEmpty) {
-        missingDimensions.add('digital_usage');
-      }
+    final usageSummaries = await usageFuture;
+    if (usageSummaries.isEmpty &&
+        !disabledDimensions.contains('digital_usage')) {
+      missingDimensions.add('digital_usage');
     }
 
-    final dailyMetricsList = disabledDimensions.contains('daily_metrics')
-        ? <DailyMetrics>[]
-        : await _metricsRepository.listRecentDays(
-            _daysForWindow(window),
-            referenceDate: _referenceDateForWindow(window),
-          );
+    final dailyMetricsList = await metricsFuture;
     if (dailyMetricsList.isEmpty &&
         !disabledDimensions.contains('daily_metrics')) {
       missingDimensions.add('daily_metrics');
@@ -130,15 +136,6 @@ int _daysForWindow(QueryWindow window) {
 DateTime _referenceDateForWindow(QueryWindow window) {
   final endExclusive = window.endAt.subtract(const Duration(microseconds: 1));
   return DateTime(endExclusive.year, endExclusive.month, endExclusive.day);
-}
-
-List<DateTime> _datesForUsage(QueryWindow window) {
-  if (_isCalendarAligned(window) &&
-      window.endAt.difference(window.startAt).inDays > 1) {
-    return window.dailyDates();
-  }
-
-  return <DateTime>[_referenceDateForWindow(window)];
 }
 
 bool _isCalendarAligned(QueryWindow window) {

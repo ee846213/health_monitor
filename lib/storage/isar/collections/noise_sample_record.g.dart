@@ -43,7 +43,21 @@ const NoiseSampleRecordSchema = CollectionSchema(
   deserialize: _noiseSampleRecordDeserialize,
   deserializeProp: _noiseSampleRecordDeserializeProp,
   idName: r'id',
-  indexes: {},
+  indexes: {
+    r'capturedAt': IndexSchema(
+      id: 7947551681198035194,
+      name: r'capturedAt',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'capturedAt',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
+    )
+  },
   links: {},
   embeddedSchemas: {},
   getId: _noiseSampleRecordGetId,
@@ -130,6 +144,15 @@ extension NoiseSampleRecordQueryWhereSort
       return query.addWhereClause(const IdWhereClause.any());
     });
   }
+
+  QueryBuilder<NoiseSampleRecord, NoiseSampleRecord, QAfterWhere>
+      anyCapturedAt() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'capturedAt'),
+      );
+    });
+  }
 }
 
 extension NoiseSampleRecordQueryWhere
@@ -197,6 +220,99 @@ extension NoiseSampleRecordQueryWhere
         lower: lowerId,
         includeLower: includeLower,
         upper: upperId,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<NoiseSampleRecord, NoiseSampleRecord, QAfterWhereClause>
+      capturedAtEqualTo(DateTime capturedAt) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'capturedAt',
+        value: [capturedAt],
+      ));
+    });
+  }
+
+  QueryBuilder<NoiseSampleRecord, NoiseSampleRecord, QAfterWhereClause>
+      capturedAtNotEqualTo(DateTime capturedAt) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'capturedAt',
+              lower: [],
+              upper: [capturedAt],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'capturedAt',
+              lower: [capturedAt],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'capturedAt',
+              lower: [capturedAt],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'capturedAt',
+              lower: [],
+              upper: [capturedAt],
+              includeUpper: false,
+            ));
+      }
+    });
+  }
+
+  QueryBuilder<NoiseSampleRecord, NoiseSampleRecord, QAfterWhereClause>
+      capturedAtGreaterThan(
+    DateTime capturedAt, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'capturedAt',
+        lower: [capturedAt],
+        includeLower: include,
+        upper: [],
+      ));
+    });
+  }
+
+  QueryBuilder<NoiseSampleRecord, NoiseSampleRecord, QAfterWhereClause>
+      capturedAtLessThan(
+    DateTime capturedAt, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'capturedAt',
+        lower: [],
+        upper: [capturedAt],
+        includeUpper: include,
+      ));
+    });
+  }
+
+  QueryBuilder<NoiseSampleRecord, NoiseSampleRecord, QAfterWhereClause>
+      capturedAtBetween(
+    DateTime lowerCapturedAt,
+    DateTime upperCapturedAt, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.between(
+        indexName: r'capturedAt',
+        lower: [lowerCapturedAt],
+        includeLower: includeLower,
+        upper: [upperCapturedAt],
         includeUpper: includeUpper,
       ));
     });

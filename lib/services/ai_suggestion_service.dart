@@ -47,7 +47,8 @@ class AiSuggestionService {
       );
     }
 
-    if (_apiKey.isEmpty || !_hasEnoughContext(metrics, verdicts, environmentOverview)) {
+    if (_apiKey.isEmpty ||
+        !_hasEnoughContext(metrics, verdicts, environmentOverview)) {
       return _fallback(
         input: input,
         metrics: metrics,
@@ -136,23 +137,94 @@ String _buildPrompt({
   required List<RuleVerdict> verdicts,
   required EnvironmentOverview? environmentOverview,
 }) {
-  final summary = verdicts.isEmpty ? '暂无高优先级规则结论。' : verdicts.first.summary;
-  final detail = verdicts.isEmpty ? '请给一句温和、生活化的建议。' : verdicts.first.detail;
+  final focusTopics = _buildFocusTopics(
+    metrics: metrics,
+    verdicts: verdicts,
+    environmentOverview: environmentOverview,
+  );
+  final verdictSummary = verdicts.isEmpty
+      ? '暂无高优先级规则结论。'
+      : verdicts
+          .take(3)
+          .map((RuleVerdict verdict) => '${verdict.summary}：${verdict.detail}')
+          .join('；');
   final environmentLabel = environmentOverview == null
       ? '环境状态暂缺'
       : '${environmentOverview.daytimeLightSummary} / ${environmentOverview.nightNoiseSummary}';
 
   return [
     '你是健康监测 App 的每日建议助手。',
-    '请只输出一句中文建议，语气亲切、非命令式、避免医学化表达。',
+    '请只输出一句中文建议，语气亲切、生活化、非命令式，避免医学化表达。',
+    '建议要优先围绕步数、整体活动、久坐、屏幕使用、环境噪音这些可解释的日常指标。',
+    '若存在明显问题，优先点出 1 到 2 个最值得调整的维度；若整体平稳，也尽量从这些维度里给出保持建议。',
     '今日步数：${metrics.stepCount}。',
     '今日久坐分钟：${metrics.sedentaryMinutes}。',
-    '今日亮屏分钟：${metrics.screenMinutes}。',
+    '今日屏幕使用分钟：${metrics.screenMinutes}。',
     '今日户外分钟：${metrics.outdoorMinutes}。',
     '当前环境：$environmentLabel。',
-    '最高优先级结论：$summary。',
-    '补充说明：$detail。',
+    '本次优先关注：${focusTopics.join('、')}。',
+    '规则结论：$verdictSummary',
   ].join('\n');
+}
+
+List<String> _buildFocusTopics({
+  required HealthInsightMetrics metrics,
+  required List<RuleVerdict> verdicts,
+  required EnvironmentOverview? environmentOverview,
+}) {
+  final topics = <String>[];
+
+  void addTopic(String topic) {
+    if (!topics.contains(topic)) {
+      topics.add(topic);
+    }
+  }
+
+  addTopic('步数');
+  addTopic('整体活动');
+
+  if (metrics.sedentaryMinutes >= 90) {
+    addTopic('久坐');
+  }
+  if (metrics.screenMinutes >= 120) {
+    addTopic('屏幕使用');
+  }
+  if (environmentOverview?.primaryConcern ==
+          EnvironmentPrimaryConcern.highNoise ||
+      environmentOverview?.primaryConcern == EnvironmentPrimaryConcern.mixed) {
+    addTopic('环境噪音');
+  }
+  if (environmentOverview?.primaryConcern ==
+          EnvironmentPrimaryConcern.lowLight ||
+      environmentOverview?.primaryConcern == EnvironmentPrimaryConcern.mixed) {
+    addTopic('白天光照');
+  }
+
+  for (final verdict in verdicts) {
+    switch (verdict.dimension) {
+      case 'activity':
+        addTopic('整体活动');
+      case 'usage':
+        addTopic('屏幕使用');
+      case 'environment':
+      case 'noise':
+        addTopic('环境噪音');
+      default:
+        break;
+    }
+  }
+
+  if (!topics.contains('久坐')) {
+    topics.add('久坐');
+  }
+  if (!topics.contains('屏幕使用')) {
+    topics.add('屏幕使用');
+  }
+  if (!topics.contains('环境噪音')) {
+    topics.add('环境噪音');
+  }
+
+  return topics.take(5).toList(growable: false);
 }
 
 String? _extractOutputText(Map<String, dynamic>? data) {

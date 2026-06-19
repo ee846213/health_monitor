@@ -7,6 +7,8 @@ abstract class ActivityRepository {
   Future<List<ActivitySample>> listByWindow(QueryWindow window);
 
   Future<void> saveAll(Iterable<ActivitySample> samples);
+
+  Future<int> deleteBefore(DateTime cutoff);
 }
 
 class InMemoryActivityRepository implements ActivityRepository {
@@ -27,6 +29,13 @@ class InMemoryActivityRepository implements ActivityRepository {
   @override
   Future<void> saveAll(Iterable<ActivitySample> samples) async {
     _samples.addAll(samples);
+  }
+
+  @override
+  Future<int> deleteBefore(DateTime cutoff) async {
+    final before = _samples.length;
+    _samples.removeWhere((sample) => sample.capturedAt.isBefore(cutoff));
+    return before - _samples.length;
   }
 }
 
@@ -65,5 +74,16 @@ class IsarActivityRepository implements ActivityRepository {
     await isar.writeTxn(() async {
       await isar.activitySampleRecords.putAll(records);
     });
+  }
+
+  @override
+  Future<int> deleteBefore(DateTime cutoff) async {
+    final isar = await _isarFuture;
+    return isar.writeTxn(
+      () => isar.activitySampleRecords
+          .filter()
+          .capturedAtLessThan(cutoff)
+          .deleteAll(),
+    );
   }
 }

@@ -122,7 +122,7 @@ void main() {
         source: MotionSampleSource.sensorFusion,
       ),
     );
-    container.read(dataCollectorRevisionProvider.notifier).state += 1;
+    container.read(dataCollectorMetricsRevisionProvider.notifier).state += 1;
 
     final refreshed = await container.read(overviewReadyDataProvider.future);
     expect(

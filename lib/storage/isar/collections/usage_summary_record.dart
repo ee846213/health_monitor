@@ -7,6 +7,7 @@ part 'usage_summary_record.g.dart';
 class UsageSummaryRecord {
   Id id = Isar.autoIncrement;
 
+  @Index()
   late String dateKey;
   late int screenOnSeconds;
   late int unlockCount;

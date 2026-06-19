@@ -7,6 +7,7 @@ import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/metrics/daily_metrics.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
+import 'package:health_monitor/features/briefing/briefing_suggestion_builder.dart';
 import 'package:health_monitor/features/overview/providers/overview_detail_providers.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
 import 'package:health_monitor/rules/input/rule_input.dart';
@@ -222,7 +223,7 @@ final briefingQualityNoteProvider = Provider<String?>((Ref ref) {
 final briefingStepDetailProvider =
     FutureProvider.family<OverviewStepDetailSnapshot, BriefingTimeRange>(
         (Ref ref, range) async {
-  ref.watch(dataCollectorRevisionProvider);
+  ref.watch(dataCollectorMetricsRevisionProvider);
   final repository = ref.watch(metricsRepositoryProvider);
   final referenceTime = ref.watch(briefingReferenceTimeProvider)();
   final anchorDate = _anchorDateForRange(range, referenceTime);
@@ -267,7 +268,7 @@ final briefingStepDetailProvider =
 final briefingSedentaryDetailProvider =
     FutureProvider.family<OverviewSedentaryDetailSnapshot, BriefingTimeRange>(
   (Ref ref, range) async {
-    ref.watch(dataCollectorRevisionProvider);
+    ref.watch(dataCollectorMetricsRevisionProvider);
     final repository = ref.watch(activityRepositoryProvider);
     final referenceTime = ref.watch(briefingReferenceTimeProvider)();
     final window = _windowForRange(range, referenceTime: referenceTime);
@@ -312,7 +313,7 @@ final briefingSedentaryDetailProvider =
 final briefingScreenDetailProvider =
     FutureProvider.family<OverviewScreenDetailSnapshot, BriefingTimeRange>(
         (Ref ref, range) async {
-  ref.watch(dataCollectorRevisionProvider);
+  ref.watch(dataCollectorUsageRevisionProvider);
   final repository = ref.watch(usageSummaryRepositoryProvider);
   final referenceTime = ref.watch(briefingReferenceTimeProvider)();
   final window = _windowForRange(range, referenceTime: referenceTime);
@@ -417,6 +418,8 @@ DailyBriefSnapshot _buildDailyBriefSnapshot(HealthInsightSnapshot snapshot) {
 }
 
 List<String> _buildSuggestions(HealthInsightSnapshot snapshot) {
+  return buildBriefingSuggestions(snapshot);
+
   final suggestions = <String>[];
   final metrics = snapshot.metrics;
   final usageSummary = snapshot.screenUsageHabitSummary;

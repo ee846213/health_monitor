@@ -8,7 +8,6 @@ import 'package:health_monitor/app/router.dart';
 import 'package:health_monitor/app/theme.dart';
 import 'package:health_monitor/features/diagnostics/providers/diagnostics_providers.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
-import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 import 'package:health_monitor/services/data_collector.dart';
 
 class HealthMonitorApp extends StatelessWidget {
@@ -73,17 +72,22 @@ class _AppLifecycleRefreshScopeState
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      unawaited(ref.read(dataCollectorProvider).pauseForegroundCapture());
+      return;
+    }
     if (state != AppLifecycleState.resumed) {
       return;
     }
 
+    ref.read(dataCollectorProvider).resumeForegroundCapture();
     unawaited(
         ref.read(androidBackgroundCaptureBootstrapServiceProvider).sync());
     unawaited(ref.read(dataCollectorProvider).syncUsageSummary());
     unawaited(ref.read(dataCollectorProvider).syncNativeRiskEvents());
     ref.invalidate(permissionStatusProvider);
-    ref.invalidate(overviewViewModelProvider);
-    ref.invalidate(overviewReadyDataProvider);
     ref.invalidate(diagnosticsSnapshotProvider);
   }
 

@@ -37,20 +37,33 @@ class TrendAnalysisService {
         referenceTime.day,
       ).subtract(Duration(days: 6 - index)),
     );
-    final metrics = await _metricsRepository.listRecentDays(
-      7,
-      referenceDate: referenceTime,
-    );
-    final usageByDate = <String, DigitalUsageSummary?>{};
-    for (final date in dates) {
-      usageByDate[_dayKey(date)] = await _usageRepository.getByDate(date);
+    final window =
+        QueryWindow.recentCalendarDays(7, referenceDate: referenceTime);
+    var metrics = const <DailyMetrics>[];
+    var usageByDate = <String, DigitalUsageSummary?>{};
+    var lightSamples = const <AmbientLightSample>[];
+    var noiseSamples = const <NoiseSample>[];
+    switch (selectedTab) {
+      case TrendTab.steps:
+      case TrendTab.sedentary:
+        metrics = await _metricsRepository.listRecentDays(
+          7,
+          referenceDate: referenceTime,
+        );
+        break;
+      case TrendTab.screen:
+        final usage = await _usageRepository.listByWindow(window);
+        usageByDate = <String, DigitalUsageSummary?>{
+          for (final summary in usage) _dayKey(summary.date): summary,
+        };
+        break;
+      case TrendTab.environment:
+        final lightFuture = _ambientLightRepository.listByWindow(window);
+        final noiseFuture = _noiseRepository.listByWindow(window);
+        lightSamples = await lightFuture;
+        noiseSamples = await noiseFuture;
+        break;
     }
-    final lightSamples = await _ambientLightRepository.listByWindow(
-      QueryWindow.recentCalendarDays(7, referenceDate: referenceTime),
-    );
-    final noiseSamples = await _noiseRepository.listByWindow(
-      QueryWindow.recentCalendarDays(7, referenceDate: referenceTime),
-    );
 
     final points = dates.map((date) {
       final value = _valueForTab(

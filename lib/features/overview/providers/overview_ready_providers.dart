@@ -41,7 +41,10 @@ enum OverviewEnvironmentNoiseIcon {
 
 final overviewReadyDataProvider = FutureProvider<OverviewReadyData>(
   (Ref ref) async {
-    ref.watch(dataCollectorRevisionProvider);
+    ref.watch(dataCollectorMetricsRevisionProvider);
+    ref.watch(dataCollectorEnvironmentRevisionProvider);
+    ref.watch(dataCollectorUsageRevisionProvider);
+    ref.watch(dataCollectorReminderRevisionProvider);
     ref.watch(dataCollectorProvider);
 
     final permissionStatuses = await ref.watch(permissionStatusProvider.future);
@@ -52,8 +55,10 @@ final overviewReadyDataProvider = FutureProvider<OverviewReadyData>(
       window: QueryWindow.recentDay(referenceTime: referenceTime),
       referenceTime: referenceTime,
     );
-    final dashboard =
-        await dashboardService.build(referenceTime: referenceTime);
+    final dashboard = await dashboardService.buildFromInsight(
+      insight: insight,
+      referenceTime: referenceTime,
+    );
 
     return OverviewReadyData(
       dashboard: dashboard,

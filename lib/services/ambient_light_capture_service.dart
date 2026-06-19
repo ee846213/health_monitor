@@ -37,7 +37,7 @@ class AmbientLightCaptureService {
     final sourceStream = _eventStreamFactory?.call() ??
         _eventChannel.receiveBroadcastStream().cast<Object?>();
 
-    return sourceStream.transform<AmbientLightSample>(
+    final samples = sourceStream.transform<AmbientLightSample>(
       StreamTransformer<Object?, AmbientLightSample>.fromHandlers(
         handleData: (Object? payload, EventSink<AmbientLightSample> sink) {
           final data = payload;
@@ -73,5 +73,22 @@ class AmbientLightCaptureService {
         },
       ),
     );
+    return _limitSamples(samples);
+  }
+
+  Stream<AmbientLightSample> _limitSamples(
+    Stream<AmbientLightSample> samples,
+  ) async* {
+    AmbientLightSample? lastEmitted;
+    await for (final sample in samples) {
+      final previous = lastEmitted;
+      if (previous != null &&
+          sample.capturedAt.difference(previous.capturedAt) <
+              const Duration(seconds: 1)) {
+        continue;
+      }
+      lastEmitted = sample;
+      yield sample;
+    }
   }
 }

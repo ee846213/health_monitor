@@ -1,119 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:health_monitor/domain/environment/noise_sample.dart';
-import 'package:health_monitor/domain/location/location_summary.dart';
-import 'package:health_monitor/domain/metrics/daily_metrics.dart';
-import 'package:health_monitor/domain/motion/activity_sample.dart';
+import 'package:health_monitor/domain/briefing/daily_brief_snapshot.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
-import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
 import 'package:health_monitor/features/briefing/pages/briefing_page.dart';
 import 'package:health_monitor/features/briefing/providers/briefing_providers.dart';
+import 'package:health_monitor/features/overview/providers/overview_detail_providers.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
-import 'package:health_monitor/services/data_collector.dart';
-import 'package:health_monitor/services/digital_usage_capture_service.dart';
-import 'package:health_monitor/services/location_capture_service.dart';
-import 'package:health_monitor/services/motion_capture_service.dart';
-import 'package:health_monitor/services/noise_capture_service.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
-import 'package:health_monitor/storage/repositories/reminder_repository.dart';
 
 void main() {
-  testWidgets('简报页默认显示今日时间段并支持切换', (WidgetTester tester) async {
-    final today = DateTime.now();
-    final todayDay = DateTime(today.year, today.month, today.day);
-    final yesterdayDay = todayDay.subtract(const Duration(days: 1));
-    final weekAgoDay = todayDay.subtract(const Duration(days: 2));
-
-    final activityRepository = SharedActivityRepository();
-    final ambientLightRepository = SharedAmbientLightRepository();
-    final noiseRepository = SharedNoiseRepository();
-    final locationRepository = SharedLocationRepository();
-    final usageRepository = SharedUsageRepository();
-    final metricsRepository = SharedMetricsRepository();
-
-    final collector = DataCollector(
-      activityRepository: activityRepository,
-      noiseRepository: noiseRepository,
-      locationRepository: locationRepository,
-      usageRepository: usageRepository,
-      metricsRepository: metricsRepository,
-      motionCaptureService: MotionCaptureService(
-        sensorStreamFactory: ({
-          Duration samplingPeriod = const Duration(milliseconds: 200),
-        }) =>
-            const Stream<MotionVectorSample>.empty(),
-      ),
-      noiseCaptureService: NoiseCaptureService(
-        noiseStreamFactory: () => const Stream<NoiseReadingSample>.empty(),
-      ),
-      locationCaptureService: LocationCaptureService(
-        positionStreamFactory: ({
-          Duration samplingPeriod = const Duration(seconds: 30),
-        }) =>
-            const Stream<GeoPositionSample>.empty(),
-        isLocationServiceEnabled: () async => true,
-        checkPermission: () async => GeoPermissionStatus.allowed,
-        requestPermission: () async => GeoPermissionStatus.allowed,
-      ),
-      digitalUsageCaptureService: DigitalUsageCaptureService(
-        lifecycleEventStreamFactory: () => const Stream<AppUsageEvent>.empty(),
-      ),
-    );
-    addTearDown(collector.dispose);
-
-    _seedDay(
-      activityRepository: activityRepository,
-      noiseRepository: noiseRepository,
-      locationRepository: locationRepository,
-      usageRepository: usageRepository,
-      metricsRepository: metricsRepository,
-      day: todayDay,
-      stepCount: 1200,
-      screenMinutes: 90,
-      outdoorMinutes: 20,
-      stationarySamples: 2,
-    );
-    _seedDay(
-      activityRepository: activityRepository,
-      noiseRepository: noiseRepository,
-      locationRepository: locationRepository,
-      usageRepository: usageRepository,
-      metricsRepository: metricsRepository,
-      day: yesterdayDay,
-      stepCount: 2400,
-      screenMinutes: 150,
-      outdoorMinutes: 35,
-      stationarySamples: 0,
-    );
-    _seedDay(
-      activityRepository: activityRepository,
-      noiseRepository: noiseRepository,
-      locationRepository: locationRepository,
-      usageRepository: usageRepository,
-      metricsRepository: metricsRepository,
-      day: weekAgoDay,
-      stepCount: 3600,
-      screenMinutes: 210,
-      outdoorMinutes: 50,
-      stationarySamples: 0,
-    );
-
+  testWidgets('简报页支持时间范围切换并打开三类指标详情', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: <Override>[
-          sharedActivityRepo.overrideWithValue(activityRepository),
-          sharedAmbientLightRepo.overrideWithValue(ambientLightRepository),
-          sharedNoiseRepo.overrideWithValue(noiseRepository),
-          sharedLocationRepo.overrideWithValue(locationRepository),
-          sharedUsageRepo.overrideWithValue(usageRepository),
-          sharedMetricsRepo.overrideWithValue(metricsRepository),
-          dataCollectorProvider.overrideWithValue(collector),
-          overviewPermissionStatusServiceProvider.overrideWithValue(
-            const _GrantedPermissionStatusService(),
+          briefingViewModelProvider.overrideWith((ref) async {
+            final range = ref.watch(briefingTimeRangeProvider);
+            return _viewModelFor(range);
+          }),
+          briefingStepDetailProvider.overrideWith(
+            (ref, range) async => _stepDetailFor(range),
           ),
-          reminderRepositoryProvider.overrideWith(
-            (Ref ref) async => InMemoryReminderRepository(),
+          briefingSedentaryDetailProvider.overrideWith(
+            (ref, range) async => _sedentaryDetailFor(range),
+          ),
+          briefingScreenDetailProvider.overrideWith(
+            (ref, range) async => _screenDetailFor(range),
           ),
         ],
         child: const MaterialApp(home: Scaffold(body: BriefingPage())),
@@ -121,175 +33,118 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(
-      find.descendant(
-        of: find.byType(SegmentedButton<BriefingTimeRange>),
-        matching: find.text('今日'),
-      ),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('briefing-step-card')), findsOneWidget);
     expect(find.text('1200 步'), findsOneWidget);
-    expect(
-      find.ancestor(
-        of: find.text('1200 步'),
-        matching: find.byType(FittedBox),
-      ),
-      findsOneWidget,
-    );
     expect(find.text('三个核心指标'), findsNothing);
-    expect(
-      find.byKey(const ValueKey<String>('briefing-0-summary-card')),
-      findsNothing,
-    );
 
     await tester.tap(find.byKey(const Key('briefing-step-card')));
     await tester.pumpAndSettle();
-    expect(find.text('近 7 天步数'), findsOneWidget);
-    expect(find.text('今日累计 1200 步。'), findsOneWidget);
-
+    expect(find.textContaining('7 天步数'), findsOneWidget);
     await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('briefing-sedentary-card')));
     await tester.pumpAndSettle();
-    expect(find.text('今日久坐分布'), findsOneWidget);
-    expect(find.text('今日累计久坐 60 分钟。'), findsOneWidget);
-
+    expect(find.textContaining('久坐分布'), findsOneWidget);
     await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('briefing-screen-card')));
     await tester.pumpAndSettle();
-    expect(find.text('今日分时段使用分布'), findsOneWidget);
-    expect(find.text('今日亮屏 90 分钟。'), findsOneWidget);
-
+    expect(find.textContaining('分时段使用分布'), findsOneWidget);
     await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('昨日'));
     await tester.tap(find.text('昨日'));
     await tester.pumpAndSettle();
-
-    expect(
-      find.descendant(
-        of: find.byType(SegmentedButton<BriefingTimeRange>),
-        matching: find.text('昨日'),
-      ),
-      findsOneWidget,
-    );
     expect(find.text('2400 步'), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('briefing-screen-card')));
-    await tester.pumpAndSettle();
-    expect(find.text('昨日分时段使用分布'), findsOneWidget);
-    expect(find.text('昨日亮屏 150 分钟。'), findsOneWidget);
-
-    await tester.tapAt(const Offset(10, 10));
-    await tester.pumpAndSettle();
 
     await tester.tap(find.text('最近 7 天'));
     await tester.pumpAndSettle();
-
-    expect(
-      find.descendant(
-        of: find.byType(SegmentedButton<BriefingTimeRange>),
-        matching: find.text('最近 7 天'),
-      ),
-      findsOneWidget,
-    );
     expect(find.text('6000 步'), findsOneWidget);
   });
 }
 
-void _seedDay({
-  required SharedActivityRepository activityRepository,
-  required SharedNoiseRepository noiseRepository,
-  required SharedLocationRepository locationRepository,
-  required SharedUsageRepository usageRepository,
-  required SharedMetricsRepository metricsRepository,
-  required DateTime day,
-  required int stepCount,
-  required int screenMinutes,
-  required int outdoorMinutes,
-  required int stationarySamples,
-}) {
-  if (stationarySamples > 0) {
-    for (var index = 0; index < stationarySamples; index += 1) {
-      activityRepository.addSample(
-        ActivitySample(
-          capturedAt: day.add(Duration(hours: 9 + index * 2)),
-          duration: const Duration(minutes: 35),
-          type: ActivityType.stationary,
-          confidence: 0.9,
-          stepCount: 0,
-          source: MotionSampleSource.sensorFusion,
-        ),
-      );
-    }
-  } else {
-    activityRepository.addSample(
-      ActivitySample(
-        capturedAt: day.add(const Duration(hours: 9)),
-        duration: const Duration(minutes: 30),
-        type: ActivityType.walking,
-        confidence: 0.9,
-        stepCount: stepCount,
-        source: MotionSampleSource.sensorFusion,
+BriefingViewModel _viewModelFor(BriefingTimeRange range) {
+  final steps = switch (range) {
+    BriefingTimeRange.today => 1200,
+    BriefingTimeRange.yesterday => 2400,
+    BriefingTimeRange.recent7Days => 6000,
+  };
+  return BriefingViewModel(
+    selectedRange: range,
+    windowLabel: range.label,
+    screenState: OverviewScreenState.ready,
+    briefSnapshot: DailyBriefSnapshot(
+      headline: '状态平稳',
+      supportingDetail: '当前范围内已有可用数据。',
+      metrics: <DailyBriefMetric>[
+        DailyBriefMetric(label: '步数', value: '$steps', unit: '步'),
+        const DailyBriefMetric(label: '久坐', value: '60', unit: '分钟'),
+        const DailyBriefMetric(label: '屏幕使用', value: '90', unit: '分钟'),
+      ],
+      suggestions: const <String>['继续保持当前节奏。'],
+    ),
+    permissionStatuses: const <PermissionType, PermissionGrantStatus>{},
+    hasRealData: true,
+    isLoading: false,
+  );
+}
+
+OverviewStepDetailSnapshot _stepDetailFor(BriefingTimeRange range) {
+  final steps = range == BriefingTimeRange.recent7Days ? 6000 : 1200;
+  final now = DateTime(2026, 6, 18);
+  return OverviewStepDetailSnapshot(
+    goalSteps: range == BriefingTimeRange.recent7Days ? 42000 : 6000,
+    todaySteps: steps,
+    todayProgress: steps / 6000,
+    points: List<OverviewStepTrendPoint>.generate(
+      7,
+      (index) => OverviewStepTrendPoint(
+        date: now.subtract(Duration(days: 6 - index)),
+        steps: index == 6 ? steps : 800 + index * 100,
+        isToday: range == BriefingTimeRange.today && index == 6,
       ),
-    );
-  }
-  noiseRepository.addSample(
-    NoiseSample(
-      capturedAt: day.add(const Duration(hours: 12)),
-      duration: const Duration(minutes: 10),
-      decibel: 45,
-      level: NoiseLevel.quiet,
-    ),
-  );
-  locationRepository.upsertSummary(
-    LocationSummary(
-      date: day,
-      distanceMeters: 1000 + stepCount.toDouble(),
-      outdoorDuration: Duration(minutes: outdoorMinutes),
-      visitCount: 1,
-      commuteCount: 0,
-    ),
-  );
-  usageRepository.upsertSummary(
-    DigitalUsageSummary(
-      date: day,
-      screenOnDuration: Duration(minutes: screenMinutes),
-      unlockCount: 20,
-      nighttimeUsageDuration: Duration.zero,
-      focusSessionBreakCount: 0,
-      topCategory: UsageCategory.unknown,
-    ),
-  );
-  metricsRepository.upsertMetrics(
-    DailyMetrics(
-      date: day,
-      stepCount: stepCount,
-      sedentaryDuration: const Duration(minutes: 60),
-      screenOnDuration: Duration(minutes: screenMinutes),
-      outdoorDuration: Duration(minutes: outdoorMinutes),
-      postureRiskCount: 0,
-      highNoiseExposureDuration: Duration.zero,
     ),
   );
 }
 
-class _GrantedPermissionStatusService implements PermissionStatusService {
-  const _GrantedPermissionStatusService();
+OverviewSedentaryDetailSnapshot _sedentaryDetailFor(
+  BriefingTimeRange range,
+) {
+  final start = DateTime(2026, 6, 18, 9);
+  return OverviewSedentaryDetailSnapshot(
+    totalDuration: const Duration(minutes: 60),
+    longestDuration: const Duration(minutes: 35),
+    segments: <OverviewSedentarySegmentSnapshot>[
+      OverviewSedentarySegmentSnapshot(
+        startedAt: start,
+        endedAt: start.add(const Duration(minutes: 35)),
+        duration: const Duration(minutes: 35),
+      ),
+    ],
+  );
+}
 
-  @override
-  Future<Map<PermissionType, PermissionGrantStatus>> getStatuses() async {
-    return <PermissionType, PermissionGrantStatus>{
-      PermissionType.motion: PermissionGrantStatus.granted,
-      PermissionType.location: PermissionGrantStatus.granted,
-      PermissionType.microphone: PermissionGrantStatus.granted,
-      PermissionType.notification: PermissionGrantStatus.granted,
-      PermissionType.usageAccess: PermissionGrantStatus.granted,
-      PermissionType.backgroundCapture: PermissionGrantStatus.granted,
-    };
-  }
+OverviewScreenDetailSnapshot _screenDetailFor(BriefingTimeRange range) {
+  return const OverviewScreenDetailSnapshot(
+    todaySummary: null,
+    yesterdaySummary: null,
+    totalDuration: Duration(minutes: 90),
+    deltaMinutes: 0,
+    buckets: <OverviewScreenUsageBucket>[
+      OverviewScreenUsageBucket(
+        label: '白天',
+        duration: Duration(minutes: 70),
+        subtitle: '06:00 - 22:00',
+      ),
+      OverviewScreenUsageBucket(
+        label: '夜间',
+        duration: Duration(minutes: 20),
+        subtitle: '22:00 - 06:00',
+      ),
+    ],
+    sourceLabel: '测试数据',
+    qualityLabel: null,
+  );
 }

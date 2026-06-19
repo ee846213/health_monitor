@@ -19,10 +19,20 @@ final trendAnalysisServiceProvider = Provider<TrendAnalysisService>((Ref ref) {
 final trendAnalysisViewModelProvider = FutureProvider<TrendSnapshot>((
   Ref ref,
 ) async {
-  ref.watch(dataCollectorRevisionProvider);
-  ref.watch(dataCollectorProvider);
-
   final selectedTab = ref.watch(trendSelectedTabProvider);
+  switch (selectedTab) {
+    case TrendTab.steps:
+    case TrendTab.sedentary:
+      ref.watch(dataCollectorMetricsRevisionProvider);
+      break;
+    case TrendTab.screen:
+      ref.watch(dataCollectorUsageRevisionProvider);
+      break;
+    case TrendTab.environment:
+      ref.watch(dataCollectorEnvironmentRevisionProvider);
+      break;
+  }
+  ref.watch(dataCollectorProvider);
   final service = ref.watch(trendAnalysisServiceProvider);
   return service.build(
     referenceTime: DateTime.now(),

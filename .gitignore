@@ -6,6 +6,12 @@ build/
 
 .superpowers/
 .worktrees/
+.tooling/appdata/
+.tooling/localappdata/
+.tooling/pub-cache/
+.tooling/audio_streamer/**/.gradle/
+.tooling/audio_streamer/**/build/
+.tooling/audio_streamer/**/local.properties
 
 pubget.err.log
 pubget.out.log

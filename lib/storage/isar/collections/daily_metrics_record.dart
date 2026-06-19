@@ -7,6 +7,7 @@ part 'daily_metrics_record.g.dart';
 class DailyMetricsRecord {
   Id id = Isar.autoIncrement;
 
+  @Index()
   late String dateKey;
   late int stepCount;
   late int sedentarySeconds;

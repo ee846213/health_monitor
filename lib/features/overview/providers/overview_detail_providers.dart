@@ -98,7 +98,7 @@ class OverviewScreenDetailSnapshot {
 
 final overviewStepDetailProvider =
     FutureProvider<OverviewStepDetailSnapshot>((Ref ref) async {
-  ref.watch(dataCollectorRevisionProvider);
+  ref.watch(dataCollectorMetricsRevisionProvider);
   final repository = ref.watch(metricsRepositoryProvider);
   final now = DateTime.now();
   final todayKey = DateKey.fromDate(now);
@@ -141,7 +141,7 @@ final overviewStepDetailProvider =
 
 final overviewSedentaryDetailProvider =
     FutureProvider<OverviewSedentaryDetailSnapshot>((Ref ref) async {
-  ref.watch(dataCollectorRevisionProvider);
+  ref.watch(dataCollectorMetricsRevisionProvider);
   final repository = ref.watch(activityRepositoryProvider);
   final now = DateTime.now();
   final samples = await repository.listByWindow(
@@ -187,7 +187,7 @@ final overviewSedentaryDetailProvider =
 
 final overviewScreenDetailProvider =
     FutureProvider<OverviewScreenDetailSnapshot>((Ref ref) async {
-  ref.watch(dataCollectorRevisionProvider);
+  ref.watch(dataCollectorUsageRevisionProvider);
   final repository = ref.watch(usageSummaryRepositoryProvider);
   final now = DateTime.now();
   final todaySummary = await repository.getByDate(now);

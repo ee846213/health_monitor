@@ -7,6 +7,8 @@ abstract class NoiseSampleRepository {
   Future<List<NoiseSample>> listByWindow(QueryWindow window);
 
   Future<void> saveAll(Iterable<NoiseSample> samples);
+
+  Future<int> deleteBefore(DateTime cutoff);
 }
 
 class InMemoryNoiseSampleRepository implements NoiseSampleRepository {
@@ -27,6 +29,13 @@ class InMemoryNoiseSampleRepository implements NoiseSampleRepository {
   @override
   Future<void> saveAll(Iterable<NoiseSample> samples) async {
     _samples.addAll(samples);
+  }
+
+  @override
+  Future<int> deleteBefore(DateTime cutoff) async {
+    final before = _samples.length;
+    _samples.removeWhere((sample) => sample.capturedAt.isBefore(cutoff));
+    return before - _samples.length;
   }
 }
 
@@ -65,5 +74,16 @@ class IsarNoiseSampleRepository implements NoiseSampleRepository {
     await isar.writeTxn(() async {
       await isar.noiseSampleRecords.putAll(records);
     });
+  }
+
+  @override
+  Future<int> deleteBefore(DateTime cutoff) async {
+    final isar = await _isarFuture;
+    return isar.writeTxn(
+      () => isar.noiseSampleRecords
+          .filter()
+          .capturedAtLessThan(cutoff)
+          .deleteAll(),
+    );
   }
 }

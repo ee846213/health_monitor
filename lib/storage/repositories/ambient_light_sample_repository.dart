@@ -7,6 +7,8 @@ abstract class AmbientLightSampleRepository {
   Future<List<AmbientLightSample>> listByWindow(QueryWindow window);
 
   Future<void> saveAll(Iterable<AmbientLightSample> samples);
+
+  Future<int> deleteBefore(DateTime cutoff);
 }
 
 class InMemoryAmbientLightSampleRepository
@@ -33,6 +35,13 @@ class InMemoryAmbientLightSampleRepository
   @override
   Future<void> saveAll(Iterable<AmbientLightSample> samples) async {
     _samples.addAll(samples);
+  }
+
+  @override
+  Future<int> deleteBefore(DateTime cutoff) async {
+    final before = _samples.length;
+    _samples.removeWhere((sample) => sample.capturedAt.isBefore(cutoff));
+    return before - _samples.length;
   }
 }
 
@@ -72,5 +81,16 @@ class IsarAmbientLightSampleRepository implements AmbientLightSampleRepository {
     await isar.writeTxn(() async {
       await isar.ambientLightSampleRecords.putAll(records);
     });
+  }
+
+  @override
+  Future<int> deleteBefore(DateTime cutoff) async {
+    final isar = await _isarFuture;
+    return isar.writeTxn(
+      () => isar.ambientLightSampleRecords
+          .filter()
+          .capturedAtLessThan(cutoff)
+          .deleteAll(),
+    );
   }
 }

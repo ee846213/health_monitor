@@ -101,8 +101,6 @@ class HealthInsightService {
     DateTime? referenceTime,
   }) async {
     final now = referenceTime ?? _now();
-    await syncNativeWalkingScreenRiskEvents();
-    await syncAndroidUsageSummaries(window: window, referenceTime: now);
     final input = await _inputService.buildInput(window: window);
     final verdicts = _evaluateRules(input);
     final metrics = HealthInsightMetrics(

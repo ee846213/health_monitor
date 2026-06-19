@@ -3,10 +3,13 @@ import 'dart:math' as math;
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
 import 'package:health_monitor/storage/isar/collections/usage_summary_record.dart';
 import 'package:health_monitor/storage/repositories/date_key.dart';
+import 'package:health_monitor/storage/repositories/query_window.dart';
 import 'package:isar/isar.dart';
 
 abstract class UsageSummaryRepository {
   Future<DigitalUsageSummary?> getByDate(DateTime date);
+
+  Future<List<DigitalUsageSummary>> listByWindow(QueryWindow window);
 
   Future<void> upsertSummary(DigitalUsageSummary summary);
 
@@ -33,6 +36,15 @@ class InMemoryUsageSummaryRepository implements UsageSummaryRepository {
     }
 
     return null;
+  }
+
+  @override
+  Future<List<DigitalUsageSummary>> listByWindow(QueryWindow window) async {
+    final summaries = _summaries
+        .where((summary) => window.contains(summary.date))
+        .toList(growable: false);
+    summaries.sort((left, right) => left.date.compareTo(right.date));
+    return summaries;
   }
 
   @override
@@ -73,6 +85,26 @@ class IsarUsageSummaryRepository implements UsageSummaryRepository {
   }
 
   @override
+  Future<List<DigitalUsageSummary>> listByWindow(QueryWindow window) async {
+    final isar = await _isarFuture;
+    final keys = window.dailyDates().map(DateKey.fromDate).toSet();
+    if (keys.isEmpty) {
+      return const <DigitalUsageSummary>[];
+    }
+    final records = await isar.usageSummaryRecords
+        .filter()
+        .anyOf(
+          keys,
+          (query, String key) => query.dateKeyEqualTo(key),
+        )
+        .findAll();
+    final summaries =
+        records.map((record) => record.toDomain()).toList(growable: false);
+    summaries.sort((left, right) => left.date.compareTo(right.date));
+    return summaries;
+  }
+
+  @override
   Future<void> upsertSummary(DigitalUsageSummary summary) async {
     final isar = await _isarFuture;
     await isar.writeTxn(() async {
@@ -101,9 +133,35 @@ class IsarUsageSummaryRepository implements UsageSummaryRepository {
 
   @override
   Future<void> upsertAll(List<DigitalUsageSummary> summaries) async {
-    for (final summary in summaries) {
-      await upsertSummary(summary);
+    if (summaries.isEmpty) {
+      return;
     }
+    final isar = await _isarFuture;
+    await isar.writeTxn(() async {
+      for (final summary in summaries) {
+        final incomingRecord = UsageSummaryRecord.fromDomain(summary);
+        final existing = await isar.usageSummaryRecords
+            .filter()
+            .dateKeyEqualTo(incomingRecord.dateKey)
+            .findAll();
+        var merged = summary;
+        for (final record in existing) {
+          merged = mergeUsageSummaryPreservingProgress(
+            record.toDomain(),
+            merged,
+          );
+        }
+        if (existing.isNotEmpty) {
+          await isar.usageSummaryRecords.deleteAll(
+            existing.map((item) => item.id).toList(growable: false),
+          );
+        }
+        final value = existing.isEmpty ? summary : merged;
+        await isar.usageSummaryRecords.put(
+          UsageSummaryRecord.fromDomain(value),
+        );
+      }
+    });
   }
 }
 
