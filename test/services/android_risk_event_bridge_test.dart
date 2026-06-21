@@ -17,18 +17,20 @@ void main() {
   test('应读取并解析 Android 精确 walking screen 风险事件', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(methodChannel, (MethodCall call) async {
-          expect(call.method, 'android.riskEvents.drainWalkingScreenRisks');
-          return <Object?>[
-            <Object?, Object?>{
-              'eventId': 'risk-1',
-              'occurredAtMillis': DateTime(2026, 6, 15, 9, 0).millisecondsSinceEpoch,
-              'screenOnStartedAtMillis': DateTime(2026, 6, 15, 8, 59, 52)
-                  .millisecondsSinceEpoch,
-              'continuousWalkingSeconds': 8,
-              'stepDelta': 12,
-            },
-          ];
-        });
+      expect(call.method, 'android.riskEvents.drainWalkingScreenRisks');
+      return <Object?>[
+        <Object?, Object?>{
+          'eventId': 'risk-1',
+          'occurredAtMillis':
+              DateTime(2026, 6, 15, 9, 0).millisecondsSinceEpoch,
+          'screenOnStartedAtMillis':
+              DateTime(2026, 6, 15, 8, 59, 52).millisecondsSinceEpoch,
+          'continuousWalkingSeconds': 8,
+          'stepDelta': 12,
+          'notificationDelivered': true,
+        },
+      ];
+    });
 
     final bridge = AndroidRiskEventBridge(
       platformBridgeService: PlatformBridgeService(
@@ -44,5 +46,6 @@ void main() {
     expect(events.single.eventId, 'risk-1');
     expect(events.single.continuousWalkingSeconds, 8);
     expect(events.single.stepDelta, 12);
+    expect(events.single.notificationDelivered, isTrue);
   });
 }

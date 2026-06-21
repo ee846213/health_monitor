@@ -49,15 +49,25 @@ class DashboardService {
     required HealthInsightSnapshot insight,
     required DateTime referenceTime,
   }) async {
-    final healthScore = calculateHealthScore(
+    final todayScreenMinutes = _screenMinutesForDate(
+      input: insight.input,
+      date: referenceTime,
+    );
+    final dashboardMetrics = HealthInsightMetrics(
       stepCount: insight.metrics.stepCount,
       sedentaryMinutes: insight.metrics.sedentaryMinutes,
-      screenMinutes: insight.metrics.screenMinutes,
+      screenMinutes: todayScreenMinutes,
+      outdoorMinutes: insight.metrics.outdoorMinutes,
+    );
+    final healthScore = calculateHealthScore(
+      stepCount: dashboardMetrics.stepCount,
+      sedentaryMinutes: dashboardMetrics.sedentaryMinutes,
+      screenMinutes: dashboardMetrics.screenMinutes,
     );
     final advice = await _buildDailyAdvice(
       referenceTime: referenceTime,
       input: insight.input,
-      metrics: insight.metrics,
+      metrics: dashboardMetrics,
       verdicts: insight.verdicts,
       environmentOverview: insight.environmentOverview,
     );
@@ -81,7 +91,9 @@ class DashboardService {
         ),
       ),
       screenCard: DashboardScreenCard(
-        totalMinutes: insight.metrics.screenMinutes,
+        // 洞察输入会同时携带昨日摘要，以便计算“较昨日”变化。
+        // 首页卡片展示的是今日值，因此不能直接使用跨摘要累加后的 metrics。
+        totalMinutes: todayScreenMinutes,
         yesterdayDeltaMinutes: _screenDeltaFromPreviousDay(
           input: insight.input,
           todayDate: referenceTime,
@@ -100,6 +112,19 @@ class DashboardService {
       hasReminderHistory: insight.reminderHistory.isNotEmpty,
     );
   }
+}
+
+int _screenMinutesForDate({
+  required RuleInput input,
+  required DateTime date,
+}) {
+  final dateKey = DateKey.fromDate(date);
+  return input.usageSummaries
+      .where((item) => DateKey.fromDate(item.date) == dateKey)
+      .fold<int>(
+        0,
+        (sum, item) => sum + item.screenOnDuration.inMinutes,
+      );
 }
 
 String _lightLabel(List<AmbientLightSample> samples) {

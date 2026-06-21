@@ -5,6 +5,7 @@ class WalkingScreenRiskEvent {
     required this.screenOnStartedAt,
     required this.continuousWalkingSeconds,
     required this.stepDelta,
+    required this.notificationDelivered,
   });
 
   final String eventId;
@@ -12,6 +13,7 @@ class WalkingScreenRiskEvent {
   final DateTime screenOnStartedAt;
   final int continuousWalkingSeconds;
   final int stepDelta;
+  final bool notificationDelivered;
 
   factory WalkingScreenRiskEvent.fromChannelPayload(
     Map<Object?, Object?> payload,
@@ -28,6 +30,7 @@ class WalkingScreenRiskEvent {
       continuousWalkingSeconds:
           payload['continuousWalkingSeconds'] as int? ?? 0,
       stepDelta: payload['stepDelta'] as int? ?? 0,
+      notificationDelivered: payload['notificationDelivered'] as bool? ?? false,
     );
   }
 }

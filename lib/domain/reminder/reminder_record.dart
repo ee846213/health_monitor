@@ -72,6 +72,7 @@ class ReminderRecord {
   factory ReminderRecord.fromWalkingScreenRiskEvent({
     required String eventId,
     required DateTime triggeredAt,
+    bool notificationDelivered = false,
     ReminderResponse response = ReminderResponse.pending,
   }) {
     return ReminderRecord(
@@ -82,7 +83,7 @@ class ReminderRecord {
       reasonSummary: '移动状态下连续亮屏超过 8 秒。',
       actionSuggestion: '走路时先收起屏幕，等停下后再查看手机。',
       response: response,
-      deliveredAt: null,
+      deliveredAt: notificationDelivered ? triggeredAt : null,
       reminderTypeKey: 'walkingScreenRisk',
       sourceDimension: 'android_risk_event',
       sourceEventId: eventId,

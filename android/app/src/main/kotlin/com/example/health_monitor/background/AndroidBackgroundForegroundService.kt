@@ -49,10 +49,15 @@ class AndroidBackgroundForegroundService : Service() {
         )
     }
     private val walkingScreenRiskMonitor by lazy {
+        val notifier = AndroidWalkingScreenRiskNotifier(
+            context = this,
+            notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager,
+        )
         AndroidWalkingScreenRiskMonitor(
             context = this,
             stepCounterReader = stepCounterReader,
             eventStore = walkingScreenRiskEventStore,
+            onRiskDetected = { event -> notifier.show(event) },
         )
     }
     private val usageStatsReader by lazy {
@@ -66,8 +71,13 @@ class AndroidBackgroundForegroundService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onCreate() {
+        super.onCreate()
+        AndroidBackgroundServiceRuntimeState.markStarted()
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val action = intent?.action ?: ACTION_START
+        val action = intent?.action ?: ACTION_RESTORE
         when (action) {
             AndroidBackgroundForegroundServiceIntentFactory.ACTION_START -> {
                 val request = intentFactory.parseRequest(intent)
@@ -81,6 +91,21 @@ class AndroidBackgroundForegroundService : Service() {
                 }
                 if (request.enableDigitalUsage) {
                     usageStatsReader.readDailySummary()?.let(usageSummarySnapshotStore::enqueue)
+                }
+                val snapshot = runtime.start(request)
+                runAsForeground(snapshot.notification)
+                return START_STICKY
+            }
+
+            ACTION_RESTORE -> {
+                val request = scheduler.currentRequest()
+                if (request == null) {
+                    stopSelf(startId)
+                    return START_NOT_STICKY
+                }
+                stepCounterReader.startListening()
+                if (request.enableMotion && request.enableDigitalUsage) {
+                    walkingScreenRiskMonitor.start()
                 }
                 val snapshot = runtime.start(request)
                 runAsForeground(snapshot.notification)
@@ -119,6 +144,7 @@ class AndroidBackgroundForegroundService : Service() {
     override fun onDestroy() {
         walkingScreenRiskMonitor.stop()
         stepCounterReader.stopListening()
+        AndroidBackgroundServiceRuntimeState.markStopped()
         super.onDestroy()
     }
 
@@ -128,7 +154,7 @@ class AndroidBackgroundForegroundService : Service() {
             startForeground(
                 FOREGROUND_NOTIFICATION_ID,
                 systemNotification,
-                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH,
             )
         } else {
             startForeground(FOREGROUND_NOTIFICATION_ID, systemNotification)
@@ -137,6 +163,7 @@ class AndroidBackgroundForegroundService : Service() {
 
     companion object {
         private const val ACTION_START = AndroidBackgroundForegroundServiceIntentFactory.ACTION_START
+        private const val ACTION_RESTORE = "health_monitor.background.action.RESTORE"
         private const val PREFS_NAME = "health_monitor_background_state"
         private const val FOREGROUND_NOTIFICATION_ID = 1001
     }

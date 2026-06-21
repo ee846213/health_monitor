@@ -14,6 +14,7 @@ class AndroidWalkingScreenRiskMonitor(
     private val stepCounterReader: AndroidStepCounterReader,
     private val eventStore: AndroidWalkingScreenRiskEventStore,
     private val detector: AndroidWalkingScreenRiskDetector = AndroidWalkingScreenRiskDetector(),
+    private val onRiskDetected: (AndroidWalkingScreenRiskEvent) -> Boolean = { false },
     private val handler: Handler = Handler(Looper.getMainLooper()),
     private val nowMillis: () -> Long = { System.currentTimeMillis() },
 ) {
@@ -27,11 +28,16 @@ class AndroidWalkingScreenRiskMonitor(
             val payload = stepCounterReader.readCurrent()
             if (payload.isAvailable) {
                 val event = detector.poll(
-                    nowMillis = payload.capturedAtMillis,
+                    // 计步器是 on-change 传感器，未产生新步数时 capturedAt 可能保持不变。
+                    // 风险持续时间必须使用当前墙钟时间，不能依赖最后一次传感器时间戳。
+                    nowMillis = nowMillis(),
                     currentStepCount = payload.stepCount,
                 )
                 if (event != null) {
-                    eventStore.append(event)
+                    val delivered = onRiskDetected(event)
+                    eventStore.append(
+                        event.copy(notificationDelivered = delivered),
+                    )
                 }
             }
             handler.postDelayed(this, POLL_INTERVAL_MILLIS)

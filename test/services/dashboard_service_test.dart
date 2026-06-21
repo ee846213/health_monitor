@@ -14,6 +14,7 @@ import 'package:health_monitor/storage/repositories/query_window.dart';
 void main() {
   test('首页聚合服务能生成分数、环境快照与 AI 建议字段', () async {
     final insight = _fakeInsightSnapshot();
+    HealthInsightMetrics? adviceMetrics;
     final service = DashboardService(
       loadInsightSnapshot: ({
         required QueryWindow window,
@@ -28,6 +29,7 @@ void main() {
         required List<RuleVerdict> verdicts,
         required EnvironmentOverview? environmentOverview,
       }) async {
+        adviceMetrics = metrics;
         return const DailyAdviceBubble(
           text: '晚饭后散步 15 分钟会更稳。',
           source: DailyAdviceSource.fallback,
@@ -43,6 +45,9 @@ void main() {
     expect(snapshot.stepCard.goalSteps, 6000);
     expect(snapshot.environmentSnapshot.lightLabel, '舒适');
     expect(snapshot.dailyAdviceBubble.text, '晚饭后散步 15 分钟会更稳。');
+    expect(snapshot.screenCard.totalMinutes, 148);
+    expect(snapshot.screenCard.yesterdayDeltaMinutes, -52);
+    expect(adviceMetrics?.screenMinutes, 148);
   });
 }
 
@@ -69,6 +74,14 @@ HealthInsightSnapshot _fakeInsightSnapshot() {
       ),
     ],
     usageSummaries: <DigitalUsageSummary>[
+      DigitalUsageSummary(
+        date: DateTime(2026, 6, 15),
+        screenOnDuration: const Duration(minutes: 200),
+        unlockCount: 36,
+        nighttimeUsageDuration: const Duration(minutes: 45),
+        focusSessionBreakCount: 6,
+        topCategory: UsageCategory.social,
+      ),
       DigitalUsageSummary(
         date: DateTime(2026, 6, 16),
         screenOnDuration: const Duration(minutes: 148),
@@ -105,7 +118,9 @@ HealthInsightSnapshot _fakeInsightSnapshot() {
     metrics: const HealthInsightMetrics(
       stepCount: 4860,
       sedentaryMinutes: 96,
-      screenMinutes: 148,
+      // 模拟最近一天窗口同时读到昨日和今日摘要后的累计值。
+      // 首页聚合必须重新收敛到今天，不能把 200 + 148 展示成今日亮屏。
+      screenMinutes: 348,
       outdoorMinutes: 15,
     ),
     environmentOverview: const EnvironmentOverview(

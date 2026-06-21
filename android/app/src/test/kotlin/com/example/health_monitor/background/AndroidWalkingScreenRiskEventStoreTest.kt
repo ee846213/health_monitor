@@ -14,6 +14,7 @@ class AndroidWalkingScreenRiskEventStoreTest {
                 screenOnStartedAtMillis = 0L,
                 continuousWalkingSeconds = 8,
                 stepDelta = 10,
+                notificationDelivered = true,
             ),
         )
 
@@ -22,6 +23,7 @@ class AndroidWalkingScreenRiskEventStoreTest {
 
         assertEquals(1, firstDrain.size)
         assertEquals("risk-1", firstDrain.single().eventId)
+        assertEquals(true, firstDrain.single().notificationDelivered)
         assertEquals(0, secondDrain.size)
     }
 }

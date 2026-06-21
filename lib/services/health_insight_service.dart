@@ -156,6 +156,7 @@ class HealthInsightService {
           (event) => ReminderRecord.fromWalkingScreenRiskEvent(
             eventId: event.eventId,
             triggeredAt: event.occurredAt,
+            notificationDelivered: event.notificationDelivered,
           ),
         )
         .toList(growable: false);

@@ -12,9 +12,11 @@ import com.example.health_monitor.background.AndroidBackgroundCaptureRequest
 import com.example.health_monitor.background.AndroidBackgroundCaptureRuntime
 import com.example.health_monitor.background.AndroidBackgroundCaptureScheduler
 import com.example.health_monitor.background.AndroidBackgroundForegroundServiceIntentFactory
+import com.example.health_monitor.background.AndroidBackgroundServiceRuntimeState
 import com.example.health_monitor.background.AndroidBackgroundWorkScheduler
 import com.example.health_monitor.background.AndroidForegroundServiceOrchestrator
 import com.example.health_monitor.background.SharedPreferencesAndroidBackgroundCaptureStateStore
+import com.example.health_monitor.background.withRuntimeServiceState
 import com.example.health_monitor.light.AndroidAmbientLightStreamHandler
 import com.example.health_monitor.stepcounter.AndroidStepCounterReader
 import com.example.health_monitor.stepcounter.StepCounterPayload
@@ -150,7 +152,9 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun handleGetBackgroundCaptureStatus(result: MethodChannel.Result) {
-        val snapshot = backgroundCaptureScheduler.snapshot()
+        val snapshot = backgroundCaptureScheduler.snapshot().withRuntimeServiceState(
+            AndroidBackgroundServiceRuntimeState.isServiceRunning,
+        )
         result.success(
             mapOf(
                 "isRunning" to snapshot.isRunning,

@@ -66,6 +66,7 @@ private fun AndroidWalkingScreenRiskEvent.toJson(): JSONObject {
         put("screenOnStartedAtMillis", screenOnStartedAtMillis)
         put("continuousWalkingSeconds", continuousWalkingSeconds)
         put("stepDelta", stepDelta)
+        put("notificationDelivered", notificationDelivered)
     }
 }
 
@@ -76,5 +77,6 @@ private fun JSONObject.toEvent(): AndroidWalkingScreenRiskEvent {
         screenOnStartedAtMillis = optLong("screenOnStartedAtMillis"),
         continuousWalkingSeconds = optInt("continuousWalkingSeconds"),
         stepDelta = optInt("stepDelta"),
+        notificationDelivered = optBoolean("notificationDelivered", false),
     )
 }

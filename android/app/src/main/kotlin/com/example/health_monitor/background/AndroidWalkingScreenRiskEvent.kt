@@ -6,6 +6,7 @@ data class AndroidWalkingScreenRiskEvent(
     val screenOnStartedAtMillis: Long,
     val continuousWalkingSeconds: Int,
     val stepDelta: Int,
+    val notificationDelivered: Boolean = false,
 ) {
     fun toChannelMap(): Map<String, Any> {
         return mapOf(
@@ -14,6 +15,7 @@ data class AndroidWalkingScreenRiskEvent(
             "screenOnStartedAtMillis" to screenOnStartedAtMillis,
             "continuousWalkingSeconds" to continuousWalkingSeconds,
             "stepDelta" to stepDelta,
+            "notificationDelivered" to notificationDelivered,
         )
     }
 }

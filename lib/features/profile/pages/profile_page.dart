@@ -154,10 +154,22 @@ class _PermissionStatusCard extends ConsumerWidget {
         status: permissionStatuses[PermissionType.microphone],
       ),
       _PermissionRowData(
+        type: PermissionType.notification,
+        title: '通知与风险提醒',
+        subtitle: '用于及时发送移动看屏、久坐等本地安全提醒。',
+        status: permissionStatuses[PermissionType.notification],
+      ),
+      _PermissionRowData(
         type: PermissionType.usageAccess,
         title: '数字生活习惯分析',
         subtitle: '用于判断看屏频率和碎片化查看时段。',
         status: permissionStatuses[PermissionType.usageAccess],
+      ),
+      _PermissionRowData(
+        type: PermissionType.backgroundCapture,
+        title: '后台持续感知',
+        subtitle: '用于在锁屏或切换应用后继续识别步行与移动看屏风险。',
+        status: permissionStatuses[PermissionType.backgroundCapture],
       ),
     ].where((_PermissionRowData row) {
       if (row.type == PermissionType.usageAccess &&

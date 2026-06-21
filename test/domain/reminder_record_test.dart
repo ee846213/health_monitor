@@ -1,4 +1,4 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/rules/engine/rule_verdict.dart';
 
@@ -73,6 +73,17 @@ void main() {
       expect(record.reasonSummary, '移动状态下连续亮屏超过 8 秒。');
       expect(record.actionSuggestion, '走路时先收起屏幕，等停下后再查看手机。');
       expect(record.sourceEventId, 'risk-1');
+    });
+
+    test('原生风险通知已送达时不应在 Flutter 恢复后重复投递', () {
+      final triggeredAt = DateTime(2026, 6, 10, 8);
+      final record = ReminderRecord.fromWalkingScreenRiskEvent(
+        eventId: 'risk-delivered',
+        triggeredAt: triggeredAt,
+        notificationDelivered: true,
+      );
+
+      expect(record.deliveredAt, triggeredAt);
     });
 
     test('fromVerdict 应正确映射 noisyEnvironment 类型', () {

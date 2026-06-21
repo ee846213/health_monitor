@@ -45,6 +45,41 @@ class AndroidWalkingScreenRiskDetectorTest {
     }
 
     @Test
+    fun shouldAcceptBatchedStepCounterDelivery() {
+        val detector = AndroidWalkingScreenRiskDetector()
+        detector.onScreenTurnedOn(1_000L)
+        detector.poll(nowMillis = 2_000L, currentStepCount = 100)
+
+        repeat(6) { second ->
+            assertNull(
+                detector.poll(
+                    nowMillis = 3_000L + second * 1_000L,
+                    currentStepCount = 100,
+                ),
+            )
+        }
+
+        val event = detector.poll(
+            nowMillis = 9_000L,
+            currentStepCount = 108,
+        )
+
+        assertNotNull(event)
+        assertEquals(8, event?.stepDelta)
+    }
+
+    @Test
+    fun staleMovementShouldNotTriggerAfterWalkingStops() {
+        val detector = AndroidWalkingScreenRiskDetector()
+        detector.onScreenTurnedOn(1_000L)
+        detector.poll(nowMillis = 2_000L, currentStepCount = 10)
+        detector.poll(nowMillis = 3_000L, currentStepCount = 14)
+
+        assertNull(detector.poll(nowMillis = 7_000L, currentStepCount = 14))
+        assertNull(detector.poll(nowMillis = 10_000L, currentStepCount = 14))
+    }
+
+    @Test
     fun shouldResetWhenWalkingStopsBeforeThreshold() {
         val detector = AndroidWalkingScreenRiskDetector()
         detector.onScreenTurnedOn(1_000L)
