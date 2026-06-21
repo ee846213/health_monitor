@@ -53,13 +53,36 @@ void main() {
     await tester.pumpAndSettle();
 
     final track = find.byKey(const Key('health-bottom-nav-track'));
-    expect(tester.getSize(track).height, 50);
+    expect(tester.getSize(track).height, 60);
     expect(
       tester.getBottomLeft(track).dy,
       greaterThan(tester.view.physicalSize.height /
           tester.view.devicePixelRatio *
           0.75),
     );
+  });
+
+  testWidgets('应用壳应提供首页、趋势、简报和我的四个一级入口', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          overviewViewModelProvider
+              .overrideWith((Ref ref) async => overviewViewModel),
+          overviewReadyDataProvider.overrideWith(
+            (Ref ref) async => _buildOverviewReadyData(overviewViewModel),
+          ),
+        ],
+        child: const HealthMonitorApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('首页'), findsOneWidget);
+    expect(find.text('趋势'), findsOneWidget);
+    expect(find.text('简报'), findsOneWidget);
+    expect(find.text('我的'), findsOneWidget);
   });
 
   testWidgets('应用壳应提供采集调试入口', (WidgetTester tester) async {

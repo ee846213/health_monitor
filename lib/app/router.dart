@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:health_monitor/app/theme/app_theme_extension.dart';
 import 'package:health_monitor/app/theme/health_motion_tokens.dart';
+import 'package:health_monitor/app/widgets/health_vector_icon.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/features/briefing/pages/briefing_page.dart';
 import 'package:health_monitor/features/diagnostics/pages/sensor_debug_page.dart';
@@ -10,122 +12,65 @@ import 'package:health_monitor/features/reminders/pages/reminder_pages.dart';
 import 'package:health_monitor/features/state_pages/state_pages.dart';
 import 'package:health_monitor/features/trends/pages/trend_analysis_page.dart';
 
-const Color _textMuted = Color(0xFF7A8179);
-const Color _sageSoft = Color(0xFFE6EEE8);
-const Color _sageDeep = Color(0xFF5C7768);
-const Color _glass = Color(0xFFFDF0CC);
-const Color _line = Color(0xFFDDD8CF);
+final GlobalKey<NavigatorState> _rootNavigatorKey =
+    GlobalKey<NavigatorState>(debugLabel: 'root');
 
-class AppShell extends StatelessWidget {
-  const AppShell({super.key, required this.child});
+/// 一级页面可注册自己的滚动控制器，以支持再次点击当前 Tab 回到顶部。
+class PrimaryTabScrollRegistry {
+  PrimaryTabScrollRegistry._();
 
-  final Widget child;
+  static final Map<int, ScrollController> _controllers =
+      <int, ScrollController>{};
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: _PrimaryTabTransition(
-        location: GoRouterState.of(context).uri.path,
-        child: child,
-      ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-        color: const Color(0xFFF5F3EE),
-        child: _TabBar(selectedIndex: _selectedIndex(context)),
-      ),
-    );
+  static void register(int index, ScrollController controller) {
+    _controllers[index] = controller;
   }
 
-  int _selectedIndex(BuildContext context) {
-    final location = GoRouterState.of(context).uri.toString();
-    if (location.startsWith('/briefing')) {
-      return 1;
+  static void unregister(int index, ScrollController controller) {
+    if (identical(_controllers[index], controller)) {
+      _controllers.remove(index);
     }
-    if (location.startsWith('/profile')) {
-      return 2;
+  }
+
+  static Future<void> scrollToTop(int index) async {
+    final controller = _controllers[index];
+    if (controller == null || !controller.hasClients) {
+      return;
     }
-    return 0;
+    await controller.animateTo(
+      0,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+    );
   }
 }
 
-class _TabBar extends StatelessWidget {
-  const _TabBar({required this.selectedIndex});
+class AppShell extends StatelessWidget {
+  const AppShell({
+    super.key,
+    required this.navigationShell,
+  });
 
-  final int selectedIndex;
+  final StatefulNavigationShell navigationShell;
 
   @override
   Widget build(BuildContext context) {
-    final motion = context.healthMotion;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: _glass,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: _line),
-        boxShadow: const <BoxShadow>[
-          BoxShadow(
-            color: Color(0x1420231F),
-            blurRadius: 24,
-            offset: Offset(0, 10),
-          ),
-        ],
-      ),
-      child: SizedBox(
-        key: const Key('health-bottom-nav-track'),
-        height: 50,
-        child: LayoutBuilder(
-          builder: (BuildContext context, BoxConstraints constraints) {
-            return Stack(
-              fit: StackFit.expand,
-              children: <Widget>[
-                AnimatedAlign(
-                  alignment: Alignment(
-                    -1 + selectedIndex * 1.0,
-                    0,
-                  ),
-                  duration: context.motionDuration(motion.base),
-                  curve: motion.standardCurve,
-                  child: FractionallySizedBox(
-                    widthFactor: 1 / 3,
-                    child: Container(
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: _sageSoft,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                    ),
-                  ),
-                ),
-                Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: _TabItem(
-                        icon: '今日',
-                        label: '首页',
-                        isActive: selectedIndex == 0,
-                        onTap: () => context.go('/overview'),
-                      ),
-                    ),
-                    Expanded(
-                      child: _TabItem(
-                        icon: '回顾',
-                        label: '简报',
-                        isActive: selectedIndex == 1,
-                        onTap: () => context.go('/briefing'),
-                      ),
-                    ),
-                    Expanded(
-                      child: _TabItem(
-                        icon: '设置',
-                        label: '我的',
-                        isActive: selectedIndex == 2,
-                        onTap: () => context.go('/profile'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            );
+    final tokens = context.healthTheme;
+    return Scaffold(
+      backgroundColor: tokens.canvas,
+      extendBody: true,
+      body: navigationShell,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.fromLTRB(18, 0, 18, 12),
+        child: _HealthBottomNavigation(
+          selectedIndex: navigationShell.currentIndex,
+          onSelected: (int index) {
+            if (index == navigationShell.currentIndex) {
+              PrimaryTabScrollRegistry.scrollToTop(index);
+              return;
+            }
+            navigationShell.goBranch(index);
           },
         ),
       ),
@@ -133,92 +78,89 @@ class _TabBar extends StatelessWidget {
   }
 }
 
-class _TabItem extends StatelessWidget {
-  const _TabItem({
-    required this.icon,
-    required this.label,
-    required this.isActive,
-    required this.onTap,
+class _HealthBottomNavigation extends StatelessWidget {
+  const _HealthBottomNavigation({
+    required this.selectedIndex,
+    required this.onSelected,
   });
 
-  final String icon;
-  final String label;
-  final bool isActive;
-  final VoidCallback onTap;
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  static const List<(String, String)> _items = <(String, String)>[
+    ('home', '首页'),
+    ('show_chart', '趋势'),
+    ('article', '简报'),
+    ('person', '我的'),
+  ];
 
   @override
   Widget build(BuildContext context) {
-    final motion = context.healthMotion;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            AnimatedDefaultTextStyle(
-              duration: context.motionDuration(motion.fast),
-              curve: motion.standardCurve,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: isActive ? _sageDeep : _textMuted,
+    final tokens = context.healthTheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xF2FFFFFF),
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: tokens.cardShadow,
+      ),
+      child: SizedBox(
+        key: const Key('health-bottom-nav-track'),
+        height: 60,
+        child: Row(
+          children: List<Widget>.generate(_items.length, (int index) {
+            final item = _items[index];
+            final active = index == selectedIndex;
+            return Expanded(
+              child: Semantics(
+                selected: active,
+                button: true,
+                label: item.$2,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(25),
+                  onTap: () => onSelected(index),
+                  child: Padding(
+                    padding: const EdgeInsets.all(5),
+                    child: AnimatedContainer(
+                      duration: context.motionDuration(
+                        context.healthMotion.base,
+                      ),
+                      curve: context.healthMotion.standardCurve,
+                      decoration: BoxDecoration(
+                        color: active ? tokens.sage : Colors.transparent,
+                        borderRadius: BorderRadius.circular(25),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: <Widget>[
+                          HealthVectorIcon(
+                            item.$1,
+                            size: 19,
+                            weight: 500,
+                            color: active ? Colors.white : tokens.textPrimary,
+                          ),
+                          const SizedBox(height: 1),
+                          AnimatedDefaultTextStyle(
+                            duration: context.motionDuration(
+                              context.healthMotion.fast,
+                            ),
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w500,
+                              color:
+                                  active ? Colors.white : tokens.textSecondary,
+                            ),
+                            child: Text(item.$2),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
-              child: Text(
-                icon,
-              ),
-            ),
-            const SizedBox(height: 4),
-            AnimatedDefaultTextStyle(
-              duration: context.motionDuration(motion.fast),
-              curve: motion.standardCurve,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                color: isActive ? _sageDeep : _textMuted,
-              ),
-              child: Text(
-                label,
-              ),
-            ),
-          ],
+            );
+          }),
         ),
       ),
-    );
-  }
-}
-
-class _PrimaryTabTransition extends StatelessWidget {
-  const _PrimaryTabTransition({
-    required this.location,
-    required this.child,
-  });
-
-  final String location;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final motion = context.healthMotion;
-    final reduceMotion = context.reduceMotion;
-    return AnimatedSwitcher(
-      duration: context.motionDuration(const Duration(milliseconds: 180)),
-      switchInCurve: motion.standardCurve,
-      switchOutCurve: Curves.easeInCubic,
-      transitionBuilder: (Widget child, Animation<double> animation) {
-        if (reduceMotion) {
-          return FadeTransition(opacity: animation, child: child);
-        }
-        return FadeTransition(
-          opacity: animation,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.99, end: 1).animate(animation),
-            child: child,
-          ),
-        );
-      },
-      child: KeyedSubtree(key: ValueKey<String>(location), child: child),
     );
   }
 }
@@ -261,35 +203,54 @@ CustomTransitionPage<void> _secondaryPage({
 }
 
 final GoRouter appRouter = GoRouter(
+  navigatorKey: _rootNavigatorKey,
   initialLocation: '/overview',
   routes: <RouteBase>[
-    ShellRoute(
-      builder: (BuildContext context, GoRouterState state, Widget child) {
-        return AppShell(child: child);
+    StatefulShellRoute.indexedStack(
+      builder: (
+        BuildContext context,
+        GoRouterState state,
+        StatefulNavigationShell navigationShell,
+      ) {
+        return AppShell(navigationShell: navigationShell);
       },
-      routes: <RouteBase>[
-        GoRoute(
-          path: '/overview',
-          builder: (_, __) => const OverviewPage(),
+      branches: <StatefulShellBranch>[
+        StatefulShellBranch(
+          routes: <RouteBase>[
+            GoRoute(
+              path: '/overview',
+              builder: (_, __) => const OverviewPage(),
+            ),
+          ],
         ),
-        GoRoute(
-          path: '/briefing',
-          builder: (_, __) => const BriefingPage(),
+        StatefulShellBranch(
+          routes: <RouteBase>[
+            GoRoute(
+              path: '/trends',
+              builder: (_, __) => const TrendAnalysisPage(),
+            ),
+          ],
         ),
-        GoRoute(
-          path: '/profile',
-          builder: (_, __) => const ProfilePage(),
+        StatefulShellBranch(
+          routes: <RouteBase>[
+            GoRoute(
+              path: '/briefing',
+              builder: (_, __) => const BriefingPage(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: <RouteBase>[
+            GoRoute(
+              path: '/profile',
+              builder: (_, __) => const ProfilePage(),
+            ),
+          ],
         ),
       ],
     ),
     GoRoute(
-      path: '/trends',
-      pageBuilder: (_, GoRouterState state) => _secondaryPage(
-        state: state,
-        child: const TrendAnalysisPage(),
-      ),
-    ),
-    GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
       path: '/reminders',
       pageBuilder: (_, GoRouterState state) => _secondaryPage(
         state: state,
@@ -299,26 +260,29 @@ final GoRouter appRouter = GoRouter(
         GoRoute(
           path: 'detail',
           pageBuilder: (BuildContext context, GoRouterState state) {
-            final record = state.extra as ReminderRecord;
             return _secondaryPage(
               state: state,
-              child: ReminderDetailPage(record: record),
+              child: ReminderDetailPage(
+                record: state.extra! as ReminderRecord,
+              ),
             );
           },
         ),
         GoRoute(
           path: 'explanation',
           pageBuilder: (BuildContext context, GoRouterState state) {
-            final record = state.extra as ReminderRecord;
             return _secondaryPage(
               state: state,
-              child: ReminderExplanationPage(record: record),
+              child: ReminderExplanationPage(
+                record: state.extra! as ReminderRecord,
+              ),
             );
           },
         ),
       ],
     ),
     GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
       path: '/diagnostics',
       pageBuilder: (_, GoRouterState state) => _secondaryPage(
         state: state,
@@ -326,6 +290,7 @@ final GoRouter appRouter = GoRouter(
       ),
     ),
     GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
       path: '/permission-denied',
       pageBuilder: (_, GoRouterState state) => _secondaryPage(
         state: state,
@@ -333,6 +298,7 @@ final GoRouter appRouter = GoRouter(
       ),
     ),
     GoRoute(
+      parentNavigatorKey: _rootNavigatorKey,
       path: '/data-insufficient',
       pageBuilder: (_, GoRouterState state) => _secondaryPage(
         state: state,
