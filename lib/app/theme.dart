@@ -3,48 +3,59 @@ import 'package:health_monitor/app/theme/app_theme_extension.dart';
 import 'package:health_monitor/app/theme/health_motion_tokens.dart';
 
 ThemeData buildAppTheme() {
-  const Color canvas = Color(0xFFF5F3EE);
-  const Color surface = Color(0xFFFFFDF8);
-  const Color line = Color(0xFFDDD8CF);
-  const Color sage = Color(0xFF7B9786);
-  const Color textPrimary = Color(0xFF1F2320);
-  const Color textMuted = Color(0xFF7A8179);
+  final tokens = HealthMonitorTheme.fallback();
 
   final ColorScheme colorScheme = ColorScheme.fromSeed(
-    seedColor: sage,
+    seedColor: tokens.sage,
     brightness: Brightness.light,
-    surface: surface,
-    outline: line,
-  ).copyWith(primary: sage, surface: surface, onSurface: textPrimary);
+    surface: tokens.surface,
+    outline: tokens.borderSubtle,
+  ).copyWith(
+    primary: tokens.sage,
+    surface: tokens.surface,
+    onSurface: tokens.textPrimary,
+  );
 
   return ThemeData(
     useMaterial3: true,
     colorScheme: colorScheme,
-    scaffoldBackgroundColor: canvas,
+    scaffoldBackgroundColor: tokens.canvas,
     fontFamily: 'Inter',
     extensions: <ThemeExtension<dynamic>>[
-      HealthMonitorTheme.fallback(),
+      tokens,
       const HealthMotionTokens.standard(),
     ],
-    textTheme: const TextTheme(
+    textTheme: TextTheme(
       headlineMedium: TextStyle(
-          fontSize: 24, fontWeight: FontWeight.w700, color: textPrimary),
+        fontSize: 24,
+        fontWeight: FontWeight.w700,
+        color: tokens.textPrimary,
+      ),
       titleMedium: TextStyle(
-          fontSize: 16, fontWeight: FontWeight.w600, color: textPrimary),
-      bodyMedium: TextStyle(fontSize: 14, height: 1.5, color: textMuted),
+        fontSize: 16,
+        fontWeight: FontWeight.w700,
+        color: tokens.textPrimary,
+      ),
+      bodyMedium: TextStyle(
+        fontSize: 14,
+        height: 1.5,
+        color: tokens.textSecondary,
+      ),
     ),
-    cardTheme: const CardThemeData(
-      color: surface,
+    cardTheme: CardThemeData(
+      color: tokens.surface,
       elevation: 0,
       shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(28)),
-          side: BorderSide(color: line)),
+        borderRadius: BorderRadius.circular(tokens.cardRadius),
+      ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        backgroundColor: sage,
+        backgroundColor: tokens.sage,
         foregroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(tokens.buttonRadius),
+        ),
       ),
     ),
   );

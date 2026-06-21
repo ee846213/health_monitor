@@ -23,6 +23,7 @@ dependencies:
   flutter_local_notifications: ^17.2.2
   path_provider: ^2.1.5
   dio: ^5.7.0
+  flutter_svg: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -33,3 +34,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icons/common/material_symbols_rounded/
+    - assets/illustrations/common/
