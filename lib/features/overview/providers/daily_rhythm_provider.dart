@@ -16,7 +16,9 @@ final dailyRhythmUiModelProvider = Provider<DailyRhythmUiModel?>((Ref ref) {
 
   return DailyRhythmUiModel(
     generatedAt: now,
-    currentTime: DateTime.now(),
+    // 当前节点必须与本次 Dashboard 快照使用同一时间基准，避免刷新前后
+    // 节点位置和卡片数据来自不同时间，造成节奏轴“跳点”。
+    currentTime: now,
     hasRealData: dashboard.hasRealData,
     nodes: <DailyRhythmNode>[
       DailyRhythmNode(

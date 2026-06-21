@@ -133,10 +133,13 @@ Future<void> _showEditor(
                                     .read(
                                         notificationPreferenceProvider.notifier)
                                     .save(draft);
-                                if (context.mounted)
+                                if (context.mounted) {
                                   Navigator.of(context).pop();
+                                }
                               } catch (_) {
-                                if (!context.mounted) return;
+                                if (!context.mounted) {
+                                  return;
+                                }
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                     content: Text('保存失败，已恢复原设置'),

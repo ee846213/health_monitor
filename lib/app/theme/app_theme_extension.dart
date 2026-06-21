@@ -76,7 +76,6 @@ class HealthMonitorTheme extends ThemeExtension<HealthMonitorTheme> {
       ),
       dataStyle: TextStyle(
         fontSize: 13,
-        fontFamily: 'Inter',
         color: Color(0xFF242724),
       ),
       verdictNormalColor: Color(0xFF6F9A72),

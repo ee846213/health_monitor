@@ -137,6 +137,8 @@ class HealthSegmentedControl<T> extends StatelessWidget {
                       fontSize: 12,
                       fontWeight: active ? FontWeight.w600 : FontWeight.w500,
                       color: active ? tokens.sage : tokens.textSecondary,
+                      fontFamily:
+                          Theme.of(context).textTheme.bodyMedium?.fontFamily,
                     ),
                     child: Text(labelBuilder(value)),
                   ),

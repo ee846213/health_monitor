@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:health_monitor/app/theme/app_theme_extension.dart';
 import 'package:health_monitor/app/theme/health_motion_tokens.dart';
 
-ThemeData buildAppTheme() {
+ThemeData buildAppTheme({String? fontFamily}) {
   final tokens = HealthMonitorTheme.fallback();
 
   final ColorScheme colorScheme = ColorScheme.fromSeed(
@@ -18,9 +18,9 @@ ThemeData buildAppTheme() {
 
   return ThemeData(
     useMaterial3: true,
+    fontFamily: fontFamily,
     colorScheme: colorScheme,
     scaffoldBackgroundColor: tokens.canvas,
-    fontFamily: 'Inter',
     extensions: <ThemeExtension<dynamic>>[
       tokens,
       const HealthMotionTokens.standard(),

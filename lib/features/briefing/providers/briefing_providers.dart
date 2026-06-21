@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_monitor/domain/briefing/daily_brief_snapshot.dart';
 import 'package:health_monitor/domain/environment/ambient_light_sample.dart';
-import 'package:health_monitor/domain/environment/environment_overview.dart';
 import 'package:health_monitor/domain/environment/noise_sample.dart';
 import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/metrics/daily_metrics.dart';
@@ -448,41 +447,6 @@ DailyBriefSnapshot _buildDailyBriefSnapshot(HealthInsightSnapshot snapshot) {
 
 List<String> _buildSuggestions(HealthInsightSnapshot snapshot) {
   return buildBriefingSuggestions(snapshot);
-
-  final suggestions = <String>[];
-  final metrics = snapshot.metrics;
-  final usageSummary = snapshot.screenUsageHabitSummary;
-
-  if (usageSummary != null && usageSummary.headline.contains('深夜')) {
-    suggestions.add('今晚尽量提前结束看屏，把最后十分钟留给放松和入睡准备。');
-  } else if (usageSummary != null && usageSummary.headline.contains('查看频率偏高')) {
-    suggestions.add('把零散查看压缩到固定时段，给连续专注留出完整区间。');
-  } else if (usageSummary != null && usageSummary.headline.contains('时段激活过密')) {
-    suggestions.add('遇到短间隔再次拿起手机时，先停一秒确认是否真的需要查看。');
-  }
-
-  final environmentOverview = snapshot.environmentOverview;
-  if (environmentOverview != null &&
-      environmentOverview.primaryConcern ==
-          EnvironmentPrimaryConcern.highNoise) {
-    suggestions.add('夜间环境偏嘈杂，睡前尽量切到更安静的空间。');
-  } else if (environmentOverview != null &&
-      environmentOverview.primaryConcern ==
-          EnvironmentPrimaryConcern.lowLight) {
-    suggestions.add('白天光线偏暗，工作或学习时尽量靠近自然光。');
-  }
-
-  if (metrics.stepCount < 5000) {
-    suggestions.add('今天活动量偏少，可以安排一次 10 到 15 分钟的补步。');
-  } else if (metrics.sedentaryMinutes >= 180) {
-    suggestions.add('久坐时间偏长，接下来每小时起身活动两三分钟会更稳妥。');
-  }
-
-  if (suggestions.isEmpty) {
-    suggestions.add('整体节奏比较平稳，继续保持现在的作息和用机边界。');
-  }
-
-  return suggestions.take(2).toList(growable: false);
 }
 
 QueryWindow _windowForRange(

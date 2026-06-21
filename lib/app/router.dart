@@ -148,6 +148,10 @@ class _HealthBottomNavigation extends StatelessWidget {
                               fontWeight: FontWeight.w500,
                               color:
                                   active ? Colors.white : tokens.textSecondary,
+                              fontFamily: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.fontFamily,
                             ),
                             child: Text(item.$2),
                           ),

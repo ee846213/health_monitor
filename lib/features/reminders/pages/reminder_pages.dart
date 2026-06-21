@@ -97,8 +97,12 @@ class _ReminderListPageState extends ConsumerState<ReminderListPage> {
 
     final groups = <String, List<ReminderRecord>>{};
     for (final record in records) {
-      groups.putIfAbsent(_dateKey(record.triggeredAt), () => <ReminderRecord>[])
-        ..add(record);
+      groups
+          .putIfAbsent(
+            _dateKey(record.triggeredAt),
+            () => <ReminderRecord>[],
+          )
+          .add(record);
     }
     final keys = groups.keys.toList()
       ..sort((left, right) => right.compareTo(left));

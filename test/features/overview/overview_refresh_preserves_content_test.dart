@@ -82,7 +82,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('综合健康分'), findsOneWidget);
+    expect(find.byKey(const Key('overview-summary-card')), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsNothing);
 
     container.read(screenStateProvider.notifier).state =
@@ -91,13 +91,13 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('综合健康分'), findsOneWidget);
+    expect(find.byKey(const Key('overview-summary-card')), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsNothing);
 
     container.read(screenStateProvider.notifier).state =
         const AsyncData(OverviewScreenState.ready);
     await tester.pumpAndSettle();
 
-    expect(find.text('综合健康分'), findsOneWidget);
+    expect(find.byKey(const Key('overview-summary-card')), findsOneWidget);
   });
 }

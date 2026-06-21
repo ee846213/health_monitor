@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health_monitor/domain/notification/notification_preference.dart';
 import 'package:health_monitor/domain/notification/reminder_delivery_plan.dart';
-import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/rules/engine/rule_verdict.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
@@ -11,7 +10,8 @@ import 'package:health_monitor/storage/repositories/notification_preference_repo
 void main() {
   test('提醒投递服务在勿扰时段内拦截发送，在非勿扰时段内放行', () async {
     final service = ReminderDeliveryService(
-      notificationPreferenceRepository: InMemoryNotificationPreferenceRepository(
+      notificationPreferenceRepository:
+          InMemoryNotificationPreferenceRepository(
         initialValue: const NotificationPreference(
           enabled: true,
           startHour: 22,
@@ -49,7 +49,8 @@ void main() {
 
   test('提醒投递服务在通知权限缺失时保留记录但不发送', () async {
     final service = ReminderDeliveryService(
-      notificationPreferenceRepository: InMemoryNotificationPreferenceRepository(
+      notificationPreferenceRepository:
+          InMemoryNotificationPreferenceRepository(
         initialValue: const NotificationPreference(
           enabled: false,
           startHour: 22,

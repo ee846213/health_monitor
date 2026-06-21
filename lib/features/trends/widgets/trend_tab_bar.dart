@@ -62,6 +62,8 @@ class TrendTabBar extends StatelessWidget {
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                         color: isSelected ? tokens.sage : tokens.textSecondary,
+                        fontFamily:
+                            Theme.of(context).textTheme.bodyMedium?.fontFamily,
                       ),
                       child: Text(_labelForTab(tab)),
                     ),

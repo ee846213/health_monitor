@@ -33,6 +33,8 @@ enum ReminderTypePreference {
   noisyEnvironment,
 }
 
+final profileNowProvider = Provider<DateTime>((ref) => DateTime.now());
+
 class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
 
@@ -153,12 +155,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
   }
 }
 
-class _Greeting extends StatelessWidget {
+class _Greeting extends ConsumerWidget {
   const _Greeting();
 
   @override
-  Widget build(BuildContext context) {
-    final hour = DateTime.now().hour;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final hour = ref.watch(profileNowProvider).hour;
     final greeting = hour < 12
         ? '早上好'
         : hour < 18

@@ -395,20 +395,3 @@ String? buildWalkingScreenRiskPrecisionNotice({
   }
   return null;
 }
-
-String _buildDashboardFallbackAdvice({
-  required HealthInsightMetrics metrics,
-  required List<RuleVerdict> verdicts,
-  required EnvironmentOverview? environmentOverview,
-}) {
-  if (verdicts.isNotEmpty) {
-    return verdicts.first.detail;
-  }
-  if (environmentOverview != null) {
-    return environmentOverview.detail;
-  }
-  if (metrics.stepCount < 6000) {
-    return '今天离 6000 步还差一点，饭后补一小段步数会更稳。';
-  }
-  return '整体节奏比较平稳，继续保持现在的活动与用机边界。';
-}

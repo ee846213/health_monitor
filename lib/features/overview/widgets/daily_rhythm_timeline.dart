@@ -80,13 +80,15 @@ class _DailyRhythmTimelineState extends State<DailyRhythmTimeline>
                   ),
                   ...List<Widget>.generate(widget.model.nodes.length, (index) {
                     final node = widget.model.nodes[index];
-                    final p = _nodePositions[index];
+                    final p = _curvePoint(node.time, constraints.maxWidth);
                     final appear = Curves.easeOut.transform(
                       ((progress - index * .12) / .52).clamp(0, 1),
                     );
                     return Positioned(
-                      left: p.dx * constraints.maxWidth - 32,
-                      top: p.dy - 58,
+                      left: p.dx - 32,
+                      // 事件图标悬浮在曲线上方，曲线上的小圆点由 Painter 单独绘制。
+                      // 这样当前时间点即使靠近某个事件，也不会与事件图标相互遮挡。
+                      top: p.dy - 96,
                       width: 64,
                       child: Opacity(
                         opacity: appear,
@@ -119,13 +121,6 @@ class _DailyRhythmTimelineState extends State<DailyRhythmTimeline>
     );
   }
 }
-
-const List<Offset> _nodePositions = <Offset>[
-  Offset(.22, 111),
-  Offset(.43, 98),
-  Offset(.66, 99),
-  Offset(.84, 113),
-];
 
 class _RhythmNodeView extends StatelessWidget {
   const _RhythmNodeView({
@@ -258,13 +253,12 @@ class _CurrentTimeMarker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final normalized =
-        ((time.hour + time.minute / 60 - 6) / 16).clamp(.06, .94);
-    final x = normalized * width;
-    final y = 113 - math.sin(normalized * math.pi) * 22;
+    final point = _curvePoint(time, width);
+    final x = point.dx;
+    final y = point.dy;
     return Positioned(
       left: x - 31,
-      top: y,
+      top: y - 15,
       width: 62,
       child: Opacity(
         opacity: Curves.easeOut.transform(((progress - .5) * 2).clamp(0, 1)),
@@ -357,8 +351,7 @@ class _RhythmCurvePainter extends CustomPainter {
     );
 
     for (var index = 0; index < nodes.length; index++) {
-      final position = _nodePositions[index];
-      final center = Offset(position.dx * size.width, position.dy);
+      final center = _curvePoint(nodes[index].time, size.width);
       final available = nodes[index].isAvailable;
       canvas.drawCircle(
         center,
@@ -377,6 +370,13 @@ class _RhythmCurvePainter extends CustomPainter {
   bool shouldRepaint(covariant _RhythmCurvePainter oldDelegate) {
     return oldDelegate.progress != progress || oldDelegate.nodes != nodes;
   }
+}
+
+Offset _curvePoint(DateTime time, double width) {
+  final normalized = ((time.hour + time.minute / 60 - 6) / 16).clamp(0.0, 1.0);
+  final x = 42 + normalized * (width - 84);
+  final y = 126 - math.sin(normalized * math.pi) * 34;
+  return Offset(x, y);
 }
 
 List<Color> _dimensionColors(BuildContext context) => <Color>[
