@@ -17,7 +17,7 @@ import 'package:health_monitor/storage/repositories/reminder_repository.dart';
 void main() {
   final overviewViewModel = _buildOverviewViewModel();
 
-  testWidgets('应用壳应渲染今日仪表盘标题', (WidgetTester tester) async {
+  testWidgets('应用壳应渲染生活节奏首页标题', (WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: <Override>[
@@ -32,7 +32,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('今日仪表盘'), findsOneWidget);
+    expect(find.text('今天的节奏'), findsOneWidget);
   });
 
   testWidgets('底部导航轨道应保持固定高度并停留在屏幕底部', (

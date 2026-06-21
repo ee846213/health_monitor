@@ -53,7 +53,7 @@ void main() {
     await tester.tap(find.byKey(const Key('metric-step-card')));
     await tester.pumpAndSettle();
     expect(find.text('近 7 天步数'), findsOneWidget);
-    expect(find.textContaining('4860 步'), findsOneWidget);
+    expect(find.text('今日 4860 步，目标 6000 步，达成 81%。'), findsOneWidget);
     expect(find.textContaining('6000 步'), findsOneWidget);
     expect(find.byKey(const ValueKey<String>('step-bar-今天')), findsOneWidget);
 
@@ -72,6 +72,8 @@ void main() {
     await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.byKey(const Key('metric-screen-card')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('metric-screen-card')));
     await tester.pumpAndSettle();
     expect(find.text('分时段使用分布'), findsOneWidget);

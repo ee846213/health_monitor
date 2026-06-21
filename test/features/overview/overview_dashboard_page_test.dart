@@ -12,7 +12,7 @@ import 'package:health_monitor/features/overview/providers/overview_ready_provid
 import 'package:health_monitor/services/permission_status_service.dart';
 
 void main() {
-  testWidgets('首页展示综合健康分、三张卡片、环境快照和 AI 建议', (
+  testWidgets('首页展示生活节奏轴、今日状态、四维摘要和行动建议', (
     WidgetTester tester,
   ) async {
     final readyData = _buildReadyData();
@@ -30,16 +30,30 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('综合健康分'), findsOneWidget);
-    expect(find.text('步数'), findsOneWidget);
-    expect(find.text('久坐'), findsOneWidget);
-    expect(find.text('屏幕'), findsOneWidget);
-    expect(find.textContaining('环境快照'), findsOneWidget);
-    expect(find.textContaining('AI 建议'), findsOneWidget);
-    expect(find.text('晚饭后散步 15 分钟会更稳。'), findsOneWidget);
+    expect(find.text('今天的节奏'), findsOneWidget);
+    expect(find.text('今日状态'), findsOneWidget);
+    expect(find.text('活动'), findsOneWidget);
+    expect(find.text('姿势'), findsOneWidget);
+    expect(find.text('环境噪音'), findsOneWidget);
+    expect(find.text('数字习惯'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('rhythm-node-activity')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('活动'), findsWidgets);
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('rhythm-current-time')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('当前状态'), findsOneWidget);
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('overview-action-card')),
+      300,
+    );
+    expect(find.byKey(const Key('overview-action-card')), findsOneWidget);
   });
 
-  testWidgets('点击综合健康分应跳转到趋势页', (WidgetTester tester) async {
+  testWidgets('点击今日结论应跳转到趋势页', (WidgetTester tester) async {
     final readyData = _buildReadyData();
     final router = GoRouter(
       initialLocation: '/overview',
@@ -68,7 +82,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('综合健康分'));
+    await tester.tap(find.byKey(const Key('overview-summary-card')));
     await tester.pumpAndSettle();
 
     expect(find.text('趋势页占位'), findsOneWidget);
