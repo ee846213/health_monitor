@@ -1,126 +1,195 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:health_monitor/app/router.dart';
+import 'package:health_monitor/app/theme/app_theme_extension.dart';
+import 'package:health_monitor/app/widgets/health_design_widgets.dart';
 import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
+import 'package:health_monitor/app/widgets/health_vector_icon.dart';
+import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
+import 'package:health_monitor/domain/trends/trend_snapshot.dart';
 import 'package:health_monitor/features/diagnostics/providers/diagnostics_providers.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
 import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 import 'package:health_monitor/features/profile/widgets/do_not_disturb_section.dart';
+import 'package:health_monitor/features/trends/providers/trend_analysis_provider.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
 
-const Color _surface = Color(0xFFFFFDF8);
-const Color _surfaceSoft = Color(0xFFF0ECE4);
-const Color _textPrimary = Color(0xFF1F2320);
-const Color _textSecondary = Color(0xFF505750);
-const Color _textMuted = Color(0xFF7A8179);
-const Color _line = Color(0xFFDDD8CF);
+final _profileReminderPreferencesProvider =
+    StateProvider<Map<ReminderTypePreference, bool>>((ref) {
+  return <ReminderTypePreference, bool>{
+    for (final type in ReminderTypePreference.values) type: true,
+  };
+});
 
-class ProfilePage extends ConsumerWidget {
+enum ReminderTypePreference {
+  all,
+  sedentary,
+  walkingScreen,
+  nightUsage,
+  noisyEnvironment,
+}
+
+class ProfilePage extends ConsumerStatefulWidget {
   const ProfilePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final pageReady = ref.watch(profilePageReadyProvider);
+  ConsumerState<ProfilePage> createState() => _ProfilePageState();
+}
 
+class _ProfilePageState extends ConsumerState<ProfilePage> {
+  final ScrollController _controller = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    PrimaryTabScrollRegistry.register(3, _controller);
+  }
+
+  @override
+  void dispose() {
+    PrimaryTabScrollRegistry.unregister(3, _controller);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = ref.watch(profilePageReadyProvider);
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F3EE),
-      appBar: AppBar(
-        title: const Text(
-          '我的',
-          style: TextStyle(
-            fontSize: 30,
-            fontWeight: FontWeight.w700,
-            color: _textPrimary,
+      backgroundColor: context.healthTheme.canvas,
+      body: SafeArea(
+        bottom: false,
+        child: ready.when(
+          skipLoadingOnRefresh: true,
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, stackTrace) => Center(
+            child: TextButton(
+              onPressed: () => ref.invalidate(overviewViewModelProvider),
+              child: const Text('我的页面加载失败，点击重试'),
+            ),
+          ),
+          data: (_) => ListView(
+            controller: _controller,
+            padding: const EdgeInsets.fromLTRB(18, 22, 18, 112),
+            children: <Widget>[
+              const HealthStaggeredEntrance(index: 0, child: _Greeting()),
+              const SizedBox(height: 18),
+              const HealthStaggeredEntrance(
+                index: 1,
+                child: _SensingStatusCard(),
+              ),
+              const SizedBox(height: 16),
+              HealthStaggeredEntrance(
+                index: 2,
+                child: _SettingsGroup(
+                  children: <Widget>[
+                    _SettingsRow(
+                      key: const Key('profile-reminders-row'),
+                      icon: 'notifications',
+                      title: '提醒记录',
+                      subtitle: '查看提醒原因和处理状态',
+                      color: context.healthTheme.sand,
+                      onTap: () => context.push('/reminders'),
+                    ),
+                    const DoNotDisturbSection(),
+                    _SettingsRow(
+                      key: const Key('profile-preferences-row'),
+                      icon: 'devices',
+                      title: '提醒偏好',
+                      subtitle: '选择参与提醒的风险类型',
+                      color: context.healthTheme.blue,
+                      onTap: () => _showReminderPreferences(context, ref),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              HealthStaggeredEntrance(
+                index: 3,
+                child: _SettingsGroup(
+                  children: <Widget>[
+                    _SettingsRow(
+                      key: const Key('profile-permission-row'),
+                      icon: 'verified_user',
+                      title: '权限与隐私',
+                      subtitle: '查看每项能力的用途与当前状态',
+                      color: context.healthTheme.sage,
+                      onTap: () => _showPermissionSheet(context, ref),
+                    ),
+                    _SettingsRow(
+                      icon: 'link',
+                      title: '数据与存储',
+                      subtitle: '本地处理、保留与清理说明',
+                      color: context.healthTheme.coral,
+                      onTap: () => _showInfoSheet(
+                        context,
+                        '本地处理',
+                        '原始感知数据优先在本地处理，不保存原始音频，也不展示虚假的云同步状态。',
+                      ),
+                    ),
+                    _SettingsRow(
+                      icon: 'info',
+                      title: '关于我们',
+                      subtitle: '版本、隐私政策与能力边界',
+                      color: context.healthTheme.textSecondary,
+                      onTap: () => _showInfoSheet(
+                        context,
+                        '关于健康感知',
+                        '本应用提供生活节奏洞察，不构成医学诊断。首版不依赖额外硬件。',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        backgroundColor: _surface,
-        elevation: 0,
-      ),
-      body: pageReady.when(
-        skipLoadingOnRefresh: true,
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (Object error, StackTrace _) =>
-            const Center(child: Text('加载我的页面失败')),
-        data: (_) {
-          return const SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(18, 6, 18, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                HealthStaggeredEntrance(
-                  index: 0,
-                  child: _MyRemindersCard(),
-                ),
-                SizedBox(height: 20),
-                HealthStaggeredEntrance(
-                  index: 1,
-                  child: DoNotDisturbSection(),
-                ),
-                SizedBox(height: 20),
-                HealthStaggeredEntrance(
-                  index: 2,
-                  child: _PermissionStatusCard(),
-                ),
-              ],
-            ),
-          );
-        },
       ),
     );
   }
 }
 
-class _MyRemindersCard extends ConsumerWidget {
-  const _MyRemindersCard();
+class _Greeting extends StatelessWidget {
+  const _Greeting();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final reminders = ref.watch(profileRemindersProvider);
-    final latestReminder = reminders.isEmpty ? null : reminders.first;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: _line),
-      ),
-      child: Column(
+  Widget build(BuildContext context) {
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12
+        ? '早上好'
+        : hour < 18
+            ? '下午好'
+            : '晚上好';
+    return SizedBox(
+      height: 92,
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          const Text(
-            '我的提醒',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: _textMuted,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  greeting,
+                  style: TextStyle(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w700,
+                    color: context.healthTheme.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text('你的数据由你掌控', style: context.healthTheme.bodyStyle),
+              ],
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            '今天提醒 ${reminders.length} 次',
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              color: _textPrimary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            latestReminder == null
-                ? '今天还没有触发提醒。'
-                : '最近一条是 ${_timeLabel(latestReminder.triggeredAt)} 的“${latestReminder.title}”。',
-            style: const TextStyle(fontSize: 13, color: _textSecondary),
-          ),
-          const SizedBox(height: 12),
-          _ActionRow(
-            title: '进入提醒记录',
-            subtitle: '查看时间、提醒文案和触发原因',
-            actionLabel: '查看',
-            onTap: () => context.push('/reminders'),
+          SvgPicture.asset(
+            'assets/illustrations/common/profile_plant.svg',
+            width: 74,
+            height: 86,
           ),
         ],
       ),
@@ -128,85 +197,123 @@ class _MyRemindersCard extends ConsumerWidget {
   }
 }
 
-class _PermissionStatusCard extends ConsumerWidget {
-  const _PermissionStatusCard();
+class _SensingStatusCard extends ConsumerWidget {
+  const _SensingStatusCard();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final permissionStatuses = ref.watch(profilePermissionStatusesProvider);
-    final permissionRows = <_PermissionRowData>[
-      _PermissionRowData(
-        type: PermissionType.motion,
-        title: '活动识别',
-        subtitle: '用于步行、久坐和活动节律判断。',
-        status: permissionStatuses[PermissionType.motion],
-      ),
-      _PermissionRowData(
-        type: PermissionType.location,
-        title: '位置',
-        subtitle: '用于判断室内外和活动范围。',
-        status: permissionStatuses[PermissionType.location],
-      ),
-      _PermissionRowData(
-        type: PermissionType.microphone,
-        title: '麦克风环境噪音',
-        subtitle: '用于环境噪音等级评估，不保存原始音频。',
-        status: permissionStatuses[PermissionType.microphone],
-      ),
-      _PermissionRowData(
-        type: PermissionType.notification,
-        title: '通知与风险提醒',
-        subtitle: '用于及时发送移动看屏、久坐等本地安全提醒。',
-        status: permissionStatuses[PermissionType.notification],
-      ),
-      _PermissionRowData(
-        type: PermissionType.usageAccess,
-        title: '数字生活习惯分析',
-        subtitle: '用于判断看屏频率和碎片化查看时段。',
-        status: permissionStatuses[PermissionType.usageAccess],
-      ),
-      _PermissionRowData(
-        type: PermissionType.backgroundCapture,
-        title: '后台持续感知',
-        subtitle: '用于在锁屏或切换应用后继续识别步行与移动看屏风险。',
-        status: permissionStatuses[PermissionType.backgroundCapture],
-      ),
-    ].where((_PermissionRowData row) {
-      if (row.type == PermissionType.usageAccess &&
-          defaultTargetPlatform != TargetPlatform.android) {
-        return false;
-      }
-      return true;
-    }).toList(growable: false);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: _surfaceSoft,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: _line),
-      ),
+    final model = ref.watch(profileViewModelStateProvider);
+    final dashboard = model?.dashboard;
+    final hasData = dashboard?.hasRealData == true;
+    final score = dashboard?.healthScore.totalScore;
+    final missing = model?.missingDimensions ?? const <String>[];
+    return HealthElevatedCard(
+      padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          const Text(
-            '权限与感知状态',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: _textPrimary,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
+            child: Text(
+              '我的感知状态',
+              style: context.healthTheme.sectionTitleStyle,
             ),
           ),
-          const SizedBox(height: 10),
-          ...permissionRows.map(
-            (_PermissionRowData row) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: _ActionRow(
-                title: row.title,
-                subtitle: row.subtitle,
-                actionLabel: _permissionLabel(row.status),
-                onTap: () => _handlePermissionTap(context, ref, row),
+          SizedBox(
+            height: 120,
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: InkWell(
+                    key: const Key('profile-sensing-score'),
+                    onTap: hasData
+                        ? () => _openTrend(context, ref, TrendTab.steps)
+                        : null,
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          Text(
+                            hasData ? '$score' : '--',
+                            style: TextStyle(
+                              fontSize: 42,
+                              fontWeight: FontWeight.w700,
+                              color: context.healthTheme.sage,
+                            ),
+                          ),
+                          Text(
+                            hasData ? '综合状态' : '正在积累数据',
+                            style: context.healthTheme.bodyStyle,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 1,
+                  height: 76,
+                  color: context.healthTheme.divider,
+                ),
+                Expanded(
+                  child: InkWell(
+                    key: const Key('profile-sensing-trend'),
+                    onTap: hasData
+                        ? () {
+                            ref
+                                .read(trendRangeForTabProvider(TrendTab.steps)
+                                    .notifier)
+                                .state = TrendRange.days7;
+                            _openTrend(context, ref, TrendTab.steps);
+                          }
+                        : null,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text('近 7 天趋势', style: context.healthTheme.bodyStyle),
+                          const SizedBox(height: 10),
+                          Expanded(
+                            child: CustomPaint(
+                              painter: _SensingTrendPainter(
+                                color: context.healthTheme.sage,
+                                hasData: hasData,
+                              ),
+                              child: const SizedBox.expand(),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          InkWell(
+            key: const Key('profile-sensing-verdict'),
+            onTap: hasData
+                ? () => _openTrend(context, ref, _priority(dashboard!))
+                : null,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(18, 13, 18, 15),
+              decoration: BoxDecoration(
+                color: context.healthTheme.sageSoft.withValues(alpha: .65),
+                borderRadius: BorderRadius.vertical(
+                  bottom: Radius.circular(context.healthTheme.cardRadius),
+                ),
+              ),
+              child: Text(
+                !hasData
+                    ? '数据正在积累，暂不生成分数'
+                    : missing.isEmpty
+                        ? '整体平稳，继续保持当前节奏'
+                        : '整体平稳 · 部分维度暂缺：${missing.join('、')}',
+                style: context.healthTheme.bodyStyle.copyWith(
+                  color: context.healthTheme.textPrimary,
+                ),
               ),
             ),
           ),
@@ -214,176 +321,113 @@ class _PermissionStatusCard extends ConsumerWidget {
       ),
     );
   }
+}
 
-  Future<void> _handlePermissionTap(
-    BuildContext context,
-    WidgetRef ref,
-    _PermissionRowData row,
-  ) async {
-    if (row.status == PermissionGrantStatus.granted) {
-      _showFeedback(context, '“${row.title}”已开启，当前感知链路可正常使用。');
-      return;
-    }
+class _SensingTrendPainter extends CustomPainter {
+  const _SensingTrendPainter({required this.color, required this.hasData});
 
-    final confirmed = await showModalBottomSheet<bool>(
-      context: context,
-      backgroundColor: _surface,
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  row.title,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: _textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  row.subtitle,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: _textSecondary,
-                    height: 1.6,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  '如果系统仍允许再次申请，我们会先在当前页请求权限；如果系统已永久拒绝，再引导你前往设置页开启。',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: _textMuted,
-                    height: 1.6,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.of(context).pop(false),
-                        child: const Text('稍后再说'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: () => Navigator.of(context).pop(true),
-                        child: const Text('立即处理'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+  final Color color;
+  final bool hasData;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = hasData ? color : const Color(0xFFDDD8CF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+    final path = Path()
+      ..moveTo(0, size.height * .65)
+      ..cubicTo(
+        size.width * .18,
+        size.height * .40,
+        size.width * .32,
+        size.height * .72,
+        size.width * .48,
+        size.height * .48,
+      )
+      ..cubicTo(
+        size.width * .62,
+        size.height * .28,
+        size.width * .76,
+        size.height * .50,
+        size.width,
+        size.height * .22,
+      );
+    canvas.drawPath(path, paint);
+    canvas.drawCircle(
+      Offset(size.width, size.height * .22),
+      4,
+      Paint()..color = paint.color,
     );
-
-    if (confirmed != true || !context.mounted) {
-      return;
-    }
-
-    final service = ref.read(permissionInteractionServiceProvider);
-    final result = await service.handlePermissionTap(row.type);
-
-    if (!context.mounted) {
-      return;
-    }
-
-    ref.invalidate(permissionStatusProvider);
-    ref.invalidate(overviewViewModelProvider);
-    ref.invalidate(overviewReadyDataProvider);
-    ref.invalidate(diagnosticsSnapshotProvider);
-
-    switch (result) {
-      case PermissionActionResult.granted:
-        _showFeedback(context, '“${row.title}”已开启，请返回后刷新当前状态。');
-      case PermissionActionResult.denied:
-        _showFeedback(context, '“${row.title}”仍未开启，当前将继续按降级模式运行。');
-      case PermissionActionResult.openedSettings:
-        _showFeedback(context, '系统已打开设置页，请开启“${row.title}”后返回应用。');
-      case PermissionActionResult.settingsUnavailable:
-        _showFeedback(context, '暂时无法打开系统设置页，请稍后重试。');
-    }
   }
 
-  void _showFeedback(BuildContext context, String message) {
-    ScaffoldMessenger.of(context)
-      ..clearSnackBars()
-      ..showSnackBar(SnackBar(content: Text(message)));
+  @override
+  bool shouldRepaint(covariant _SensingTrendPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.hasData != hasData;
+}
+
+class _SettingsGroup extends StatelessWidget {
+  const _SettingsGroup({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return HealthElevatedCard(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Column(
+        children: List<Widget>.generate(children.length * 2 - 1, (index) {
+          if (index.isEven) return children[index ~/ 2];
+          return Divider(height: 1, color: context.healthTheme.divider);
+        }),
+      ),
+    );
   }
 }
 
-class _ActionRow extends StatelessWidget {
-  const _ActionRow({
+class _SettingsRow extends StatelessWidget {
+  const _SettingsRow({
+    super.key,
+    required this.icon,
     required this.title,
     required this.subtitle,
-    required this.actionLabel,
+    required this.color,
     required this.onTap,
   });
 
+  final String icon;
   final String title;
   final String subtitle;
-  final String actionLabel;
-  final VoidCallback? onTap;
+  final Color color;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(22),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: _surface,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: _line),
-        ),
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 13),
         child: Row(
           children: <Widget>[
+            HealthIconBubble(
+              icon: icon,
+              foreground: color,
+              background: color.withValues(alpha: .15),
+            ),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: _textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: _textSecondary,
-                      height: 1.5,
-                    ),
-                  ),
+                  Text(title, style: context.healthTheme.sectionTitleStyle),
+                  const SizedBox(height: 3),
+                  Text(subtitle, style: context.healthTheme.bodyStyle),
                 ],
               ),
             ),
-            HealthAnimatedSwitcher(
-              childKey: ValueKey<String>(actionLabel),
-              child: Text(
-                actionLabel,
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: _textMuted,
-                ),
-              ),
-            ),
+            const HealthVectorIcon('chevron_right', size: 18),
           ],
         ),
       ),
@@ -391,36 +435,211 @@ class _ActionRow extends StatelessWidget {
   }
 }
 
-class _PermissionRowData {
-  const _PermissionRowData({
-    required this.type,
-    required this.title,
-    required this.subtitle,
-    required this.status,
-  });
-
-  final PermissionType type;
-  final String title;
-  final String subtitle;
-  final PermissionGrantStatus? status;
+Future<void> _showPermissionSheet(BuildContext context, WidgetRef ref) {
+  final statuses = ref.read(profilePermissionStatusesProvider);
+  final rows = <(PermissionType, String, String)>[
+    (PermissionType.motion, '活动识别', '用于活动、久坐和姿势节奏判断'),
+    (PermissionType.location, '位置', '用于室内外和活动范围判断'),
+    (PermissionType.microphone, '麦克风环境噪音', '只评估等级，不保存原始音频'),
+    (PermissionType.notification, '通知与风险提醒', '用于发送本地安全提醒'),
+    if (defaultTargetPlatform == TargetPlatform.android)
+      (PermissionType.usageAccess, '数字生活习惯分析', '用于屏幕使用趋势分析'),
+    (PermissionType.backgroundCapture, '后台持续感知', '用于锁屏后的低频风险识别'),
+  ];
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: context.healthTheme.surface,
+    builder: (sheetContext) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 4, 18, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text('权限与隐私', style: context.healthTheme.sectionTitleStyle),
+            const SizedBox(height: 6),
+            Text(
+              '单项权限失败不会影响其他设置项。',
+              style: context.healthTheme.bodyStyle,
+            ),
+            const SizedBox(height: 10),
+            ...rows.map((row) {
+              final status = statuses[row.$1] ?? PermissionGrantStatus.unknown;
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(row.$2),
+                subtitle: Text(row.$3),
+                trailing: Text(_permissionLabel(status)),
+                onTap: () => _handlePermission(
+                  sheetContext,
+                  ref,
+                  row.$1,
+                  row.$2,
+                  row.$3,
+                  status,
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
-String _permissionLabel(PermissionGrantStatus? status) {
-  switch (status) {
-    case PermissionGrantStatus.granted:
-      return '已开启';
-    case PermissionGrantStatus.denied:
-      return '未开启';
-    case PermissionGrantStatus.restricted:
-      return '去设置';
-    case PermissionGrantStatus.unknown:
-    case null:
-      return '待确认';
+Future<void> _handlePermission(
+  BuildContext context,
+  WidgetRef ref,
+  PermissionType type,
+  String title,
+  String purpose,
+  PermissionGrantStatus status,
+) async {
+  if (status == PermissionGrantStatus.granted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$title 已开启')),
+    );
+    return;
   }
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      title: Text(title),
+      content: Text('$purpose。\n\n不开启时，相关维度将降级或显示数据不足。'),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('稍后再说'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('立即处理'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed != true) return;
+  final result = await ref
+      .read(permissionInteractionServiceProvider)
+      .handlePermissionTap(type);
+  ref.invalidate(permissionStatusProvider);
+  ref.invalidate(overviewViewModelProvider);
+  ref.invalidate(overviewReadyDataProvider);
+  ref.invalidate(diagnosticsSnapshotProvider);
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(_permissionResultMessage(title, result))),
+  );
 }
 
-String _timeLabel(DateTime dateTime) {
-  final hour = dateTime.hour.toString().padLeft(2, '0');
-  final minute = dateTime.minute.toString().padLeft(2, '0');
-  return '$hour:$minute';
+Future<void> _showReminderPreferences(
+  BuildContext context,
+  WidgetRef ref,
+) {
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    backgroundColor: context.healthTheme.surface,
+    builder: (context) => SafeArea(
+      child: Consumer(
+        builder: (context, ref, child) {
+          final values = ref.watch(_profileReminderPreferencesProvider);
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(18, 4, 18, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text('提醒偏好', style: context.healthTheme.sectionTitleStyle),
+                ...ReminderTypePreference.values.map(
+                  (type) => SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(_preferenceLabel(type)),
+                    value: values[type] ?? true,
+                    onChanged: (enabled) {
+                      final next = {...values, type: enabled};
+                      if (type == ReminderTypePreference.all) {
+                        for (final item in ReminderTypePreference.values) {
+                          next[item] = enabled;
+                        }
+                      }
+                      ref
+                          .read(_profileReminderPreferencesProvider.notifier)
+                          .state = next;
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    ),
+  );
 }
+
+Future<void> _showInfoSheet(
+  BuildContext context,
+  String title,
+  String content,
+) {
+  return showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    backgroundColor: context.healthTheme.surface,
+    builder: (context) => SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(title, style: context.healthTheme.sectionTitleStyle),
+            const SizedBox(height: 12),
+            Text(content, style: context.healthTheme.bodyStyle),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+void _openTrend(BuildContext context, WidgetRef ref, TrendTab tab) {
+  ref.read(trendSelectedTabProvider.notifier).state = tab;
+  context.go('/trends');
+}
+
+TrendTab _priority(DashboardSnapshot dashboard) {
+  final entries = <TrendTab, int>{
+    TrendTab.steps: dashboard.healthScore.stepScore,
+    TrendTab.sedentary: dashboard.healthScore.sedentaryScore,
+    TrendTab.screen: dashboard.healthScore.screenScore,
+  }.entries.toList()
+    ..sort((left, right) => left.value.compareTo(right.value));
+  return entries.first.key;
+}
+
+String _permissionLabel(PermissionGrantStatus status) => switch (status) {
+      PermissionGrantStatus.granted => '已开启',
+      PermissionGrantStatus.denied => '未开启',
+      PermissionGrantStatus.restricted => '去设置',
+      PermissionGrantStatus.unknown => '待确认',
+    };
+
+String _permissionResultMessage(String title, PermissionActionResult result) =>
+    switch (result) {
+      PermissionActionResult.granted => '$title 已开启',
+      PermissionActionResult.denied => '$title 未开启，将继续降级运行',
+      PermissionActionResult.openedSettings => '已打开系统设置，请完成后返回',
+      PermissionActionResult.settingsUnavailable => '暂时无法打开系统设置',
+    };
+
+String _preferenceLabel(ReminderTypePreference type) => switch (type) {
+      ReminderTypePreference.all => '总提醒开关',
+      ReminderTypePreference.sedentary => '久坐提醒',
+      ReminderTypePreference.walkingScreen => '移动看屏提醒',
+      ReminderTypePreference.nightUsage => '夜间使用提醒',
+      ReminderTypePreference.noisyEnvironment => '环境噪音提醒',
+    };

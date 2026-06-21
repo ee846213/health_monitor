@@ -52,7 +52,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('活动识别'));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('profile-permission-row')),
+      300,
+    );
+    await tester.tap(find.byKey(const Key('profile-permission-row')));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('活动识别'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('立即处理'));
@@ -100,7 +105,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('数字生活习惯分析'));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('profile-permission-row')),
+      300,
+    );
+    await tester.tap(find.byKey(const Key('profile-permission-row')));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('数字生活习惯分析'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('立即处理'));
@@ -134,7 +144,51 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('勿扰时段'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('do-not-disturb-row')),
+      300,
+    );
+    expect(find.text('勿扰时间'), findsOneWidget);
+  });
+
+  testWidgets('我的感知状态分数、趋势和结论为三个独立点击区域', (tester) async {
+    final notifier = _FakeNotificationPreferenceNotifier(
+      const NotificationPreference(
+        enabled: true,
+        startHour: 22,
+        startMinute: 30,
+        endHour: 7,
+        endMinute: 0,
+      ),
+    );
+    final viewModel = _buildViewModel(
+      permissionStatuses: const <PermissionType, PermissionGrantStatus>{},
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          overviewViewModelProvider.overrideWith((ref) async => viewModel),
+          notificationPreferenceProvider.overrideWith(() => notifier),
+        ],
+        child: const MaterialApp(home: ProfilePage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('profile-sensing-score')), findsOneWidget);
+    expect(find.byKey(const Key('profile-sensing-trend')), findsOneWidget);
+    expect(find.byKey(const Key('profile-sensing-verdict')), findsOneWidget);
+
+    final scoreRect =
+        tester.getRect(find.byKey(const Key('profile-sensing-score')));
+    final trendRect =
+        tester.getRect(find.byKey(const Key('profile-sensing-trend')));
+    final verdictRect =
+        tester.getRect(find.byKey(const Key('profile-sensing-verdict')));
+    expect(scoreRect.overlaps(trendRect), isFalse);
+    expect(scoreRect.overlaps(verdictRect), isFalse);
+    expect(trendRect.overlaps(verdictRect), isFalse);
   });
 }
 

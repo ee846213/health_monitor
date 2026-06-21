@@ -25,7 +25,17 @@ class NotificationPreferenceNotifier
   Future<void> save(NotificationPreference preference) async {
     final repository =
         await ref.read(notificationPreferenceRepositoryProvider.future);
+    final previous = state.valueOrNull;
     state = AsyncData(preference);
-    await repository.save(preference);
+    try {
+      await repository.save(preference);
+    } catch (error, stackTrace) {
+      if (previous != null) {
+        state = AsyncData(previous);
+      } else {
+        state = AsyncError(error, stackTrace);
+      }
+      rethrow;
+    }
   }
 }

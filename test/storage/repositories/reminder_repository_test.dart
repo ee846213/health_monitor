@@ -186,6 +186,24 @@ void main() {
     expect(stored.deliveredAt, DateTime(2026, 6, 16, 10, 1));
   });
 
+  test('提醒仓储应支持更新用户处理状态', () async {
+    final record = ReminderRecord.fromWalkingScreenRiskEvent(
+      eventId: 'response-update-1',
+      triggeredAt: DateTime(2026, 6, 16, 10),
+    );
+    final repository =
+        InMemoryReminderRepository(records: <ReminderRecord>[record]);
+
+    await repository.updateResponse(record, ReminderResponse.taken);
+    final stored = (await repository.listRecentDays(
+      1,
+      referenceDate: DateTime(2026, 6, 16),
+    ))
+        .single;
+
+    expect(stored.response, ReminderResponse.taken);
+  });
+
   test('Isar 提醒仓储能筛选未投递记录并保留首次投递时间', () async {
     await _initializeIsarCoreForTest();
     final dir = await Directory.systemTemp.createTemp('isar-reminder-test');

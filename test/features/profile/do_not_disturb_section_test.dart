@@ -27,7 +27,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('勿扰时段'), findsOneWidget);
+    expect(find.text('勿扰时间'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('do-not-disturb-row')));
+    await tester.pumpAndSettle();
     expect(find.text('启用勿扰'), findsOneWidget);
     expect(find.text('22:30'), findsOneWidget);
     expect(find.text('07:00'), findsOneWidget);
@@ -54,7 +56,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.tap(find.byKey(const Key('do-not-disturb-row')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byType(Switch));
+    await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
 
     expect(notifier.state.requireValue.enabled, isFalse);

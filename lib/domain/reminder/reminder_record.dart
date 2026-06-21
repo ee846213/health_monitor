@@ -92,6 +92,7 @@ class ReminderRecord {
 
   ReminderRecord copyWith({
     DateTime? deliveredAt,
+    ReminderResponse? response,
   }) {
     return ReminderRecord(
       triggeredAt: triggeredAt,
@@ -100,7 +101,7 @@ class ReminderRecord {
       message: message,
       reasonSummary: reasonSummary,
       actionSuggestion: actionSuggestion,
-      response: response,
+      response: response ?? this.response,
       deliveredAt: deliveredAt ?? this.deliveredAt,
       reminderTypeKey: reminderTypeKey,
       sourceDimension: sourceDimension,

@@ -19,6 +19,11 @@ abstract class ReminderRepository {
     Iterable<ReminderRecord> records, {
     required DateTime deliveredAt,
   });
+
+  Future<void> updateResponse(
+    ReminderRecord record,
+    ReminderResponse response,
+  );
 }
 
 class InMemoryReminderRepository implements ReminderRepository {
@@ -82,6 +87,20 @@ class InMemoryReminderRepository implements ReminderRepository {
       if (item.deliveredAt == null &&
           deliveredKeys.contains(_historyDedupKeyForRecord(item))) {
         _records[index] = item.copyWith(deliveredAt: deliveredAt);
+      }
+    }
+  }
+
+  @override
+  Future<void> updateResponse(
+    ReminderRecord record,
+    ReminderResponse response,
+  ) async {
+    final key = _historyDedupKeyForRecord(record);
+    for (var index = 0; index < _records.length; index++) {
+      if (_historyDedupKeyForRecord(_records[index]) == key) {
+        _records[index] = _records[index].copyWith(response: response);
+        return;
       }
     }
   }
@@ -199,6 +218,28 @@ class IsarReminderRepository implements ReminderRepository {
         entity.deliveredAt = deliveredAt;
       }
       await _isar.reminderRecordEntitys.putAll(targets);
+    });
+  }
+
+  @override
+  Future<void> updateResponse(
+    ReminderRecord record,
+    ReminderResponse response,
+  ) async {
+    final key = _historyDedupKeyForRecord(record);
+    final entities =
+        await _isar.reminderRecordEntitys.where().anyId().findAll();
+    final target = entities.cast<ReminderRecordEntity?>().firstWhere(
+          (entity) =>
+              entity != null && _historyDedupKeyForEntity(entity) == key,
+          orElse: () => null,
+        );
+    if (target == null) {
+      return;
+    }
+    target.responseKey = response.name;
+    await _isar.writeTxn(() async {
+      await _isar.reminderRecordEntitys.put(target);
     });
   }
 }

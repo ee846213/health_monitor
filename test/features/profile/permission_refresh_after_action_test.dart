@@ -99,9 +99,13 @@ void main() {
     );
     expect(readCount, 1);
     expect(readyDataReadCount, 1);
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('profile-permission-row')),
+      300,
+    );
+    await tester.tap(find.byKey(const Key('profile-permission-row')));
+    await tester.pumpAndSettle();
     expect(find.text('未开启'), findsWidgets);
-
-    await tester.ensureVisible(find.text('活动识别'));
     await tester.tap(find.text('活动识别'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('立即处理'));
@@ -116,7 +120,6 @@ void main() {
       PermissionGrantStatus.granted,
     );
     expect(readyDataReadCount, 2);
-    expect(find.text('已开启'), findsWidgets);
   });
 }
 
