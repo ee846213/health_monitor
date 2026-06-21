@@ -68,9 +68,15 @@ final briefingTimeRangeProvider = StateProvider<BriefingTimeRange>((Ref ref) {
   return BriefingTimeRange.today;
 });
 
+/// 选择具体自然日时记录日期；最近 7 日汇总使用 `null`。
+final briefingSelectedDateProvider = StateProvider<DateTime?>((Ref ref) {
+  return null;
+});
+
 final briefingRangeRevisionProvider = Provider<String>((Ref ref) {
   final selectedRange = ref.watch(briefingTimeRangeProvider);
-  final referenceTime = ref.watch(briefingReferenceTimeProvider)();
+  final referenceTime = ref.watch(briefingSelectedDateProvider) ??
+      ref.watch(briefingReferenceTimeProvider)();
   final dayKeys = _dayKeysForRange(selectedRange, referenceTime);
 
   return ref.watch(
@@ -86,9 +92,11 @@ final briefingViewModelProvider =
   ref.watch(briefingRangeRevisionProvider);
   ref.watch(dataCollectorProvider);
   final selectedRange = ref.watch(briefingTimeRangeProvider);
+  final selectedDate = ref.watch(briefingSelectedDateProvider);
   final permissionStatuses = await ref.watch(permissionStatusProvider.future);
   final insightService = ref.watch(healthInsightServiceProvider);
-  final now = ref.watch(briefingReferenceTimeProvider)();
+  final actualNow = ref.watch(briefingReferenceTimeProvider)();
+  final now = selectedDate ?? actualNow;
   final snapshot = await insightService.buildSnapshot(
     window: _windowForRange(selectedRange, referenceTime: now),
     referenceTime: now,
@@ -96,7 +104,11 @@ final briefingViewModelProvider =
 
   return BriefingViewModel(
     selectedRange: selectedRange,
-    windowLabel: _windowLabelForRange(selectedRange),
+    windowLabel: _windowLabelForSelection(
+      selectedRange,
+      selectedDate,
+      actualNow,
+    ),
     screenState: resolveOverviewScreenState(
       permissionStatuses: permissionStatuses,
       hasRealData: snapshot.hasRealData,
@@ -225,7 +237,8 @@ final briefingStepDetailProvider =
         (Ref ref, range) async {
   ref.watch(dataCollectorMetricsRevisionProvider);
   final repository = ref.watch(metricsRepositoryProvider);
-  final referenceTime = ref.watch(briefingReferenceTimeProvider)();
+  final referenceTime = ref.watch(briefingSelectedDateProvider) ??
+      ref.watch(briefingReferenceTimeProvider)();
   final anchorDate = _anchorDateForRange(range, referenceTime);
   final metrics = await repository.listRecentDays(
     7,
@@ -270,7 +283,8 @@ final briefingSedentaryDetailProvider =
   (Ref ref, range) async {
     ref.watch(dataCollectorMetricsRevisionProvider);
     final repository = ref.watch(activityRepositoryProvider);
-    final referenceTime = ref.watch(briefingReferenceTimeProvider)();
+    final referenceTime = ref.watch(briefingSelectedDateProvider) ??
+        ref.watch(briefingReferenceTimeProvider)();
     final window = _windowForRange(range, referenceTime: referenceTime);
     final samples = await repository.listByWindow(window);
     final input = RuleInput(
@@ -315,7 +329,8 @@ final briefingScreenDetailProvider =
         (Ref ref, range) async {
   ref.watch(dataCollectorUsageRevisionProvider);
   final repository = ref.watch(usageSummaryRepositoryProvider);
-  final referenceTime = ref.watch(briefingReferenceTimeProvider)();
+  final referenceTime = ref.watch(briefingSelectedDateProvider) ??
+      ref.watch(briefingReferenceTimeProvider)();
   final window = _windowForRange(range, referenceTime: referenceTime);
   final summaries = <DigitalUsageSummary>[];
   for (final date in window.dailyDates()) {
@@ -369,8 +384,22 @@ final briefingScreenDetailProvider =
   );
 });
 
-String _windowLabelForRange(BriefingTimeRange range) {
-  return range.label;
+String _windowLabelForSelection(
+  BriefingTimeRange range,
+  DateTime? selectedDate,
+  DateTime actualNow,
+) {
+  if (range == BriefingTimeRange.recent7Days) {
+    return range.label;
+  }
+  final date = selectedDate ?? actualNow;
+  if (_dayKey(date) == _dayKey(actualNow)) {
+    return '今日';
+  }
+  if (_dayKey(date) == _dayKey(actualNow.subtract(const Duration(days: 1)))) {
+    return '昨日';
+  }
+  return '${date.month}月${date.day}日';
 }
 
 DailyBriefSnapshot _buildDailyBriefSnapshot(HealthInsightSnapshot snapshot) {

@@ -29,7 +29,7 @@ void main() {
 
     expect(find.text('近 7 天步数趋势'), findsOneWidget);
 
-    await tester.tap(find.text('久坐'));
+    await tester.tap(find.text('姿势'));
     await tester.pumpAndSettle();
 
     expect(find.text('近 7 天久坐趋势'), findsOneWidget);

@@ -1,12 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:health_monitor/app/theme/app_theme_extension.dart';
 import 'package:health_monitor/app/theme/health_motion_tokens.dart';
 import 'package:health_monitor/domain/trends/trend_snapshot.dart';
-
-const Color _tabActive = Color(0xFF5F775F);
-const Color _tabActiveSurface = Color(0xFFE9F0E6);
-const Color _tabInactiveSurface = Color(0xFFFFFFFF);
-const Color _tabInactiveText = Color(0xFF5D645B);
-const Color _tabLine = Color(0xFFDAD4CA);
 
 class TrendTabBar extends StatelessWidget {
   const TrendTabBar({
@@ -21,13 +16,14 @@ class TrendTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final motion = context.healthMotion;
+    final tokens = context.healthTheme;
     final selectedIndex = TrendTab.values.indexOf(selectedTab);
     return Container(
       height: 44,
       decoration: BoxDecoration(
-        color: _tabInactiveSurface,
+        color: tokens.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _tabLine),
+        border: Border.all(color: tokens.borderSubtle),
       ),
       child: Stack(
         children: <Widget>[
@@ -43,9 +39,9 @@ class TrendTabBar extends StatelessWidget {
               child: Container(
                 margin: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
-                  color: _tabActiveSurface,
+                  color: tokens.sageSoft,
                   borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: _tabActive),
+                  border: Border.all(color: tokens.sage),
                 ),
               ),
             ),
@@ -65,7 +61,7 @@ class TrendTabBar extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: isSelected ? _tabActive : _tabInactiveText,
+                        color: isSelected ? tokens.sage : tokens.textSecondary,
                       ),
                       child: Text(_labelForTab(tab)),
                     ),
@@ -83,12 +79,12 @@ class TrendTabBar extends StatelessWidget {
 String _labelForTab(TrendTab tab) {
   switch (tab) {
     case TrendTab.steps:
-      return '步数';
+      return '活动';
     case TrendTab.sedentary:
-      return '久坐';
+      return '姿势';
     case TrendTab.screen:
       return '屏幕';
     case TrendTab.environment:
-      return '环境分';
+      return '噪音';
   }
 }

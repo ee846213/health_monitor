@@ -33,6 +33,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('briefing-step-card')),
+      300,
+    );
     expect(find.byKey(const Key('briefing-step-card')), findsOneWidget);
     expect(find.text('1200 步'), findsOneWidget);
     expect(find.text('三个核心指标'), findsNothing);
@@ -43,25 +47,69 @@ void main() {
     await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('briefing-sedentary-card')),
+      200,
+    );
     await tester.tap(find.byKey(const Key('briefing-sedentary-card')));
     await tester.pumpAndSettle();
     expect(find.textContaining('久坐分布'), findsOneWidget);
     await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('briefing-screen-card')),
+      200,
+    );
     await tester.tap(find.byKey(const Key('briefing-screen-card')));
     await tester.pumpAndSettle();
     expect(find.textContaining('分时段使用分布'), findsOneWidget);
     await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('昨日'));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('briefing-seven-days')),
+      -300,
+    );
+    await tester.tap(find.byKey(const Key('briefing-seven-days')));
     await tester.pumpAndSettle();
-    expect(find.text('2400 步'), findsOneWidget);
-
-    await tester.tap(find.text('最近 7 天'));
-    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('briefing-step-card')),
+      300,
+    );
     expect(find.text('6000 步'), findsOneWidget);
+  });
+
+  testWidgets('简报时间线只展开一个事件且主卡可解释结论', (tester) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          briefingViewModelProvider.overrideWith((ref) async {
+            return _viewModelFor(ref.watch(briefingTimeRangeProvider));
+          }),
+        ],
+        child: const MaterialApp(home: BriefingPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('briefing-conclusion-card')));
+    await tester.pumpAndSettle();
+    expect(find.text('为什么这样总结'), findsOneWidget);
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('briefing-event-0')),
+      250,
+    );
+    await tester.tap(find.byKey(const Key('briefing-event-0')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('轻量活动'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('briefing-event-1')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('两三分钟'), findsOneWidget);
   });
 }
 

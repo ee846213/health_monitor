@@ -1,101 +1,114 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:health_monitor/app/router.dart';
+import 'package:health_monitor/app/theme/app_theme_extension.dart';
+import 'package:health_monitor/app/widgets/health_design_widgets.dart';
 import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
+import 'package:health_monitor/app/widgets/health_vector_icon.dart';
 import 'package:health_monitor/domain/trends/trend_snapshot.dart';
 import 'package:health_monitor/features/trends/providers/trend_analysis_provider.dart';
 import 'package:health_monitor/features/trends/widgets/trend_chart_panel.dart';
-import 'package:health_monitor/features/trends/widgets/trend_insight_panel.dart';
 import 'package:health_monitor/features/trends/widgets/trend_tab_bar.dart';
 
-const Color _pageSurface = Color(0xFFFFFBF5);
-const Color _pageText = Color(0xFF1F2320);
-const Color _pageMuted = Color(0xFF5D645B);
-
-class TrendAnalysisPage extends ConsumerWidget {
+class TrendAnalysisPage extends ConsumerStatefulWidget {
   const TrendAnalysisPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final selectedTab = ref.watch(trendSelectedTabProvider);
+  ConsumerState<TrendAnalysisPage> createState() => _TrendAnalysisPageState();
+}
 
+class _TrendAnalysisPageState extends ConsumerState<TrendAnalysisPage> {
+  final ScrollController _controller = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    PrimaryTabScrollRegistry.register(1, _controller);
+  }
+
+  @override
+  void dispose() {
+    PrimaryTabScrollRegistry.unregister(1, _controller);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedTab = ref.watch(trendSelectedTabProvider);
+    final selectedRange = ref.watch(trendSelectedRangeProvider);
     return Scaffold(
-      backgroundColor: _pageSurface,
-      appBar: AppBar(
-        title: Row(
+      backgroundColor: context.healthTheme.canvas,
+      body: SafeArea(
+        bottom: false,
+        child: ListView(
+          controller: _controller,
+          padding: const EdgeInsets.fromLTRB(18, 22, 18, 112),
           children: <Widget>[
-            Hero(
-              tag: 'health-score-hero',
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEEF3EA),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFF5E775F)),
+            HealthStaggeredEntrance(
+              index: 0,
+              child: Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      '趋势分析',
+                      style: TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.w700,
+                        color: context.healthTheme.textPrimary,
+                      ),
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.insights_rounded,
-                    size: 19,
-                    color: Color(0xFF5E775F),
+                  HealthIconBubble(
+                    icon: 'show_chart',
+                    foreground: context.healthTheme.sage,
+                    background: context.healthTheme.sageSoft,
+                    size: 40,
+                    iconSize: 21,
                   ),
-                ),
+                ],
               ),
             ),
-            const SizedBox(width: 10),
-            const Text(
-              '趋势分析',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: _pageText,
+            const SizedBox(height: 18),
+            HealthStaggeredEntrance(
+              index: 1,
+              child: HealthSegmentedControl<TrendRange>(
+                values: TrendRange.values,
+                selected: selectedRange,
+                labelBuilder: (range) => range.label,
+                onSelected: (range) {
+                  ref
+                      .read(trendRangeForTabProvider(selectedTab).notifier)
+                      .state = range;
+                },
               ),
+            ),
+            const SizedBox(height: 16),
+            HealthStaggeredEntrance(
+              index: 2,
+              child: TrendTabBar(
+                selectedTab: selectedTab,
+                onSelected: (tab) {
+                  ref.read(trendSelectedTabProvider.notifier).state = tab;
+                },
+              ),
+            ),
+            const SizedBox(height: 18),
+            const HealthStaggeredEntrance(
+              index: 3,
+              child: _TrendChartSection(),
+            ),
+            const SizedBox(height: 16),
+            const HealthStaggeredEntrance(
+              index: 4,
+              child: _TrendInsightSection(),
+            ),
+            const SizedBox(height: 16),
+            const HealthStaggeredEntrance(
+              index: 5,
+              child: _DailyComparisonSection(),
             ),
           ],
-        ),
-        backgroundColor: _pageSurface,
-        surfaceTintColor: Colors.transparent,
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(18, 14, 18, 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              const HealthStaggeredEntrance(
-                index: 0,
-                child: Text(
-                  '近 7 天趋势会默认从步数开始，你也可以切换查看久坐、屏幕与环境健康分。',
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 1.7,
-                    color: _pageMuted,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              HealthStaggeredEntrance(
-                index: 1,
-                child: TrendTabBar(
-                  selectedTab: selectedTab,
-                  onSelected: (TrendTab tab) {
-                    ref.read(trendSelectedTabProvider.notifier).state = tab;
-                  },
-                ),
-              ),
-              const SizedBox(height: 18),
-              const HealthStaggeredEntrance(
-                index: 2,
-                child: _TrendChartSection(),
-              ),
-              const SizedBox(height: 18),
-              const HealthStaggeredEntrance(
-                index: 3,
-                child: _TrendInsightSection(),
-              ),
-            ],
-          ),
         ),
       ),
     );
@@ -110,13 +123,13 @@ class _TrendChartSection extends ConsumerWidget {
     final snapshot = ref.watch(trendChartSnapshotProvider);
     return snapshot.when(
       skipLoadingOnRefresh: true,
-      loading: () => const _CardLoadingPlaceholder(height: 290),
-      error: (Object error, StackTrace _) => const _CardErrorPlaceholder(
-        message: '趋势图加载失败',
-        height: 160,
+      loading: () => const _CardLoadingPlaceholder(height: 330),
+      error: (error, stackTrace) => _CardErrorPlaceholder(
+        message: '趋势数据暂时无法加载',
+        onRetry: () => ref.invalidate(trendAnalysisViewModelProvider),
       ),
-      data: (TrendSnapshot value) => HealthAnimatedSwitcher(
-        childKey: ValueKey<TrendTab>(value.selectedTab),
+      data: (value) => HealthAnimatedSwitcher(
+        childKey: ValueKey<Object>((value.selectedTab, value.range)),
         child: TrendChartPanel(snapshot: value),
       ),
     );
@@ -128,18 +141,115 @@ class _TrendInsightSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final insight = ref.watch(trendInsightTextProvider);
-    return insight.when(
+    final snapshot = ref.watch(trendSnapshotStateProvider);
+    return snapshot.when(
       skipLoadingOnRefresh: true,
-      loading: () => const _CardLoadingPlaceholder(height: 120),
-      error: (Object error, StackTrace _) => const _CardErrorPlaceholder(
-        message: '洞察加载失败',
-        height: 120,
+      loading: () => const _CardLoadingPlaceholder(height: 138),
+      error: (error, stackTrace) => const SizedBox.shrink(),
+      data: (value) => HealthAnimatedSwitcher(
+        childKey: ValueKey<String>(value.insightText),
+        child: HealthElevatedCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  HealthIconBubble(
+                    icon: 'info',
+                    foreground: context.healthTheme.sage,
+                    background: context.healthTheme.sageSoft,
+                  ),
+                  const SizedBox(width: 10),
+                  Text('本期洞察', style: context.healthTheme.sectionTitleStyle),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(value.insightText, style: context.healthTheme.bodyStyle),
+            ],
+          ),
+        ),
       ),
-      data: (String text) => HealthAnimatedSwitcher(
-        childKey: ValueKey<String>(text),
-        duration: const Duration(milliseconds: 320),
-        child: TrendInsightPanel(text: text),
+    );
+  }
+}
+
+class _DailyComparisonSection extends ConsumerStatefulWidget {
+  const _DailyComparisonSection();
+
+  @override
+  ConsumerState<_DailyComparisonSection> createState() =>
+      _DailyComparisonSectionState();
+}
+
+class _DailyComparisonSectionState
+    extends ConsumerState<_DailyComparisonSection> {
+  int? _selectedIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    final snapshot = ref.watch(trendSnapshotStateProvider).valueOrNull;
+    if (snapshot == null || snapshot.points.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final selected = _selectedIndex ?? snapshot.defaultSelectedIndex ?? 0;
+    return HealthElevatedCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text('每日对比', style: context.healthTheme.sectionTitleStyle),
+          const SizedBox(height: 6),
+          Text(
+            snapshot.points[selected].hasData
+                ? '${snapshot.points[selected].label} · ${snapshot.points[selected].value.round()} ${snapshot.unitLabel}'
+                : '${snapshot.points[selected].label} · 数据暂缺',
+            style: context.healthTheme.dataStyle.copyWith(
+              fontSize: 11,
+              color: context.healthTheme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 86,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: List<Widget>.generate(snapshot.points.length, (index) {
+                final point = snapshot.points[index];
+                final max = snapshot.points
+                    .where((item) => item.hasData)
+                    .fold<num>(
+                        1,
+                        (value, item) =>
+                            item.value > value ? item.value : value);
+                final active = index == selected;
+                return Expanded(
+                  child: Semantics(
+                    button: true,
+                    label: '${point.label} ${point.value}${snapshot.unitLabel}',
+                    child: InkWell(
+                      onTap: () => setState(() => _selectedIndex = index),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Align(
+                        alignment: Alignment.bottomCenter,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 220),
+                          width: snapshot.points.length > 12 ? 7 : 18,
+                          height:
+                              point.hasData ? 18 + 58 * point.value / max : 4,
+                          decoration: BoxDecoration(
+                            color: active
+                                ? context.healthTheme.sage
+                                : context.healthTheme.sageSoft,
+                            borderRadius: BorderRadius.circular(9),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -152,18 +262,15 @@ class _CardLoadingPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: height,
-      width: double.infinity,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: const Color(0xFFDAD4CA)),
-      ),
-      child: const SizedBox.square(
-        dimension: 24,
-        child: CircularProgressIndicator(strokeWidth: 2),
+    return HealthElevatedCard(
+      child: SizedBox(
+        height: height,
+        child: Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: context.healthTheme.sage,
+          ),
+        ),
       ),
     );
   }
@@ -172,26 +279,22 @@ class _CardLoadingPlaceholder extends StatelessWidget {
 class _CardErrorPlaceholder extends StatelessWidget {
   const _CardErrorPlaceholder({
     required this.message,
-    required this.height,
+    required this.onRetry,
   });
 
   final String message;
-  final double height;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: height,
-      width: double.infinity,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: const Color(0xFFDAD4CA)),
-      ),
-      child: Text(
-        message,
-        style: const TextStyle(color: _pageMuted),
+    return HealthElevatedCard(
+      child: Column(
+        children: <Widget>[
+          const HealthVectorIcon('info', size: 24),
+          const SizedBox(height: 10),
+          Text(message, style: context.healthTheme.bodyStyle),
+          TextButton(onPressed: onRetry, child: const Text('重试')),
+        ],
       ),
     );
   }

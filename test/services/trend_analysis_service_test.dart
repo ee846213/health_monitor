@@ -91,6 +91,28 @@ void main() {
     expect(snapshot.points[5].value, 70);
     expect(snapshot.emptyStateText, isNull);
   });
+
+  test('30 天范围按周聚合并保留范围信息', () async {
+    final service = TrendAnalysisService(
+      metricsRepository: InMemoryMetricsRepository(
+        metrics: _sevenDayMetrics(),
+      ),
+      usageRepository: InMemoryUsageSummaryRepository(summaries: const []),
+      ambientLightRepository:
+          InMemoryAmbientLightSampleRepository(samples: const []),
+      noiseRepository: InMemoryNoiseSampleRepository(samples: const []),
+    );
+
+    final snapshot = await service.build(
+      referenceTime: DateTime(2026, 6, 16, 9),
+      range: TrendRange.days30,
+    );
+
+    expect(snapshot.range, TrendRange.days30);
+    expect(snapshot.aggregation, TrendAggregation.week);
+    expect(snapshot.points, hasLength(5));
+    expect(snapshot.points.where((point) => point.hasData), isNotEmpty);
+  });
 }
 
 List<DailyMetrics> _sevenDayMetrics() {

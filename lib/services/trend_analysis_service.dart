@@ -28,17 +28,20 @@ class TrendAnalysisService {
   Future<TrendSnapshot> build({
     required DateTime referenceTime,
     TrendTab selectedTab = TrendTab.steps,
+    TrendRange range = TrendRange.days7,
   }) async {
     final dates = List<DateTime>.generate(
-      7,
+      range.dayCount,
       (index) => DateTime(
         referenceTime.year,
         referenceTime.month,
         referenceTime.day,
-      ).subtract(Duration(days: 6 - index)),
+      ).subtract(Duration(days: range.dayCount - 1 - index)),
     );
-    final window =
-        QueryWindow.recentCalendarDays(7, referenceDate: referenceTime);
+    final window = QueryWindow.recentCalendarDays(
+      range.dayCount,
+      referenceDate: referenceTime,
+    );
     var metrics = const <DailyMetrics>[];
     var usageByDate = <String, DigitalUsageSummary?>{};
     var lightSamples = const <AmbientLightSample>[];
@@ -47,7 +50,7 @@ class TrendAnalysisService {
       case TrendTab.steps:
       case TrendTab.sedentary:
         metrics = await _metricsRepository.listRecentDays(
-          7,
+          range.dayCount,
           referenceDate: referenceTime,
         );
         break;
@@ -65,7 +68,7 @@ class TrendAnalysisService {
         break;
     }
 
-    final points = dates.map((date) {
+    final dailyPoints = dates.map((date) {
       final value = _valueForTab(
         selectedTab: selectedTab,
         date: date,
@@ -80,6 +83,7 @@ class TrendAnalysisService {
         hasData: value.hasData,
       );
     }).toList(growable: false);
+    final points = _aggregatePoints(dailyPoints, range);
     final availablePoints = points
         .where((TrendPoint point) => point.hasData)
         .toList(growable: false);
@@ -88,7 +92,19 @@ class TrendAnalysisService {
     return TrendSnapshot(
       generatedAt: referenceTime,
       selectedTab: selectedTab,
-      title: _titleForTab(selectedTab),
+      range: range,
+      aggregation: switch (range) {
+        TrendRange.days7 => TrendAggregation.day,
+        TrendRange.days30 => TrendAggregation.week,
+        TrendRange.days90 => TrendAggregation.month,
+      },
+      dataQuality: availablePoints.isEmpty
+          ? TrendDataQuality.empty
+          : availablePoints.length == points.length
+              ? TrendDataQuality.complete
+              : TrendDataQuality.partial,
+      defaultSelectedIndex: _lastAvailableIndex(points),
+      title: '${range.label}${_titleForTab(selectedTab)}',
       unitLabel: _unitForTab(selectedTab),
       points: points,
       insightText: hasAnyData
@@ -97,6 +113,46 @@ class TrendAnalysisService {
       emptyStateText: hasAnyData ? null : _emptyStateForTab(selectedTab),
     );
   }
+}
+
+List<TrendPoint> _aggregatePoints(
+  List<TrendPoint> points,
+  TrendRange range,
+) {
+  if (range == TrendRange.days7) {
+    return points;
+  }
+  final bucketSize = range == TrendRange.days30 ? 7 : 30;
+  final result = <TrendPoint>[];
+  for (var start = 0; start < points.length; start += bucketSize) {
+    final end =
+        start + bucketSize > points.length ? points.length : start + bucketSize;
+    final bucket = points.sublist(start, end);
+    final available = bucket.where((point) => point.hasData).toList();
+    final value = available.isEmpty
+        ? 0
+        : available.fold<num>(0, (sum, point) => sum + point.value) /
+            available.length;
+    result.add(
+      TrendPoint(
+        label: bucket.length == 1
+            ? bucket.first.label
+            : '${bucket.first.label}-${bucket.last.label.split('/').last}',
+        value: value,
+        hasData: available.isNotEmpty,
+      ),
+    );
+  }
+  return result;
+}
+
+int? _lastAvailableIndex(List<TrendPoint> points) {
+  for (var index = points.length - 1; index >= 0; index--) {
+    if (points[index].hasData) {
+      return index;
+    }
+  }
+  return null;
 }
 
 class _TrendValue {
@@ -161,13 +217,13 @@ _TrendValue _valueForTab({
 String _titleForTab(TrendTab tab) {
   switch (tab) {
     case TrendTab.steps:
-      return '近 7 天步数趋势';
+      return '活动趋势';
     case TrendTab.sedentary:
-      return '近 7 天久坐趋势';
+      return '姿势趋势';
     case TrendTab.screen:
-      return '近 7 天屏幕趋势';
+      return '屏幕趋势';
     case TrendTab.environment:
-      return '近 7 天环境趋势';
+      return '环境趋势';
   }
 }
 
@@ -205,9 +261,9 @@ String _insightForTab(TrendTab tab, List<TrendPoint> points) {
 
 String _emptyStateForTab(TrendTab tab) {
   if (tab == TrendTab.environment) {
-    return '最近 7 天还没有采集到环境光照或噪音数据，暂不生成环境健康分。';
+    return '所选范围还没有采集到环境光照或噪音数据，暂不生成环境健康分。';
   }
-  return '最近 7 天还没有足够的可展示数据。';
+  return '所选范围还没有足够的可展示数据。';
 }
 
 String _emptyInsightForTab(TrendTab tab) {
