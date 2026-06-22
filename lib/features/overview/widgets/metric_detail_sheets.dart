@@ -507,6 +507,8 @@ Future<void> showMetricDetailSheet(
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    // 使用根导航器，让浮层覆盖在底部 tabbar 之上，从屏幕底部弹出并盖住导航栏
+    useRootNavigator: true,
     backgroundColor: Colors.transparent,
     sheetAnimationStyle: AnimationStyle(
       duration: duration,
