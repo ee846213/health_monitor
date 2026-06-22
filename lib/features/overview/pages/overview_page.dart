@@ -10,6 +10,7 @@ import 'package:health_monitor/domain/dashboard/daily_rhythm_ui_model.dart';
 import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
 import 'package:health_monitor/domain/trends/trend_snapshot.dart';
 import 'package:health_monitor/features/overview/providers/daily_rhythm_provider.dart';
+import 'package:health_monitor/features/overview/providers/overview_metric_trend_provider.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
 import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 import 'package:health_monitor/features/overview/widgets/daily_rhythm_timeline.dart';
@@ -317,7 +318,7 @@ class _SummaryCard extends StatelessWidget {
   }
 }
 
-class _MetricGroup extends StatelessWidget {
+class _MetricGroup extends ConsumerWidget {
   const _MetricGroup({
     required this.dashboard,
     required this.onActivityTap,
@@ -333,11 +334,14 @@ class _MetricGroup extends StatelessWidget {
   final VoidCallback onDigitalTap;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final tokens = context.healthTheme;
+    final trendData = ref.watch(overviewMetricTrendDataProvider).valueOrNull ??
+        const OverviewMetricTrendData();
     final rows = <_MetricRowData>[
       _MetricRowData(
         key: const Key('metric-step-card'),
+        dimension: DailyRhythmDimension.activity,
         icon: 'directions_walk',
         label: '活动',
         value: '${dashboard.stepCard.currentSteps}',
@@ -346,11 +350,12 @@ class _MetricGroup extends StatelessWidget {
         caption: '目标 ${dashboard.stepCard.goalSteps}',
         color: tokens.sage,
         background: tokens.sageSoft,
-        values: const <double>[.25, .34, .3, .48, .38, .55, .64],
+        values: trendData.activity,
         onTap: onActivityTap,
       ),
       _MetricRowData(
         key: const Key('metric-sedentary-card'),
+        dimension: DailyRhythmDimension.posture,
         icon: 'chair_alt',
         label: '姿势',
         value: _hours(dashboard.sedentaryCard.totalMinutes),
@@ -359,11 +364,12 @@ class _MetricGroup extends StatelessWidget {
         caption: '最长 ${dashboard.sedentaryCard.longestSingleMinutes} 分钟',
         color: const Color(0xFFA77A42),
         background: tokens.sandSoft,
-        values: const <double>[.22, .28, .26, .44, .39, .72, .55],
+        values: trendData.posture,
         onTap: onPostureTap,
       ),
       _MetricRowData(
         key: const Key('metric-noise-card'),
+        dimension: DailyRhythmDimension.noise,
         icon: 'graphic_eq',
         label: '环境噪音',
         value: dashboard.environmentSnapshot.noiseLabel,
@@ -372,11 +378,12 @@ class _MetricGroup extends StatelessWidget {
         caption: '最近有效样本',
         color: tokens.coral,
         background: tokens.coralSoft,
-        values: const <double>[.2, .3, .24, .5, .4, .66, .45],
+        values: trendData.noise,
         onTap: onNoiseTap,
       ),
       _MetricRowData(
         key: const Key('metric-screen-card'),
+        dimension: DailyRhythmDimension.digital,
         icon: 'phone_iphone',
         label: '数字习惯',
         value: _hours(dashboard.screenCard.totalMinutes),
@@ -385,7 +392,7 @@ class _MetricGroup extends StatelessWidget {
         caption: _screenCaption(dashboard.screenCard),
         color: tokens.blue,
         background: tokens.blueSoft,
-        values: const <double>[.2, .2, .34, .29, .42, .4, .61],
+        values: trendData.digital,
         onTap: onDigitalTap,
       ),
     ];
@@ -475,6 +482,7 @@ class _MetricRow extends StatelessWidget {
               child: SizedBox(
                 height: 34,
                 child: CustomPaint(
+                  key: Key('metric-${data.dimension.name}-trend'),
                   painter: _MiniTrendPainter(
                     values: data.values,
                     color: data.color,
@@ -544,6 +552,20 @@ class _MiniTrendPainter extends CustomPainter {
         ..color = baseline
         ..strokeWidth = 1,
     );
+    if (values.isEmpty) {
+      // 没有真实序列时只保留轻量基线，不补造折线或末端状态点。
+      return;
+    }
+    if (values.length == 1) {
+      // 单个真实值不足以表达趋势，仅绘制当前数据点，避免暗示不存在的变化。
+      canvas.drawCircle(
+        Offset(size.width - 5, size.height / 2),
+        3.5,
+        Paint()..color = color,
+      );
+      return;
+    }
+
     final path = Path();
     for (var index = 0; index < values.length; index++) {
       final point = Offset(
@@ -676,6 +698,7 @@ class _OverviewError extends StatelessWidget {
 class _MetricRowData {
   const _MetricRowData({
     required this.key,
+    required this.dimension,
     required this.icon,
     required this.label,
     required this.value,
@@ -689,6 +712,7 @@ class _MetricRowData {
   });
 
   final Key key;
+  final DailyRhythmDimension dimension;
   final String icon;
   final String label;
   final String value;

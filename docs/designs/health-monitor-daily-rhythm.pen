@@ -1,0 +1,2102 @@
+{
+  "version": "2.13",
+  "children": [
+    {
+      "type": "frame",
+      "id": "rhythmScreen",
+      "x": 0,
+      "y": 0,
+      "name": "生活节奏轴 - 首页 390x844",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "#FAF5EC",
+      "layout": "none",
+      "children": [
+        {
+          "type": "text",
+          "id": "screenTitle",
+          "x": 18,
+          "y": 40,
+          "name": "页面标题",
+          "fill": "#242724",
+          "content": "今天的节奏",
+          "fontFamily": "Inter",
+          "fontSize": 30,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "screenSubtitle",
+          "x": 18,
+          "y": 82,
+          "name": "页面副标题",
+          "fill": "#737873",
+          "content": "身体没有催你，只是在提醒你换个姿势",
+          "fontFamily": "Inter",
+          "fontSize": 13,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "frame",
+          "id": "sensingEntry",
+          "x": 270,
+          "y": 38,
+          "name": "个人感知入口",
+          "width": 102,
+          "height": 40,
+          "fill": "#FFFDF8",
+          "cornerRadius": 20,
+          "stroke": "#DDD8CF",
+          "gap": 8,
+          "padding": [
+            10,
+            12
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "icon",
+              "id": "sensingIcon",
+              "name": "个人感知图标",
+              "width": 18,
+              "height": 18,
+              "icon": "person",
+              "library": "Material Symbols Rounded",
+              "weight": 400,
+              "fill": "#6F9A72"
+            },
+            {
+              "type": "text",
+              "id": "sensingText",
+              "name": "个人感知文字",
+              "fill": "#343734",
+              "content": "个人感知",
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "timelineArea",
+          "x": 0,
+          "y": 135,
+          "name": "日间节奏轴",
+          "width": 390,
+          "height": 147,
+          "fill": "#FFFDF800",
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "morningLabel",
+              "x": 22,
+              "y": 111,
+              "name": "早晨标签",
+              "fill": "#737873",
+              "content": "早晨",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "500"
+            },
+            {
+              "type": "icon",
+              "id": "morningIcon",
+              "x": 26,
+              "y": 82,
+              "name": "早晨图标",
+              "width": 20,
+              "height": 20,
+              "icon": "wb_sunny",
+              "library": "Material Symbols Rounded",
+              "weight": 400,
+              "fill": "#D7B27B"
+            },
+            {
+              "type": "path",
+              "id": "timelineCurveBase",
+              "x": 48,
+              "y": 80,
+              "name": "节奏轴基础曲线",
+              "width": 294,
+              "height": 35,
+              "geometry": "M 0 31 C 48 14 91 5 133 3 C 183 1 246 10 294 31",
+              "viewBox": [
+                0,
+                0,
+                294,
+                35
+              ],
+              "fill": "#FFFFFF00",
+              "stroke": "#9FA9A1",
+              "strokeWidth": 2,
+              "strokeLinecap": "round",
+              "strokeLinejoin": "round"
+            },
+            {
+              "type": "path",
+              "id": "timelineCurveActivity",
+              "x": 48,
+              "y": 80,
+              "name": "活动区间曲线",
+              "width": 110,
+              "height": 35,
+              "geometry": "M 0 31 C 40 16 78 7 110 4",
+              "viewBox": [
+                0,
+                0,
+                110,
+                35
+              ],
+              "fill": "#FFFFFF00",
+              "stroke": "#78AA7D",
+              "strokeWidth": 2,
+              "strokeLinecap": "round",
+              "strokeLinejoin": "round"
+            },
+            {
+              "type": "path",
+              "id": "timelineCurvePosture",
+              "x": 158,
+              "y": 80,
+              "name": "姿势区间曲线",
+              "width": 75,
+              "height": 35,
+              "geometry": "M 0 4 C 25 2 50 2 75 4",
+              "viewBox": [
+                0,
+                0,
+                75,
+                35
+              ],
+              "fill": "#FFFFFF00",
+              "stroke": "#D7B27B",
+              "strokeWidth": 2,
+              "strokeLinecap": "round",
+              "strokeLinejoin": "round"
+            },
+            {
+              "type": "path",
+              "id": "timelineCurveNoise",
+              "x": 233,
+              "y": 80,
+              "name": "噪音区间曲线",
+              "width": 55,
+              "height": 35,
+              "geometry": "M 0 4 C 20 6 38 10 55 14",
+              "viewBox": [
+                0,
+                0,
+                55,
+                35
+              ],
+              "fill": "#FFFFFF00",
+              "stroke": "#DF7B6E",
+              "strokeWidth": 2,
+              "strokeLinecap": "round",
+              "strokeLinejoin": "round"
+            },
+            {
+              "type": "path",
+              "id": "timelineCurveUsage",
+              "x": 288,
+              "y": 80,
+              "name": "数字习惯区间曲线",
+              "width": 54,
+              "height": 35,
+              "geometry": "M 0 14 C 20 19 38 25 54 31",
+              "viewBox": [
+                0,
+                0,
+                54,
+                35
+              ],
+              "fill": "#FFFFFF00",
+              "stroke": "#72A7C4",
+              "strokeWidth": 2,
+              "strokeLinecap": "round",
+              "strokeLinejoin": "round"
+            },
+            {
+              "type": "frame",
+              "id": "activityNode",
+              "x": 72,
+              "y": 56,
+              "name": "09:00 活动良好",
+              "width": 28,
+              "height": 28,
+              "fill": "#DDEBDD",
+              "cornerRadius": 14,
+              "layout": "vertical",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "activityIcon",
+                  "name": "活动图标",
+                  "width": 16,
+                  "height": 16,
+                  "icon": "directions_walk",
+                  "library": "Material Symbols Rounded",
+                  "weight": 500,
+                  "fill": "#6F9A72"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "activityTime",
+              "x": 73,
+              "y": 13,
+              "name": "活动时间",
+              "fill": "#6F9A72",
+              "content": "09:00",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "activityState",
+              "x": 68,
+              "y": 33,
+              "name": "活动状态",
+              "fill": "#343734",
+              "content": "活动良好",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "500"
+            },
+            {
+              "type": "frame",
+              "id": "postureNode",
+              "x": 148,
+              "y": 47,
+              "name": "14:30 久坐集中",
+              "width": 28,
+              "height": 28,
+              "fill": "#F3E6D2",
+              "cornerRadius": 14,
+              "layout": "vertical",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "postureIcon",
+                  "name": "姿势图标",
+                  "width": 16,
+                  "height": 16,
+                  "icon": "chair_alt",
+                  "library": "Material Symbols Rounded",
+                  "weight": 500,
+                  "fill": "#A77A42"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "postureTime",
+              "x": 149,
+              "y": 0,
+              "name": "姿势时间",
+              "fill": "#343734",
+              "content": "14:30",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "postureState",
+              "x": 141,
+              "y": 20,
+              "name": "姿势状态",
+              "fill": "#343734",
+              "content": "久坐集中",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "500"
+            },
+            {
+              "type": "frame",
+              "id": "noiseNode",
+              "x": 224,
+              "y": 48,
+              "name": "18:00 噪音偏高",
+              "width": 28,
+              "height": 28,
+              "fill": "#F6DAD5",
+              "cornerRadius": 14,
+              "layout": "vertical",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "noiseIcon",
+                  "name": "噪音图标",
+                  "width": 16,
+                  "height": 16,
+                  "icon": "graphic_eq",
+                  "library": "Material Symbols Rounded",
+                  "weight": 500,
+                  "fill": "#C66659"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "noiseTime",
+              "x": 225,
+              "y": 4,
+              "name": "噪音时间",
+              "fill": "#343734",
+              "content": "18:00",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "noiseState",
+              "x": 217,
+              "y": 24,
+              "name": "噪音状态",
+              "fill": "#343734",
+              "content": "噪音偏高",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "500"
+            },
+            {
+              "type": "frame",
+              "id": "screenNode",
+              "x": 292,
+              "y": 58,
+              "name": "21:00 看屏频繁",
+              "width": 28,
+              "height": 28,
+              "fill": "#DDECF3",
+              "cornerRadius": 14,
+              "layout": "vertical",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "screenIcon",
+                  "name": "数字习惯图标",
+                  "width": 16,
+                  "height": 16,
+                  "icon": "phone_iphone",
+                  "library": "Material Symbols Rounded",
+                  "weight": 500,
+                  "fill": "#5C8EAA"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "screenTime",
+              "x": 293,
+              "y": 17,
+              "name": "看屏时间",
+              "fill": "#343734",
+              "content": "21:00",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "screenState",
+              "x": 286,
+              "y": 37,
+              "name": "看屏状态",
+              "fill": "#343734",
+              "content": "看屏频繁",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "500"
+            },
+            {
+              "type": "ellipse",
+              "id": "activityPointHalo",
+              "x": 81,
+              "y": 91,
+              "name": "活动节点外圈",
+              "width": 14,
+              "height": 14,
+              "fill": "#FFFFFF"
+            },
+            {
+              "type": "ellipse",
+              "id": "activityPoint",
+              "x": 84,
+              "y": 94,
+              "name": "活动节点",
+              "width": 8,
+              "height": 8,
+              "fill": "#78AA7D"
+            },
+            {
+              "type": "ellipse",
+              "id": "posturePointHalo",
+              "x": 155,
+              "y": 78,
+              "name": "姿势节点外圈",
+              "width": 14,
+              "height": 14,
+              "fill": "#FFFFFF"
+            },
+            {
+              "type": "ellipse",
+              "id": "posturePoint",
+              "x": 158,
+              "y": 81,
+              "name": "姿势节点",
+              "width": 8,
+              "height": 8,
+              "fill": "#D7B27B"
+            },
+            {
+              "type": "ellipse",
+              "id": "noisePointHalo",
+              "x": 231,
+              "y": 79,
+              "name": "噪音节点外圈",
+              "width": 14,
+              "height": 14,
+              "fill": "#FFFFFF"
+            },
+            {
+              "type": "ellipse",
+              "id": "noisePoint",
+              "x": 234,
+              "y": 82,
+              "name": "噪音节点",
+              "width": 8,
+              "height": 8,
+              "fill": "#DF7B6E"
+            },
+            {
+              "type": "ellipse",
+              "id": "usagePointHalo",
+              "x": 299,
+              "y": 94,
+              "name": "数字习惯节点外圈",
+              "width": 14,
+              "height": 14,
+              "fill": "#FFFFFF"
+            },
+            {
+              "type": "ellipse",
+              "id": "usagePoint",
+              "x": 302,
+              "y": 97,
+              "name": "数字习惯节点",
+              "width": 8,
+              "height": 8,
+              "fill": "#72A7C4"
+            },
+            {
+              "type": "path",
+              "id": "currentConnector",
+              "x": 203,
+              "y": 83,
+              "name": "当前节点连接线",
+              "width": 2,
+              "height": 11,
+              "geometry": "M 1 0 L 1 11",
+              "viewBox": [
+                0,
+                0,
+                2,
+                11
+              ],
+              "fill": "#FFFFFF00",
+              "stroke": "#F0A23B",
+              "strokeWidth": 1,
+              "strokeLinecap": "round"
+            },
+            {
+              "type": "ellipse",
+              "id": "currentOuter",
+              "x": 189,
+              "y": 91,
+              "name": "当前时刻外环",
+              "width": 30,
+              "height": 30,
+              "fill": "#FFF3E0",
+              "stroke": "#F0A23B"
+            },
+            {
+              "type": "ellipse",
+              "id": "currentInner",
+              "x": 199,
+              "y": 101,
+              "name": "当前时刻内点",
+              "width": 10,
+              "height": 10,
+              "fill": "#F0A23B"
+            },
+            {
+              "type": "text",
+              "id": "currentTime",
+              "x": 178,
+              "y": 126,
+              "name": "当前时间",
+              "fill": "#F0A23B",
+              "content": "现在 16:42",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "600"
+            },
+            {
+              "type": "icon",
+              "id": "nightIcon",
+              "x": 352,
+              "y": 84,
+              "name": "晚间图标",
+              "width": 20,
+              "height": 20,
+              "icon": "dark_mode",
+              "library": "Material Symbols Rounded",
+              "weight": 400,
+              "fill": "#9A968E"
+            },
+            {
+              "type": "text",
+              "id": "nightLabel",
+              "x": 348,
+              "y": 112,
+              "name": "晚间标签",
+              "fill": "#737873",
+              "content": "晚间",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "500"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "summaryCard",
+          "x": 18,
+          "y": 290,
+          "name": "今日结论",
+          "width": 354,
+          "height": 92,
+          "fill": "#FFFFFF",
+          "cornerRadius": 28,
+          "stroke": "#DDD8CF",
+          "effect": {
+            "type": "shadow",
+            "shadowType": "outer",
+            "color": "#20231F14",
+            "offset": {
+              "x": 0,
+              "y": 8
+            },
+            "blur": 24
+          },
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "summaryText",
+              "x": 18,
+              "y": 25,
+              "name": "今日结论文字",
+              "fill": "#242724",
+              "textGrowth": "fixed-width",
+              "width": 238,
+              "content": "整体平稳，下午需要一次短暂活动",
+              "lineHeight": 1.25,
+              "fontFamily": "Inter",
+              "fontSize": 18,
+              "fontWeight": "700"
+            },
+            {
+              "type": "frame",
+              "id": "scoreArea",
+              "x": 276,
+              "y": 14,
+              "name": "今日状态分",
+              "width": 64,
+              "height": 64,
+              "fill": "#FAF8F3",
+              "cornerRadius": 22,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "scoreLabel",
+                  "x": 9,
+                  "y": 7,
+                  "name": "状态分标签",
+                  "fill": "#A09D96",
+                  "content": "今日状态",
+                  "fontFamily": "Inter",
+                  "fontSize": 9,
+                  "fontWeight": "500"
+                },
+                {
+                  "type": "text",
+                  "id": "scoreValue",
+                  "x": 10,
+                  "y": 21,
+                  "name": "状态分数值",
+                  "fill": "#6F9A72",
+                  "content": "82",
+                  "fontFamily": "Inter",
+                  "fontSize": 30,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "ellipse",
+                  "id": "scoreDot",
+                  "x": 50,
+                  "y": 44,
+                  "name": "状态分强调点",
+                  "width": 6,
+                  "height": 6,
+                  "fill": "#F0A23B"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "metricsGroup",
+          "x": 18,
+          "y": 394,
+          "name": "四维健康摘要",
+          "width": 354,
+          "height": 264,
+          "fill": "#FFFFFF",
+          "cornerRadius": 28,
+          "stroke": "#DDD8CF",
+          "effect": {
+            "type": "shadow",
+            "shadowType": "outer",
+            "color": "#20231F14",
+            "offset": {
+              "x": 0,
+              "y": 10
+            },
+            "blur": 28
+          },
+          "layout": "vertical",
+          "padding": [
+            4,
+            14
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "activityRow",
+              "name": "活动摘要",
+              "width": "fill_container",
+              "height": 64,
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "activityRowIconBox",
+                  "name": "活动摘要图标容器",
+                  "width": 34,
+                  "height": 34,
+                  "fill": "#DDEBDD",
+                  "cornerRadius": 17,
+                  "layout": "vertical",
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "activityRowIcon",
+                      "name": "活动摘要图标",
+                      "width": 19,
+                      "height": 19,
+                      "icon": "directions_walk",
+                      "library": "Material Symbols Rounded",
+                      "weight": 500,
+                      "fill": "#6F9A72"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "activityData",
+                  "name": "活动数据",
+                  "width": 92,
+                  "layout": "vertical",
+                  "gap": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "activityName",
+                      "name": "活动名称",
+                      "fill": "#737873",
+                      "content": "活动",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "text",
+                      "id": "activityValue",
+                      "name": "活动数值",
+                      "fill": "#242724",
+                      "content": "6,240 步",
+                      "fontFamily": "Inter",
+                      "fontSize": 18,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "activityTrendBox",
+                  "name": "活动趋势",
+                  "width": 80,
+                  "height": 28,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "type": "path",
+                      "id": "activityTrendBaseline",
+                      "x": 2,
+                      "y": 25,
+                      "name": "活动趋势基线",
+                      "width": 74,
+                      "height": 1,
+                      "geometry": "M 0 0 L 74 0",
+                      "viewBox": [
+                        0,
+                        0,
+                        74,
+                        1
+                      ],
+                      "fill": "#FFFFFF00",
+                      "stroke": "#DCE5DC",
+                      "strokeWidth": 1
+                    },
+                    {
+                      "type": "path",
+                      "id": "activityTrend",
+                      "x": 0,
+                      "y": 0,
+                      "name": "活动趋势曲线",
+                      "width": 80,
+                      "height": 28,
+                      "geometry": "M 2 22 C 10 22 13 14 20 14 C 27 14 30 19 36 17 C 43 15 44 5 52 5 C 60 5 59 17 66 17 C 72 17 73 11 76 9",
+                      "viewBox": [
+                        0,
+                        0,
+                        80,
+                        28
+                      ],
+                      "fill": "#FFFFFF00",
+                      "stroke": "#6F9A72",
+                      "strokeWidth": 2,
+                      "strokeLinecap": "round",
+                      "strokeLinejoin": "round"
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "activityTrendDot",
+                      "x": 73,
+                      "y": 6,
+                      "name": "活动趋势终点",
+                      "width": 6,
+                      "height": 6,
+                      "fill": "#6F9A72",
+                      "stroke": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "activityStatus",
+                  "name": "活动状态",
+                  "width": 82,
+                  "layout": "vertical",
+                  "gap": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "activityStatusMain",
+                      "name": "活动状态主文案",
+                      "fill": "#6F9A72",
+                      "content": "良好",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "activityStatusSub",
+                      "name": "活动状态辅助文案",
+                      "fill": "#9A9D98",
+                      "content": "比昨日多 12%",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "rectangle",
+              "id": "divider1",
+              "name": "分隔线 1",
+              "width": "fill_container",
+              "height": 1,
+              "fill": "#EAE5DC"
+            },
+            {
+              "type": "frame",
+              "id": "postureRow",
+              "name": "姿势摘要",
+              "width": "fill_container",
+              "height": 64,
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "postureRowIconBox",
+                  "name": "姿势摘要图标容器",
+                  "width": 34,
+                  "height": 34,
+                  "fill": "#F3E6D2",
+                  "cornerRadius": 17,
+                  "layout": "vertical",
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "postureRowIcon",
+                      "name": "姿势摘要图标",
+                      "width": 19,
+                      "height": 19,
+                      "icon": "chair_alt",
+                      "library": "Material Symbols Rounded",
+                      "weight": 500,
+                      "fill": "#A77A42"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "postureData",
+                  "name": "姿势数据",
+                  "width": 92,
+                  "layout": "vertical",
+                  "gap": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "postureName",
+                      "name": "姿势名称",
+                      "fill": "#737873",
+                      "content": "姿势",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "text",
+                      "id": "postureValue",
+                      "name": "姿势数值",
+                      "fill": "#242724",
+                      "content": "久坐 3.2 小时",
+                      "fontFamily": "Inter",
+                      "fontSize": 16,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "postureTrendBox",
+                  "name": "姿势趋势",
+                  "width": 80,
+                  "height": 28,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "type": "path",
+                      "id": "postureTrendBaseline",
+                      "x": 2,
+                      "y": 25,
+                      "name": "姿势趋势基线",
+                      "width": 74,
+                      "height": 1,
+                      "geometry": "M 0 0 L 74 0",
+                      "viewBox": [
+                        0,
+                        0,
+                        74,
+                        1
+                      ],
+                      "fill": "#FFFFFF00",
+                      "stroke": "#EADFCF",
+                      "strokeWidth": 1
+                    },
+                    {
+                      "type": "path",
+                      "id": "postureTrend",
+                      "x": 0,
+                      "y": 0,
+                      "name": "姿势趋势曲线",
+                      "width": 80,
+                      "height": 28,
+                      "geometry": "M 2 23 C 9 23 12 19 18 19 C 24 19 26 23 31 21 C 36 19 35 12 41 12 C 47 12 47 4 53 4 C 60 4 60 10 65 10 C 70 10 72 17 76 18",
+                      "viewBox": [
+                        0,
+                        0,
+                        80,
+                        28
+                      ],
+                      "fill": "#FFFFFF00",
+                      "stroke": "#D7A557",
+                      "strokeWidth": 2,
+                      "strokeLinecap": "round",
+                      "strokeLinejoin": "round"
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "postureTrendDot",
+                      "x": 73,
+                      "y": 15,
+                      "name": "姿势趋势终点",
+                      "width": 6,
+                      "height": 6,
+                      "fill": "#D7A557",
+                      "stroke": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "postureStatus",
+                  "name": "姿势状态",
+                  "width": 82,
+                  "layout": "vertical",
+                  "gap": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "postureStatusMain",
+                      "name": "姿势状态主文案",
+                      "fill": "#E18B2F",
+                      "content": "专注时段",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "postureStatusSub",
+                      "name": "姿势状态辅助文案",
+                      "fill": "#9A9D98",
+                      "content": "14:00–16:30",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "rectangle",
+              "id": "divider2",
+              "name": "分隔线 2",
+              "width": "fill_container",
+              "height": 1,
+              "fill": "#EAE5DC"
+            },
+            {
+              "type": "frame",
+              "id": "noiseRow",
+              "name": "环境噪音摘要",
+              "width": "fill_container",
+              "height": 64,
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "noiseRowIconBox",
+                  "name": "噪音摘要图标容器",
+                  "width": 34,
+                  "height": 34,
+                  "fill": "#F6DAD5",
+                  "cornerRadius": 17,
+                  "layout": "vertical",
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "noiseRowIcon",
+                      "name": "噪音摘要图标",
+                      "width": 19,
+                      "height": 19,
+                      "icon": "graphic_eq",
+                      "library": "Material Symbols Rounded",
+                      "weight": 500,
+                      "fill": "#C66659"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "noiseData",
+                  "name": "噪音数据",
+                  "width": 92,
+                  "layout": "vertical",
+                  "gap": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "noiseName",
+                      "name": "噪音名称",
+                      "fill": "#737873",
+                      "content": "环境噪音",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "text",
+                      "id": "noiseValue",
+                      "name": "噪音数值",
+                      "fill": "#242724",
+                      "content": "48 dB",
+                      "fontFamily": "Inter",
+                      "fontSize": 18,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "noiseTrendBox",
+                  "name": "噪音趋势",
+                  "width": 80,
+                  "height": 28,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "type": "path",
+                      "id": "noiseTrendBaseline",
+                      "x": 2,
+                      "y": 25,
+                      "name": "噪音趋势基线",
+                      "width": 74,
+                      "height": 1,
+                      "geometry": "M 0 0 L 74 0",
+                      "viewBox": [
+                        0,
+                        0,
+                        74,
+                        1
+                      ],
+                      "fill": "#FFFFFF00",
+                      "stroke": "#F0DEDB",
+                      "strokeWidth": 1
+                    },
+                    {
+                      "type": "path",
+                      "id": "noiseTrend",
+                      "x": 0,
+                      "y": 0,
+                      "name": "噪音趋势曲线",
+                      "width": 80,
+                      "height": 28,
+                      "geometry": "M 2 23 C 9 23 11 19 17 19 C 23 19 24 23 30 21 C 36 19 35 13 41 13 C 47 13 48 6 54 6 C 60 6 61 2 66 3 C 72 4 72 13 76 15",
+                      "viewBox": [
+                        0,
+                        0,
+                        80,
+                        28
+                      ],
+                      "fill": "#FFFFFF00",
+                      "stroke": "#DF7B6E",
+                      "strokeWidth": 2,
+                      "strokeLinecap": "round",
+                      "strokeLinejoin": "round"
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "noiseTrendDot",
+                      "x": 73,
+                      "y": 12,
+                      "name": "噪音趋势终点",
+                      "width": 6,
+                      "height": 6,
+                      "fill": "#DF7B6E",
+                      "stroke": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "noiseStatus",
+                  "name": "噪音状态",
+                  "width": 82,
+                  "layout": "vertical",
+                  "gap": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "noiseStatusMain",
+                      "name": "噪音状态主文案",
+                      "fill": "#E18B2F",
+                      "content": "偏高",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "noiseStatusSub",
+                      "name": "噪音状态辅助文案",
+                      "fill": "#9A9D98",
+                      "content": "傍晚时段",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "rectangle",
+              "id": "divider3",
+              "name": "分隔线 3",
+              "width": "fill_container",
+              "height": 1,
+              "fill": "#EAE5DC"
+            },
+            {
+              "type": "frame",
+              "id": "usageRow",
+              "name": "数字习惯摘要",
+              "width": "fill_container",
+              "height": 64,
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "usageRowIconBox",
+                  "name": "数字习惯摘要图标容器",
+                  "width": 34,
+                  "height": 34,
+                  "fill": "#DDECF3",
+                  "cornerRadius": 17,
+                  "layout": "vertical",
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "icon",
+                      "id": "usageRowIcon",
+                      "name": "数字习惯摘要图标",
+                      "width": 19,
+                      "height": 19,
+                      "icon": "phone_iphone",
+                      "library": "Material Symbols Rounded",
+                      "weight": 500,
+                      "fill": "#5C8EAA"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "usageData",
+                  "name": "数字习惯数据",
+                  "width": 92,
+                  "layout": "vertical",
+                  "gap": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "usageName",
+                      "name": "数字习惯名称",
+                      "fill": "#737873",
+                      "content": "数字习惯",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "500"
+                    },
+                    {
+                      "type": "text",
+                      "id": "usageValue",
+                      "name": "数字习惯数值",
+                      "fill": "#242724",
+                      "content": "看屏 2.8 小时",
+                      "fontFamily": "Inter",
+                      "fontSize": 16,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "usageTrendBox",
+                  "name": "数字习惯趋势",
+                  "width": 80,
+                  "height": 28,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "type": "path",
+                      "id": "usageTrendBaseline",
+                      "x": 2,
+                      "y": 25,
+                      "name": "数字习惯趋势基线",
+                      "width": 74,
+                      "height": 1,
+                      "geometry": "M 0 0 L 74 0",
+                      "viewBox": [
+                        0,
+                        0,
+                        74,
+                        1
+                      ],
+                      "fill": "#FFFFFF00",
+                      "stroke": "#DCE8EE",
+                      "strokeWidth": 1
+                    },
+                    {
+                      "type": "path",
+                      "id": "usageTrend",
+                      "x": 0,
+                      "y": 0,
+                      "name": "数字习惯趋势曲线",
+                      "width": 80,
+                      "height": 28,
+                      "geometry": "M 2 22 C 10 22 13 21 18 18 C 24 14 28 15 34 18 C 40 21 43 14 49 14 C 55 14 57 17 62 15 C 68 13 68 7 76 6",
+                      "viewBox": [
+                        0,
+                        0,
+                        80,
+                        28
+                      ],
+                      "fill": "#FFFFFF00",
+                      "stroke": "#72A7C4",
+                      "strokeWidth": 2,
+                      "strokeLinecap": "round",
+                      "strokeLinejoin": "round"
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "usageTrendDot",
+                      "x": 73,
+                      "y": 3,
+                      "name": "数字习惯趋势终点",
+                      "width": 6,
+                      "height": 6,
+                      "fill": "#72A7C4",
+                      "stroke": "#FFFFFF"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "usageStatus",
+                  "name": "数字习惯状态",
+                  "width": 82,
+                  "layout": "vertical",
+                  "gap": 3,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "usageStatusMain",
+                      "name": "数字习惯状态主文案",
+                      "fill": "#E18B2F",
+                      "content": "偏多",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "usageStatusSub",
+                      "name": "数字习惯状态辅助文案",
+                      "fill": "#9A9D98",
+                      "content": "晚间时段",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "actionCard",
+          "x": 18,
+          "y": 670,
+          "name": "当前行动建议",
+          "width": 354,
+          "height": 82,
+          "fill": "#FFFFFF",
+          "cornerRadius": 28,
+          "stroke": "#E8DED0",
+          "effect": {
+            "type": "shadow",
+            "shadowType": "outer",
+            "color": "#A66D251A",
+            "offset": {
+              "x": 0,
+              "y": 10
+            },
+            "blur": 26
+          },
+          "layout": "none",
+          "children": [
+            {
+              "type": "frame",
+              "id": "actionIconBox",
+              "x": 16,
+              "y": 21,
+              "name": "行动图标容器",
+              "width": 40,
+              "height": 40,
+              "fill": "#FFF8EC",
+              "cornerRadius": 20,
+              "layout": "vertical",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "actionIcon",
+                  "name": "行动图标",
+                  "width": 21,
+                  "height": 21,
+                  "icon": "directions_walk",
+                  "library": "Material Symbols Rounded",
+                  "weight": 500,
+                  "fill": "#6F9A72"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "actionTitle",
+              "x": 70,
+              "y": 18,
+              "name": "行动标题",
+              "fill": "#242724",
+              "content": "现在起身活动 3 分钟",
+              "fontFamily": "Inter",
+              "fontSize": 17,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "actionSubtitle",
+              "x": 70,
+              "y": 48,
+              "name": "行动说明",
+              "fill": "#737873",
+              "content": "不用补运动量，先打断久坐就够了",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "actionButton",
+              "x": 296,
+              "y": 19,
+              "name": "行动按钮",
+              "width": 44,
+              "height": 44,
+              "fill": "#F0A23B",
+              "cornerRadius": 22,
+              "layout": "vertical",
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "actionArrow",
+                  "name": "行动箭头",
+                  "width": 22,
+                  "height": 22,
+                  "icon": "arrow_forward",
+                  "library": "Material Symbols Rounded",
+                  "weight": 500,
+                  "fill": "#FFFFFF"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "bottomNav",
+          "x": 26,
+          "y": 766,
+          "name": "底部导航",
+          "width": 338,
+          "height": 64,
+          "fill": "#FFFFFF",
+          "cornerRadius": 32,
+          "stroke": "#DDD8CF",
+          "effect": {
+            "type": "shadow",
+            "shadowType": "outer",
+            "color": "#20231F1A",
+            "offset": {
+              "x": 0,
+              "y": 10
+            },
+            "blur": 28
+          },
+          "gap": 4,
+          "padding": 6,
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "navHome",
+              "name": "首页激活态",
+              "width": 76,
+              "height": 52,
+              "fill": "#6F9A72",
+              "cornerRadius": 26,
+              "layout": "vertical",
+              "gap": 2,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "navHomeIcon",
+                  "name": "首页图标",
+                  "width": 21,
+                  "height": 21,
+                  "icon": "home",
+                  "library": "Material Symbols Rounded",
+                  "weight": 400,
+                  "fill": "#FFFFFF"
+                },
+                {
+                  "type": "text",
+                  "id": "navHomeText",
+                  "name": "首页文字",
+                  "fill": "#FFFFFF",
+                  "content": "首页",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "navTrend",
+              "name": "趋势导航",
+              "width": 76,
+              "height": 52,
+              "layout": "vertical",
+              "gap": 2,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "navTrendIcon",
+                  "name": "趋势图标",
+                  "width": 21,
+                  "height": 21,
+                  "icon": "show_chart",
+                  "library": "Material Symbols Rounded",
+                  "weight": 400,
+                  "fill": "#343734"
+                },
+                {
+                  "type": "text",
+                  "id": "navTrendText",
+                  "name": "趋势文字",
+                  "fill": "#737873",
+                  "content": "趋势",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "navBrief",
+              "name": "简报导航",
+              "width": 76,
+              "height": 52,
+              "layout": "vertical",
+              "gap": 2,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "navBriefIcon",
+                  "name": "简报图标",
+                  "width": 21,
+                  "height": 21,
+                  "icon": "article",
+                  "library": "Material Symbols Rounded",
+                  "weight": 400,
+                  "fill": "#343734"
+                },
+                {
+                  "type": "text",
+                  "id": "navBriefText",
+                  "name": "简报文字",
+                  "fill": "#737873",
+                  "content": "简报",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "500"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "navProfile",
+              "name": "我的导航",
+              "width": 76,
+              "height": 52,
+              "layout": "vertical",
+              "gap": 2,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "icon",
+                  "id": "navProfileIcon",
+                  "name": "我的图标",
+                  "width": 21,
+                  "height": 21,
+                  "icon": "person",
+                  "library": "Material Symbols Rounded",
+                  "weight": 400,
+                  "fill": "#343734"
+                },
+                {
+                  "type": "text",
+                  "id": "navProfileText",
+                  "name": "我的文字",
+                  "fill": "#737873",
+                  "content": "我的",
+                  "fontFamily": "Inter",
+                  "fontSize": 10,
+                  "fontWeight": "500"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "designBrief",
+      "x": 450,
+      "y": 0,
+      "name": "生活节奏轴 - 设计规范",
+      "width": 560,
+      "height": 1180,
+      "fill": "#F5F3EE",
+      "cornerRadius": 32,
+      "stroke": "#DDD8CF",
+      "layout": "vertical",
+      "gap": 20,
+      "padding": [
+        28,
+        28
+      ],
+      "children": [
+        {
+          "type": "text",
+          "id": "briefTitle",
+          "name": "规范标题",
+          "fill": "#1F2320",
+          "content": "生活节奏轴 UI 设计规范",
+          "fontFamily": "Inter",
+          "fontSize": 30,
+          "fontWeight": "700"
+        },
+        {
+          "type": "text",
+          "id": "briefIntro",
+          "name": "规范简介",
+          "fill": "#505750",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "目标：为健康监测 App 建立温和、可解释、低打扰的今日总览。用一天的节奏串联活动、姿势、环境噪音和数字习惯，不把首页做成高压式医学仪表盘。",
+          "lineHeight": 1.55,
+          "fontFamily": "Inter",
+          "fontSize": 14,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "frame",
+          "id": "sourceBlock",
+          "name": "设计来源",
+          "width": "fill_container",
+          "fill": "#FFFDF8",
+          "cornerRadius": 24,
+          "stroke": "#DDD8CF",
+          "layout": "vertical",
+          "gap": 8,
+          "padding": 18,
+          "children": [
+            {
+              "type": "text",
+              "id": "sourceTitle",
+              "name": "设计来源标题",
+              "fill": "#1F2320",
+              "content": "设计来源",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "sourceReference",
+              "name": "视觉参考路径",
+              "fill": "#505750",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "视觉参考：docs/designs/health-monitor-daily-rhythm-reference.png",
+              "lineHeight": 1.5,
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "sourceSpec",
+              "name": "完整规范路径",
+              "fill": "#505750",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "完整规范：docs/superpowers/specs/2026-06-21-health-monitor-daily-rhythm-ui-spec.md",
+              "lineHeight": 1.5,
+              "fontFamily": "Inter",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "principlesBlock",
+          "name": "核心原则",
+          "width": "fill_container",
+          "fill": "#FFFDF8",
+          "cornerRadius": 24,
+          "stroke": "#DDD8CF",
+          "layout": "vertical",
+          "gap": 8,
+          "padding": 18,
+          "children": [
+            {
+              "type": "text",
+              "id": "principlesTitle",
+              "name": "核心原则标题",
+              "fill": "#1F2320",
+              "content": "核心原则",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "principlesText",
+              "name": "核心原则内容",
+              "fill": "#505750",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "• 温和陪伴，不制造健康焦虑\n• 先给结论，再解释依据\n• 不做医学诊断，不展示未定义医学指标\n• 页面只消费聚合后的 UI 数据\n• 通过留白、分组和排版建立层级，避免卡片套卡片",
+              "lineHeight": 1.65,
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "layoutBlock",
+          "name": "布局与尺寸",
+          "width": "fill_container",
+          "fill": "#FFFDF8",
+          "cornerRadius": 24,
+          "stroke": "#DDD8CF",
+          "layout": "vertical",
+          "gap": 8,
+          "padding": 18,
+          "children": [
+            {
+              "type": "text",
+              "id": "layoutTitle",
+              "name": "布局标题",
+              "fill": "#1F2320",
+              "content": "布局与尺寸",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "layoutText",
+              "name": "布局内容",
+              "fill": "#505750",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "画板 390 × 844；页面边距 18；主卡圆角 28；图标容器 34；底部导航高 64、圆角 32。页面顺序：问候 → 节奏轴 → 今日结论 → 四维摘要 → 行动建议 → 底部导航。",
+              "lineHeight": 1.6,
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "paletteBlock",
+          "name": "色彩规范",
+          "width": "fill_container",
+          "fill": "#FFFDF8",
+          "cornerRadius": 24,
+          "stroke": "#DDD8CF",
+          "layout": "vertical",
+          "gap": 12,
+          "padding": 18,
+          "children": [
+            {
+              "type": "text",
+              "id": "paletteTitle",
+              "name": "色彩标题",
+              "fill": "#1F2320",
+              "content": "色彩规范",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "700"
+            },
+            {
+              "type": "frame",
+              "id": "paletteRow1",
+              "name": "色彩行 1",
+              "width": "fill_container",
+              "gap": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "canvasSwatch",
+                  "name": "背景色",
+                  "width": 112,
+                  "fill": "#FAF5EC",
+                  "cornerRadius": 14,
+                  "stroke": "#DDD8CF",
+                  "layout": "vertical",
+                  "gap": 6,
+                  "padding": 10,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "canvasSwatchText",
+                      "name": "背景色色值",
+                      "fill": "#505750",
+                      "content": "背景 #FAF5EC",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "sageSwatch",
+                  "name": "鼠尾草绿",
+                  "width": 112,
+                  "fill": "#6F9A72",
+                  "cornerRadius": 14,
+                  "layout": "vertical",
+                  "gap": 6,
+                  "padding": 10,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "sageSwatchText",
+                      "name": "鼠尾草绿色值",
+                      "fill": "#FFFFFF",
+                      "content": "主色 #6F9A72",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "orangeSwatch",
+                  "name": "柔和橙",
+                  "width": 112,
+                  "fill": "#F0A23B",
+                  "cornerRadius": 14,
+                  "layout": "vertical",
+                  "gap": 6,
+                  "padding": 10,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "orangeSwatchText",
+                      "name": "柔和橙色值",
+                      "fill": "#FFFFFF",
+                      "content": "强调 #F0A23B",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "600"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "paletteRow2",
+              "name": "色彩行 2",
+              "width": "fill_container",
+              "gap": 10,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "sandSwatch",
+                  "name": "暖沙色",
+                  "width": 112,
+                  "fill": "#F3E6D2",
+                  "cornerRadius": 14,
+                  "layout": "vertical",
+                  "gap": 6,
+                  "padding": 10,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "sandSwatchText",
+                      "name": "暖沙色色值",
+                      "fill": "#76552D",
+                      "content": "姿势 #F3E6D2",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "coralSwatch",
+                  "name": "珊瑚色",
+                  "width": 112,
+                  "fill": "#F6DAD5",
+                  "cornerRadius": 14,
+                  "layout": "vertical",
+                  "gap": 6,
+                  "padding": 10,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "coralSwatchText",
+                      "name": "珊瑚色色值",
+                      "fill": "#9A4D43",
+                      "content": "噪音 #F6DAD5",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "600"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "blueSwatch",
+                  "name": "雾蓝色",
+                  "width": 112,
+                  "fill": "#DDECF3",
+                  "cornerRadius": 14,
+                  "layout": "vertical",
+                  "gap": 6,
+                  "padding": 10,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "blueSwatchText",
+                      "name": "雾蓝色色值",
+                      "fill": "#416E87",
+                      "content": "看屏 #DDECF3",
+                      "fontFamily": "Inter",
+                      "fontSize": 10,
+                      "fontWeight": "600"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "iconBlock",
+          "name": "图标与绘制",
+          "width": "fill_container",
+          "fill": "#FFFDF8",
+          "cornerRadius": 24,
+          "stroke": "#DDD8CF",
+          "layout": "vertical",
+          "gap": 8,
+          "padding": 18,
+          "children": [
+            {
+              "type": "text",
+              "id": "iconTitle",
+              "name": "图标标题",
+              "fill": "#1F2320",
+              "content": "图标与绘制",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "iconText",
+              "name": "图标与绘制内容",
+              "fill": "#505750",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "统一使用 Material Symbols Rounded：person、directions_walk、chair_alt、graphic_eq、phone_iphone、wb_sunny、dark_mode、home、show_chart、article。Flutter 中节奏轴与微型趋势线使用 CustomPainter，不依赖位图或 Figma 导出。",
+              "lineHeight": 1.6,
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "deliveryBlock",
+          "name": "交付与验收",
+          "width": "fill_container",
+          "fill": "#EAF2EA",
+          "cornerRadius": 24,
+          "stroke": "#C9D9CA",
+          "layout": "vertical",
+          "gap": 8,
+          "padding": 18,
+          "children": [
+            {
+              "type": "text",
+              "id": "deliveryTitle",
+              "name": "交付标题",
+              "fill": "#36543B",
+              "content": "交付与验收",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "deliveryText",
+              "name": "交付内容",
+              "fill": "#4A6B52",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "以 390 × 844 截图为基准做并排视觉比较，同时检查 360 × 800、小屏、大字体、权限缺失和数据不足状态。优先保证信息层级、文字可读性、布局尺寸与图标一致性。",
+              "lineHeight": 1.6,
+              "fontFamily": "Inter",
+              "fontSize": 13,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "canvas": {
+      "type": "color",
+      "value": "#FAF5EC"
+    },
+    "surface": {
+      "type": "color",
+      "value": "#FFFFFF"
+    },
+    "line": {
+      "type": "color",
+      "value": "#DDD8CF"
+    },
+    "text_primary": {
+      "type": "color",
+      "value": "#242724"
+    },
+    "text_secondary": {
+      "type": "color",
+      "value": "#737873"
+    },
+    "sage": {
+      "type": "color",
+      "value": "#6F9A72"
+    },
+    "orange": {
+      "type": "color",
+      "value": "#F0A23B"
+    },
+    "sand_soft": {
+      "type": "color",
+      "value": "#F3E6D2"
+    },
+    "coral_soft": {
+      "type": "color",
+      "value": "#F6DAD5"
+    },
+    "blue_soft": {
+      "type": "color",
+      "value": "#DDECF3"
+    },
+    "radius_card": {
+      "type": "number",
+      "value": 28
+    },
+    "heading_font": {
+      "type": "string",
+      "value": "Inter"
+    },
+    "body_font": {
+      "type": "string",
+      "value": "Inter"
+    }
+  }
+}

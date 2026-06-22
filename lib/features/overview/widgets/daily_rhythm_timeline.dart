@@ -320,24 +320,7 @@ class _RhythmCurvePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final path = Path()
-      ..moveTo(42, 126)
-      ..cubicTo(
-        size.width * .25,
-        95,
-        size.width * .42,
-        91,
-        size.width * .52,
-        92,
-      )
-      ..cubicTo(
-        size.width * .70,
-        93,
-        size.width * .84,
-        109,
-        size.width - 42,
-        126,
-      );
+    final path = DailyRhythmCurveGeometry.pathForWidth(size.width);
 
     final metrics = path.computeMetrics().first;
     final extracted = metrics.extractPath(0, metrics.length * progress);
@@ -373,10 +356,39 @@ class _RhythmCurvePainter extends CustomPainter {
 }
 
 Offset _curvePoint(DateTime time, double width) {
-  final normalized = ((time.hour + time.minute / 60 - 6) / 16).clamp(0.0, 1.0);
-  final x = 42 + normalized * (width - 84);
-  final y = 126 - math.sin(normalized * math.pi) * 34;
-  return Offset(x, y);
+  return DailyRhythmCurveGeometry.pointForTime(time, width);
+}
+
+class DailyRhythmCurveGeometry {
+  const DailyRhythmCurveGeometry._();
+
+  static Path pathForWidth(double width) {
+    // 线条和节点必须共享同一套采样函数。此前线条使用贝塞尔曲线、
+    // 节点使用正弦曲线，即使时间横坐标一致，纵坐标也会出现肉眼可见的偏移。
+    const segmentCount = 64;
+    final path = Path();
+    for (var index = 0; index <= segmentCount; index++) {
+      final point = _pointAt(index / segmentCount, width);
+      if (index == 0) {
+        path.moveTo(point.dx, point.dy);
+      } else {
+        path.lineTo(point.dx, point.dy);
+      }
+    }
+    return path;
+  }
+
+  static Offset pointForTime(DateTime time, double width) {
+    final normalized =
+        ((time.hour + time.minute / 60 - 6) / 16).clamp(0.0, 1.0);
+    return _pointAt(normalized, width);
+  }
+
+  static Offset _pointAt(double normalized, double width) {
+    final x = 42 + normalized * (width - 84);
+    final y = 126 - math.sin(normalized * math.pi) * 34;
+    return Offset(x, y);
+  }
 }
 
 List<Color> _dimensionColors(BuildContext context) => <Color>[

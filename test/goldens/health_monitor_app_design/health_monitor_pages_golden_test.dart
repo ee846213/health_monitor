@@ -15,6 +15,7 @@ import 'package:health_monitor/domain/trends/trend_snapshot.dart';
 import 'package:health_monitor/features/briefing/pages/briefing_page.dart';
 import 'package:health_monitor/features/briefing/providers/briefing_providers.dart';
 import 'package:health_monitor/features/overview/pages/overview_page.dart';
+import 'package:health_monitor/features/overview/providers/overview_metric_trend_provider.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
 import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 import 'package:health_monitor/features/profile/pages/profile_page.dart';
@@ -49,6 +50,14 @@ void main() {
           (ref) => const AsyncData(OverviewScreenState.ready),
         ),
         overviewReadyDataStateProvider.overrideWith((ref) => _readyData()),
+        overviewMetricTrendDataProvider.overrideWith(
+          (ref) async => const OverviewMetricTrendData(
+            activity: <double>[.25, .34, .3, .48, .38, .55, .64],
+            posture: <double>[.22, .28, .26, .44, .39, .72, .55],
+            noise: <double>[.2, .3, .24, .5, .4, .66, .45],
+            digital: <double>[.2, .2, .34, .29, .42, .4, .61],
+          ),
+        ),
       ],
     );
     await expectLater(
