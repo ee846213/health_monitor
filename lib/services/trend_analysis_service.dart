@@ -1,11 +1,7 @@
-import 'package:health_monitor/domain/environment/ambient_light_sample.dart';
-import 'package:health_monitor/domain/environment/noise_sample.dart';
 import 'package:health_monitor/domain/metrics/daily_metrics.dart';
 import 'package:health_monitor/domain/trends/trend_snapshot.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
-import 'package:health_monitor/storage/repositories/ambient_light_sample_repository.dart';
 import 'package:health_monitor/storage/repositories/metrics_repository.dart';
-import 'package:health_monitor/storage/repositories/noise_sample_repository.dart';
 import 'package:health_monitor/storage/repositories/query_window.dart';
 import 'package:health_monitor/storage/repositories/usage_summary_repository.dart';
 
@@ -13,17 +9,11 @@ class TrendAnalysisService {
   TrendAnalysisService({
     required MetricsRepository metricsRepository,
     required UsageSummaryRepository usageRepository,
-    required AmbientLightSampleRepository ambientLightRepository,
-    required NoiseSampleRepository noiseRepository,
   })  : _metricsRepository = metricsRepository,
-        _usageRepository = usageRepository,
-        _ambientLightRepository = ambientLightRepository,
-        _noiseRepository = noiseRepository;
+        _usageRepository = usageRepository;
 
   final MetricsRepository _metricsRepository;
   final UsageSummaryRepository _usageRepository;
-  final AmbientLightSampleRepository _ambientLightRepository;
-  final NoiseSampleRepository _noiseRepository;
 
   Future<TrendSnapshot> build({
     required DateTime referenceTime,
@@ -44,8 +34,6 @@ class TrendAnalysisService {
     );
     var metrics = const <DailyMetrics>[];
     var usageByDate = <String, DigitalUsageSummary?>{};
-    var lightSamples = const <AmbientLightSample>[];
-    var noiseSamples = const <NoiseSample>[];
     switch (selectedTab) {
       case TrendTab.steps:
       case TrendTab.sedentary:
@@ -60,12 +48,6 @@ class TrendAnalysisService {
           for (final summary in usage) _dayKey(summary.date): summary,
         };
         break;
-      case TrendTab.environment:
-        final lightFuture = _ambientLightRepository.listByWindow(window);
-        final noiseFuture = _noiseRepository.listByWindow(window);
-        lightSamples = await lightFuture;
-        noiseSamples = await noiseFuture;
-        break;
     }
 
     final dailyPoints = dates.map((date) {
@@ -74,104 +56,40 @@ class TrendAnalysisService {
         date: date,
         metrics: metrics,
         usageByDate: usageByDate,
-        lightSamples: lightSamples,
-        noiseSamples: noiseSamples,
       );
       return TrendPoint(
         label: '${date.month}/${date.day}',
-        value: value.value,
-        hasData: value.hasData,
+        value: value,
       );
     }).toList(growable: false);
-    final points = _aggregatePoints(dailyPoints, range);
-    final availablePoints = points
-        .where((TrendPoint point) => point.hasData)
-        .toList(growable: false);
-    final hasAnyData = availablePoints.isNotEmpty;
+    final points = dailyPoints;
+    final hasAnyData = points.any((TrendPoint point) => point.value > 0);
 
     return TrendSnapshot(
       generatedAt: referenceTime,
       selectedTab: selectedTab,
       range: range,
-      aggregation: switch (range) {
-        TrendRange.days7 => TrendAggregation.day,
-        TrendRange.days30 => TrendAggregation.week,
-        TrendRange.days90 => TrendAggregation.month,
-      },
-      dataQuality: availablePoints.isEmpty
-          ? TrendDataQuality.empty
-          : availablePoints.length == points.length
-              ? TrendDataQuality.complete
-              : TrendDataQuality.partial,
-      defaultSelectedIndex: _lastAvailableIndex(points),
+      aggregation: TrendAggregation.day,
+      dataQuality: hasAnyData
+          ? TrendDataQuality.complete
+          : TrendDataQuality.empty,
+      defaultSelectedIndex: points.isEmpty ? null : points.length - 1,
       title: '${range.label}${_titleForTab(selectedTab)}',
       unitLabel: _unitForTab(selectedTab),
       points: points,
       insightText: hasAnyData
-          ? _insightForTab(selectedTab, availablePoints)
+          ? _insightForTab(selectedTab, points, range)
           : _emptyInsightForTab(selectedTab),
       emptyStateText: hasAnyData ? null : _emptyStateForTab(selectedTab),
     );
   }
 }
 
-List<TrendPoint> _aggregatePoints(
-  List<TrendPoint> points,
-  TrendRange range,
-) {
-  if (range == TrendRange.days7) {
-    return points;
-  }
-  final bucketSize = range == TrendRange.days30 ? 7 : 30;
-  final result = <TrendPoint>[];
-  for (var start = 0; start < points.length; start += bucketSize) {
-    final end =
-        start + bucketSize > points.length ? points.length : start + bucketSize;
-    final bucket = points.sublist(start, end);
-    final available = bucket.where((point) => point.hasData).toList();
-    final value = available.isEmpty
-        ? 0
-        : available.fold<num>(0, (sum, point) => sum + point.value) /
-            available.length;
-    result.add(
-      TrendPoint(
-        label: bucket.length == 1
-            ? bucket.first.label
-            : '${bucket.first.label}-${bucket.last.label.split('/').last}',
-        value: value,
-        hasData: available.isNotEmpty,
-      ),
-    );
-  }
-  return result;
-}
-
-int? _lastAvailableIndex(List<TrendPoint> points) {
-  for (var index = points.length - 1; index >= 0; index--) {
-    if (points[index].hasData) {
-      return index;
-    }
-  }
-  return null;
-}
-
-class _TrendValue {
-  const _TrendValue({
-    required this.value,
-    required this.hasData,
-  });
-
-  final num value;
-  final bool hasData;
-}
-
-_TrendValue _valueForTab({
+num _valueForTab({
   required TrendTab selectedTab,
   required DateTime date,
   required List<DailyMetrics> metrics,
   required Map<String, DigitalUsageSummary?> usageByDate,
-  required List<AmbientLightSample> lightSamples,
-  required List<NoiseSample> noiseSamples,
 }) {
   final dateKey = _dayKey(date);
   final dayMetrics = metrics
@@ -179,38 +97,14 @@ _TrendValue _valueForTab({
       .toList(growable: false);
   switch (selectedTab) {
     case TrendTab.steps:
-      return _TrendValue(
-        value: dayMetrics.fold<int>(0, (sum, item) => sum + item.stepCount),
-        hasData: dayMetrics.isNotEmpty,
-      );
+      return dayMetrics.fold<int>(0, (sum, item) => sum + item.stepCount);
     case TrendTab.sedentary:
-      return _TrendValue(
-        value: dayMetrics.fold<int>(
-          0,
-          (sum, item) => sum + item.sedentaryDuration.inMinutes,
-        ),
-        hasData: dayMetrics.isNotEmpty,
+      return dayMetrics.fold<int>(
+        0,
+        (sum, item) => sum + item.sedentaryDuration.inMinutes,
       );
     case TrendTab.screen:
-      final usage = usageByDate[dateKey];
-      return _TrendValue(
-        value: usage?.screenOnDuration.inMinutes ?? 0,
-        hasData: usage != null,
-      );
-    case TrendTab.environment:
-      final dayLightSamples = lightSamples
-          .where((item) => _dayKey(item.capturedAt) == dateKey)
-          .toList(growable: false);
-      final dayNoiseSamples = noiseSamples
-          .where((item) => _dayKey(item.capturedAt) == dateKey)
-          .toList(growable: false);
-      return _TrendValue(
-        value: _environmentScoreForDate(
-          lightSamples: dayLightSamples,
-          noiseSamples: dayNoiseSamples,
-        ),
-        hasData: dayLightSamples.isNotEmpty || dayNoiseSamples.isNotEmpty,
-      );
+      return usageByDate[dateKey]?.screenOnDuration.inMinutes ?? 0;
   }
 }
 
@@ -222,8 +116,6 @@ String _titleForTab(TrendTab tab) {
       return '姿势趋势';
     case TrendTab.screen:
       return '屏幕趋势';
-    case TrendTab.environment:
-      return '环境趋势';
   }
 }
 
@@ -234,58 +126,37 @@ String _unitForTab(TrendTab tab) {
     case TrendTab.sedentary:
     case TrendTab.screen:
       return '分钟';
-    case TrendTab.environment:
-      return '分';
   }
 }
 
-String _insightForTab(TrendTab tab, List<TrendPoint> points) {
+String _insightForTab(
+  TrendTab tab,
+  List<TrendPoint> points,
+  TrendRange range,
+) {
+  final windowLabel = range == TrendRange.days7 ? '过去一周' : '近 30 天';
   switch (tab) {
     case TrendTab.steps:
       final aboveGoalDays = points.where((item) => item.value >= 6000).length;
-      return '过去一周你有 $aboveGoalDays 天步数超过 6000，继续保持这个节奏。';
+      return '$windowLabel你有 $aboveGoalDays 天步数超过 6000，继续保持这个节奏。';
     case TrendTab.sedentary:
       final highest = points.fold<num>(
         0,
         (current, item) => item.value > current ? item.value : current,
       );
-      return '过去一周久坐最高达到 ${highest.round()} 分钟，长时间静坐的日子值得重点关注。';
+      return '$windowLabel久坐最高达到 ${highest.round()} 分钟，长时间静坐的日子值得重点关注。';
     case TrendTab.screen:
       final latest = points.isEmpty ? 0 : points.last.value.round();
       return '最近一天亮屏约 $latest 分钟，趋势页会继续帮你观察是否在收敛。';
-    case TrendTab.environment:
-      final latest = points.isEmpty ? 0 : points.last.value.round();
-      return '最近一天环境健康分约 $latest 分，光照和噪音的组合会继续纳入观察。';
   }
 }
 
 String _emptyStateForTab(TrendTab tab) {
-  if (tab == TrendTab.environment) {
-    return '所选范围还没有采集到环境光照或噪音数据，暂不生成环境健康分。';
-  }
   return '所选范围还没有足够的可展示数据。';
 }
 
 String _emptyInsightForTab(TrendTab tab) {
-  if (tab == TrendTab.environment) {
-    return '采集到真实的光照或噪音样本后，这里会生成环境趋势洞察。';
-  }
   return '采集到真实数据后，这里会生成对应的趋势洞察。';
-}
-
-int _environmentScoreForDate({
-  required List<AmbientLightSample> lightSamples,
-  required List<NoiseSample> noiseSamples,
-}) {
-  final darkMinutes = lightSamples
-      .where((item) => item.level == AmbientLightLevel.dark)
-      .fold<int>(0, (sum, item) => sum + item.duration.inMinutes);
-  final loudMinutes = noiseSamples
-      .where((item) => item.level == NoiseLevel.loud)
-      .fold<int>(0, (sum, item) => sum + item.duration.inMinutes);
-
-  final score = 100 - (darkMinutes.clamp(0, 60)) - loudMinutes.clamp(0, 40);
-  return score.clamp(0, 100);
 }
 
 String _dayKey(DateTime date) {

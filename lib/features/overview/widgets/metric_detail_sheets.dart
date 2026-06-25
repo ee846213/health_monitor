@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_monitor/app/theme/health_motion_tokens.dart';
 import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
+import 'package:health_monitor/app/widgets/health_vector_icon.dart';
 import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
 import 'package:health_monitor/features/overview/providers/overview_detail_providers.dart';
 
@@ -58,6 +59,7 @@ class SedentaryTimelineDetailSheet extends ConsumerWidget {
     this.detailProvider,
     this.title = '今日久坐分布',
     this.summary,
+    this.progressLabel,
   });
 
   final DashboardSedentaryCard card;
@@ -65,20 +67,36 @@ class SedentaryTimelineDetailSheet extends ConsumerWidget {
       detailProvider;
   final String title;
   final String? summary;
+  final String? progressLabel;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(detailProvider ?? overviewSedentaryDetailProvider);
-    return _DetailScaffold(
-      title: title,
-      summary: summary ??
-          '累计久坐 ${card.totalMinutes} 分钟，单次最长 ${card.longestSingleMinutes} 分钟。',
-      child: detail.when(
-        skipLoadingOnRefresh: true,
-        loading: () => const _SheetLoading(),
-        error: (_, __) => const _SheetError(message: '久坐时段暂时无法读取'),
-        data: (OverviewSedentaryDetailSnapshot snapshot) =>
-            _SedentaryTimeline(snapshot: snapshot),
+    return detail.when(
+      skipLoadingOnRefresh: true,
+      loading: () => _DetailScaffold(
+        title: title,
+        summary: summary ??
+            '累计久坐 ${card.totalMinutes} 分钟，单次最长 ${card.longestSingleMinutes} 分钟。',
+        child: const _SheetLoading(),
+      ),
+      error: (_, __) => _DetailScaffold(
+        title: title,
+        summary: summary ??
+            '累计久坐 ${card.totalMinutes} 分钟，单次最长 ${card.longestSingleMinutes} 分钟。',
+        child: const _SheetError(message: '久坐时段暂时无法读取'),
+      ),
+      data: (OverviewSedentaryDetailSnapshot snapshot) => _DetailScaffold(
+        title: title,
+        summary: summary ??
+            '累计久坐 ${snapshot.totalDuration.inMinutes} 分钟，'
+            '单次最长 ${snapshot.longestDuration.inMinutes} 分钟。',
+        child: snapshot.dailyPoints.isNotEmpty
+            ? _SedentaryBarChart(
+                snapshot: snapshot,
+                progressLabel: progressLabel,
+              )
+            : _SedentaryTimeline(snapshot: snapshot),
       ),
     );
   }
@@ -104,13 +122,181 @@ class ScreenUsageDetailSheet extends ConsumerWidget {
     final detail = ref.watch(detailProvider ?? overviewScreenDetailProvider);
     return _DetailScaffold(
       title: title,
-      summary: summary ?? '今日亮屏 ${card.totalMinutes} 分钟，${_deltaLabel(card)}。',
+      summary: summary ??
+          '今日累计亮屏 ${card.totalMinutes} 分钟'
+          '${card.longestSingleMinutes > 0 ? '，最长一段连续 ${card.longestSingleMinutes} 分钟' : ''}'
+          '，${_deltaLabel(card)}。',
       child: detail.when(
         skipLoadingOnRefresh: true,
         loading: () => const _SheetLoading(),
         error: (_, __) => const _SheetError(message: '屏幕使用分布暂时无法读取'),
         data: (OverviewScreenDetailSnapshot snapshot) =>
             _ScreenUsageBars(snapshot: snapshot),
+      ),
+    );
+  }
+}
+
+class EnvironmentSnapshotDetailSheet extends ConsumerWidget {
+  const EnvironmentSnapshotDetailSheet({
+    super.key,
+    required this.snapshot,
+    this.detailProvider,
+  });
+
+  final DashboardEnvironmentSnapshot snapshot;
+  final ProviderListenable<AsyncValue<OverviewEnvironmentDetailSnapshot>>?
+      detailProvider;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final detail =
+        ref.watch(detailProvider ?? overviewEnvironmentDetailProvider);
+    return _DetailScaffold(
+      title: '当前环境',
+      summary: '展示今天最近一次有效光照与噪音样本，不保存原始音频。',
+      child: detail.when(
+        skipLoadingOnRefresh: true,
+        loading: () => const _SheetLoading(),
+        error: (_, __) => const _SheetError(message: '环境数据暂时无法读取'),
+        data: (OverviewEnvironmentDetailSnapshot data) =>
+            _EnvironmentReadingPanel(
+          dashboardSnapshot: snapshot,
+          detail: data,
+        ),
+      ),
+    );
+  }
+}
+
+class _EnvironmentReadingPanel extends StatelessWidget {
+  const _EnvironmentReadingPanel({
+    required this.dashboardSnapshot,
+    required this.detail,
+  });
+
+  final DashboardEnvironmentSnapshot dashboardSnapshot;
+  final OverviewEnvironmentDetailSnapshot detail;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        _EnvironmentMetricCard(
+          icon: 'wb_sunny',
+          title: '光照',
+          label: detail.lightLabel,
+          value: _formatEnvironmentReading(detail.lux, 'lx'),
+          timeLabel: _capturedAtLabel(detail.lightCapturedAt),
+          tint: _sheetSand,
+        ),
+        const SizedBox(height: 12),
+        _EnvironmentMetricCard(
+          icon: 'graphic_eq',
+          title: '噪音',
+          label: detail.noiseLabel,
+          value: _formatEnvironmentReading(detail.decibel, 'dB'),
+          timeLabel: _capturedAtLabel(detail.noiseCapturedAt),
+          tint: _sheetBlue,
+        ),
+        if (dashboardSnapshot.lightLabel == '等待采集' &&
+            dashboardSnapshot.noiseLabel == '等待采集') ...<Widget>[
+          const SizedBox(height: 12),
+          const Text(
+            '开启麦克风与光照相关权限后，可在这里看到实时环境读数。',
+            style: TextStyle(fontSize: 12, color: _sheetMuted, height: 1.45),
+          ),
+        ],
+      ],
+    );
+  }
+
+  String _capturedAtLabel(DateTime? capturedAt) {
+    if (capturedAt == null) {
+      return '今天尚无有效样本';
+    }
+    final hour = capturedAt.hour.toString().padLeft(2, '0');
+    final minute = capturedAt.minute.toString().padLeft(2, '0');
+    return '最近样本 $hour:$minute';
+  }
+}
+
+String _formatEnvironmentReading(double? value, String unit) {
+  if (value == null || !value.isFinite) {
+    return '暂无样本';
+  }
+  return '${value.round()} $unit';
+}
+
+class _EnvironmentMetricCard extends StatelessWidget {
+  const _EnvironmentMetricCard({
+    required this.icon,
+    required this.title,
+    required this.label,
+    required this.value,
+    required this.timeLabel,
+    required this.tint,
+  });
+
+  final String icon;
+  final String title;
+  final String label;
+  final String value;
+  final String timeLabel;
+  final Color tint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _sheetLine.withValues(alpha: 0.72)),
+      ),
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: tint,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: HealthVectorIcon(icon, size: 20, color: _sheetText),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: _sheetMuted,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$label · $value',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: _sheetText,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  timeLabel,
+                  style: const TextStyle(fontSize: 11, color: _sheetMuted),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -196,6 +382,96 @@ class _StepBarChart extends StatelessWidget {
           label: progressLabel,
           value: '${(snapshot.todayProgress * 100).round()}%',
         ),
+      ],
+    );
+  }
+}
+
+class _SedentaryBarChart extends StatelessWidget {
+  const _SedentaryBarChart({
+    required this.snapshot,
+    this.progressLabel,
+  });
+
+  final OverviewSedentaryDetailSnapshot snapshot;
+  final String? progressLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final referenceMinutes = snapshot.referenceMinutes ?? 120;
+    final maxMinutes = math.max(
+      referenceMinutes,
+      snapshot.dailyPoints.fold<int>(
+        0,
+        (int current, OverviewSedentaryTrendPoint point) =>
+            math.max(current, point.minutes),
+      ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        SizedBox(
+          height: 190,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: snapshot.dailyPoints.map((OverviewSedentaryTrendPoint point) {
+              final ratio = maxMinutes == 0 ? 0.0 : point.minutes / maxMinutes;
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: <Widget>[
+                      Text(
+                        '${point.minutes}',
+                        maxLines: 1,
+                        overflow: TextOverflow.fade,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: _sheetMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      HealthAnimatedValue(
+                        key: ValueKey<String>('sedentary-bar-${point.label}'),
+                        value: ratio,
+                        duration: const Duration(milliseconds: 500),
+                        builder: (_, double value, __) => Container(
+                          height: math.max(8, 120 * value),
+                          decoration: BoxDecoration(
+                            color:
+                                point.isHighlight ? _sheetSand : const Color(0xFFF2E9DE),
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        point.label,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: point.isHighlight
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                          color: point.isHighlight ? _sheetText : _sheetMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(growable: false),
+          ),
+        ),
+        if (progressLabel != null && snapshot.rangeProgress != null) ...<Widget>[
+          const SizedBox(height: 12),
+          _InfoRow(
+            label: progressLabel!,
+            value: '${(snapshot.rangeProgress! * 100).round()}%',
+          ),
+        ],
       ],
     );
   }

@@ -32,6 +32,9 @@ void main() {
           overviewScreenDetailProvider.overrideWith(
             (Ref ref) async => _screenDetail(),
           ),
+          overviewEnvironmentDetailProvider.overrideWith(
+            (Ref ref) async => _environmentDetail(),
+          ),
         ],
         child: const MaterialApp(home: OverviewPage()),
       ),
@@ -90,6 +93,51 @@ void main() {
       find.byKey(const ValueKey<String>('screen-夜间')),
       findsOneWidget,
     );
+
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byKey(const Key('metric-noise-card')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('metric-noise-card')));
+    await tester.pumpAndSettle();
+    expect(find.text('当前环境'), findsOneWidget);
+    expect(find.text('舒适 · 320 lx'), findsOneWidget);
+    expect(find.text('正常 · 48 dB'), findsOneWidget);
+  });
+
+  testWidgets('环境浮层遇到无效分贝值时应降级显示暂无样本', (
+    WidgetTester tester,
+  ) async {
+    final readyData = _buildReadyData();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: <Override>[
+          overviewScreenStateProvider.overrideWith(
+            (Ref ref) => const AsyncData(OverviewScreenState.ready),
+          ),
+          overviewReadyDataStateProvider.overrideWith((Ref ref) => readyData),
+          overviewEnvironmentDetailProvider.overrideWith(
+            (Ref ref) async => OverviewEnvironmentDetailSnapshot(
+              lightLabel: '舒适',
+              noiseLabel: '正常',
+              lux: 320,
+              decibel: double.nan,
+            ),
+          ),
+        ],
+        child: const MaterialApp(home: OverviewPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('metric-noise-card')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('当前环境'), findsOneWidget);
+    expect(find.text('舒适 · 320 lx'), findsOneWidget);
+    expect(find.text('正常 · 暂无样本'), findsOneWidget);
   });
 }
 
@@ -157,6 +205,17 @@ OverviewScreenDetailSnapshot _screenDetail() {
     ],
     sourceLabel: '系统 Usage Stats',
     qualityLabel: null,
+  );
+}
+
+OverviewEnvironmentDetailSnapshot _environmentDetail() {
+  return OverviewEnvironmentDetailSnapshot(
+    lightLabel: '舒适',
+    noiseLabel: '正常',
+    lux: 320,
+    decibel: 48,
+    lightCapturedAt: DateTime(2026, 6, 16, 9, 20),
+    noiseCapturedAt: DateTime(2026, 6, 16, 9, 18),
   );
 }
 

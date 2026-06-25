@@ -1,11 +1,15 @@
 package com.example.health_monitor.stepcounter
 
+import android.Manifest
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Build
+import androidx.core.content.ContextCompat
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -21,6 +25,9 @@ class AndroidStepCounterReader(
     }
 
     fun startListening(): StepCounterPayload {
+        if (!hasActivityRecognitionPermission()) {
+            return unavailable("activity_recognition_permission_denied")
+        }
         val manager = sensorManager ?: return unavailable("sensor_manager_unavailable")
         val sensor = stepCounterSensor ?: return unavailable("step_counter_sensor_unavailable")
         stateStore.ensureListening(manager, sensor)
@@ -39,6 +46,16 @@ class AndroidStepCounterReader(
             isAvailable = false,
             reason = reason,
         )
+    }
+
+    private fun hasActivityRecognitionPermission(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return true
+        }
+        return ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACTIVITY_RECOGNITION,
+        ) == PackageManager.PERMISSION_GRANTED
     }
 }
 

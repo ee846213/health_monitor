@@ -2,13 +2,11 @@ enum TrendTab {
   steps,
   sedentary,
   screen,
-  environment,
 }
 
 enum TrendRange {
   days7(7, '近 7 天'),
-  days30(30, '近 30 天'),
-  days90(90, '近 90 天');
+  days30(30, '近 30 天');
 
   const TrendRange(this.dayCount, this.label);
 

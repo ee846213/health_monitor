@@ -6,6 +6,7 @@ import 'package:health_monitor/app/widgets/health_design_widgets.dart';
 import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
 import 'package:health_monitor/app/widgets/health_vector_icon.dart';
 import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
+import 'package:health_monitor/domain/dashboard/daily_rhythm_ui_model.dart';
 import 'package:health_monitor/features/briefing/providers/briefing_providers.dart';
 import 'package:health_monitor/features/overview/widgets/metric_detail_sheets.dart';
 
@@ -36,29 +37,38 @@ class _BriefingPageState extends ConsumerState<BriefingPage> {
 
   @override
   Widget build(BuildContext context) {
-    final asyncRange = ref.watch(briefingPageRangeProvider);
+    final selectedRange = ref.watch(briefingTimeRangeProvider);
+    final asyncViewModel = ref.watch(briefingViewModelProvider);
     return Scaffold(
       backgroundColor: context.healthTheme.canvas,
       body: SafeArea(
         bottom: false,
-        child: asyncRange.when(
+        child: asyncViewModel.when(
           skipLoadingOnRefresh: true,
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, stackTrace) => Center(
+          error: (Object error, StackTrace stackTrace) => Center(
             child: TextButton(
               onPressed: () => ref.invalidate(briefingViewModelProvider),
               child: const Text('简报加载失败，点击重试'),
             ),
           ),
-          data: (selectedRange) => ListView(
+          data: (_) => ListView(
             controller: _controller,
-            padding: const EdgeInsets.fromLTRB(18, 22, 18, 112),
+            padding: const EdgeInsets.fromLTRB(18, 8, 18, 112),
             children: <Widget>[
               HealthStaggeredEntrance(
                 index: 0,
-                child: _Header(onCalendarTap: _openCalendar),
+                child: HealthPageHeader(
+                  title: '每日简报',
+                  trailing: HealthNavIconButton(
+                    key: const Key('briefing-calendar-button'),
+                    icon: 'calendar_month',
+                    onTap: _openCalendar,
+                    semanticLabel: '选择日期',
+                  ),
+                ),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 17),
               HealthStaggeredEntrance(
                 index: 1,
                 child: _WeekSelector(
@@ -86,18 +96,21 @@ class _BriefingPageState extends ConsumerState<BriefingPage> {
                 ),
               ),
               const SizedBox(height: 16),
-              HealthStaggeredEntrance(
-                index: 3,
-                child: _Timeline(
-                  expandedIndex: _expandedEvent,
-                  onToggle: (index) {
-                    setState(() {
-                      _expandedEvent = _expandedEvent == index ? null : index;
-                    });
-                  },
+              if (selectedRange != BriefingTimeRange.recent7Days)
+                HealthStaggeredEntrance(
+                  index: 3,
+                  child: _Timeline(
+                    expandedIndex: _expandedEvent,
+                    onToggle: (int index) {
+                      setState(() {
+                        _expandedEvent =
+                            _expandedEvent == index ? null : index;
+                      });
+                    },
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
+              if (selectedRange != BriefingTimeRange.recent7Days)
+                const SizedBox(height: 16),
               const HealthStaggeredEntrance(
                 index: 4,
                 child: _SummarySection(),
@@ -110,6 +123,7 @@ class _BriefingPageState extends ConsumerState<BriefingPage> {
   }
 
   void _selectDate(DateTime date) {
+    setState(() => _expandedEvent = null);
     ref.read(briefingSelectedDateProvider.notifier).state = date;
     ref.read(briefingTimeRangeProvider.notifier).state =
         BriefingTimeRange.today;
@@ -121,6 +135,7 @@ class _BriefingPageState extends ConsumerState<BriefingPage> {
   }
 
   void _selectSevenDays() {
+    setState(() => _expandedEvent = null);
     ref.read(briefingSelectedDateProvider.notifier).state = null;
     ref.read(briefingTimeRangeProvider.notifier).state =
         BriefingTimeRange.recent7Days;
@@ -144,52 +159,6 @@ class _BriefingPageState extends ConsumerState<BriefingPage> {
           },
         ),
       ),
-    );
-  }
-}
-
-class _Header extends ConsumerWidget {
-  const _Header({required this.onCalendarTap});
-
-  final VoidCallback onCalendarTap;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Row(
-      children: <Widget>[
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                '每日简报',
-                style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w700,
-                  color: context.healthTheme.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                ref.watch(briefingWindowLabelProvider),
-                style: context.healthTheme.bodyStyle,
-              ),
-            ],
-          ),
-        ),
-        InkWell(
-          key: const Key('briefing-calendar-button'),
-          onTap: onCalendarTap,
-          borderRadius: BorderRadius.circular(22),
-          child: HealthIconBubble(
-            icon: 'calendar_month',
-            foreground: context.healthTheme.sage,
-            background: context.healthTheme.sageSoft,
-            size: 44,
-            iconSize: 21,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -325,6 +294,29 @@ class _WeekSelector extends ConsumerWidget {
   }
 }
 
+class _BriefingSectionLoading extends StatelessWidget {
+  const _BriefingSectionLoading({this.minHeight = 96});
+
+  final double minHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: minHeight,
+      child: Center(
+        child: SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: context.healthTheme.sage,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ConclusionCard extends ConsumerWidget {
   const _ConclusionCard({required this.onTap});
 
@@ -332,6 +324,13 @@ class _ConclusionCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (ref.watch(briefingContentLoadingProvider)) {
+      return const HealthElevatedCard(
+        key: Key('briefing-conclusion-card'),
+        child: _BriefingSectionLoading(minHeight: 132),
+      );
+    }
+
     final hasData = ref.watch(briefingHasRealDataProvider);
     return HealthElevatedCard(
       key: const Key('briefing-conclusion-card'),
@@ -387,113 +386,124 @@ class _Timeline extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final suggestions = ref.watch(briefingSuggestionsProvider);
-    final metrics = ref.watch(briefingMetricsProvider);
-    final events = <(String, String, String, String)>[
-      (
-        '09:00',
-        '上午节奏',
-        metrics.isEmpty
-            ? '活动数据正在积累'
-            : '已记录 ${metrics.first.value} ${metrics.first.unit}',
-        '保持轻量活动，不需要为了数字补足运动量。',
-      ),
-      (
-        '14:30',
-        '久坐观察',
-        metrics.length < 2
-            ? '姿势数据正在积累'
-            : '累计 ${metrics[1].value} ${metrics[1].unit}',
-        '连续静坐时，起身走动两三分钟就足够。',
-      ),
-      (
-        '21:00',
-        '晚间提醒',
-        metrics.length < 3
-            ? '屏幕数据正在积累'
-            : '亮屏 ${metrics[2].value} ${metrics[2].unit}',
-        suggestions.isEmpty ? '给睡前留一点无屏幕时间。' : suggestions.first,
-      ),
-    ];
+    if (ref.watch(briefingContentLoadingProvider)) {
+      return const HealthElevatedCard(
+        child: _BriefingSectionLoading(minHeight: 88),
+      );
+    }
+
+    final rhythm = ref.watch(briefingDailyRhythmProvider);
+    final actualNow = ref.watch(briefingReferenceTimeProvider)();
+    final selectedDate =
+        ref.watch(briefingSelectedDateProvider) ?? actualNow;
+    final isToday = _sameDay(selectedDate, actualNow);
+    final nodes = rhythm?.nodes ?? const <DailyRhythmNode>[];
+
     return HealthElevatedCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text('当日时间线', style: context.healthTheme.sectionTitleStyle),
           const SizedBox(height: 8),
-          ...List<Widget>.generate(events.length, (index) {
-            final event = events[index];
-            final expanded = expandedIndex == index;
-            return Column(
-              children: <Widget>[
-                InkWell(
-                  key: Key('briefing-event-$index'),
-                  onTap: () => onToggle(index),
-                  borderRadius: BorderRadius.circular(18),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Container(
-                          width: 10,
-                          height: 10,
-                          margin: const EdgeInsets.only(top: 5),
-                          decoration: BoxDecoration(
-                            color: <Color>[
-                              context.healthTheme.sage,
-                              context.healthTheme.sand,
-                              context.healthTheme.blue,
-                            ][index],
-                            shape: BoxShape.circle,
+          if (nodes.isEmpty)
+            Text(
+              isToday ? '今天还没有形成明显节奏节点' : '这一天还没有形成明显节奏节点',
+              style: context.healthTheme.bodyStyle,
+            )
+          else
+            ...List<Widget>.generate(nodes.length, (int index) {
+              final node = nodes[index];
+              final expanded = expandedIndex == index;
+              return Column(
+                children: <Widget>[
+                  InkWell(
+                    key: Key('briefing-event-$index'),
+                    onTap: () => onToggle(index),
+                    borderRadius: BorderRadius.circular(18),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Container(
+                            width: 10,
+                            height: 10,
+                            margin: const EdgeInsets.only(top: 5),
+                            decoration: BoxDecoration(
+                              color: _rhythmDimensionColor(
+                                context,
+                                node.dimension,
+                              ),
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        SizedBox(
-                          width: 45,
-                          child: Text(event.$1,
-                              style: context.healthTheme.dataStyle),
-                        ),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Text(event.$2,
-                                  style: context.healthTheme.sectionTitleStyle),
-                              const SizedBox(height: 3),
-                              Text(event.$3,
-                                  style: context.healthTheme.bodyStyle),
-                            ],
+                          const SizedBox(width: 12),
+                          SizedBox(
+                            width: 45,
+                            child: Text(
+                              node.showEventTime ? _rhythmTime(node.time) : '今日',
+                              style: context.healthTheme.dataStyle,
+                            ),
                           ),
-                        ),
-                        AnimatedRotation(
-                          turns: expanded ? .25 : 0,
-                          duration: const Duration(milliseconds: 220),
-                          child:
-                              const HealthVectorIcon('chevron_right', size: 18),
-                        ),
-                      ],
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  node.title,
+                                  style: context.healthTheme.sectionTitleStyle,
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  node.value,
+                                  style: context.healthTheme.bodyStyle,
+                                ),
+                              ],
+                            ),
+                          ),
+                          AnimatedRotation(
+                            turns: expanded ? .25 : 0,
+                            duration: const Duration(milliseconds: 220),
+                            child: const HealthVectorIcon(
+                              'chevron_right',
+                              size: 18,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                HealthAnimatedExpand(
-                  expanded: expanded,
-                  child: Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(left: 22, bottom: 10),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: context.healthTheme.surfaceSoft,
-                      borderRadius: BorderRadius.circular(16),
+                  HealthAnimatedExpand(
+                    expanded: expanded,
+                    child: Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(left: 22, bottom: 10),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: context.healthTheme.surfaceSoft,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            node.reason,
+                            style: context.healthTheme.bodyStyle,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            node.suggestion,
+                            style: context.healthTheme.bodyStyle,
+                          ),
+                        ],
+                      ),
                     ),
-                    child: Text(event.$4, style: context.healthTheme.bodyStyle),
                   ),
-                ),
-                if (index < events.length - 1)
-                  Divider(height: 1, color: context.healthTheme.divider),
-              ],
-            );
-          }),
+                  if (index < nodes.length - 1)
+                    Divider(height: 1, color: context.healthTheme.divider),
+                ],
+              );
+            }),
         ],
       ),
     );
@@ -505,8 +515,23 @@ class _SummarySection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final metrics = ref.watch(briefingMetricsProvider);
     final range = ref.watch(briefingTimeRangeProvider);
+    if (ref.watch(briefingContentLoadingProvider)) {
+      return HealthElevatedCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              range == BriefingTimeRange.recent7Days ? '7 日总结' : '今日总结',
+              style: context.healthTheme.sectionTitleStyle,
+            ),
+            const _BriefingSectionLoading(minHeight: 120),
+          ],
+        ),
+      );
+    }
+
+    final metrics = ref.watch(briefingMetricsProvider);
     if (metrics.length < 3) return const SizedBox.shrink();
     final items = <(String, String, String, Color, VoidCallback)>[
       (
@@ -652,6 +677,7 @@ Future<void> _showSedentaryDetailSheet(
   BriefingTimeRange range,
   int minutes,
 ) {
+  final isRecent7Days = range == BriefingTimeRange.recent7Days;
   return showMetricDetailSheet(
     context,
     SedentaryTimelineDetailSheet(
@@ -660,8 +686,9 @@ Future<void> _showSedentaryDetailSheet(
         longestSingleMinutes: 0,
       ),
       detailProvider: briefingSedentaryDetailProvider(range),
-      title: '${range.label}久坐分布',
+      title: isRecent7Days ? '近 7 天久坐' : '${range.label}久坐分布',
       summary: '${range.label}累计久坐 $minutes 分钟。',
+      progressLabel: isRecent7Days ? '7 日参考进度' : null,
     ),
   );
 }
@@ -688,6 +715,28 @@ Future<void> _showScreenDetailSheet(
 
 bool _sameDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
+
+String _rhythmTime(DateTime time) {
+  return '${time.hour.toString().padLeft(2, '0')}:'
+      '${time.minute.toString().padLeft(2, '0')}';
+}
+
+Color _rhythmDimensionColor(
+  BuildContext context,
+  DailyRhythmDimension dimension,
+) {
+  final theme = context.healthTheme;
+  switch (dimension) {
+    case DailyRhythmDimension.activity:
+      return theme.sage;
+    case DailyRhythmDimension.posture:
+      return theme.sand;
+    case DailyRhythmDimension.noise:
+      return theme.coral;
+    case DailyRhythmDimension.digital:
+      return theme.blue;
+  }
+}
 
 String _weekday(int weekday) {
   return const <String>['一', '二', '三', '四', '五', '六', '日'][weekday - 1];

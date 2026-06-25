@@ -9,6 +9,7 @@ enum ActivityType {
 enum MotionSampleSource {
   sensorFusion,
   platformActivity,
+  healthConnectHourly,
   manualFallback,
 }
 

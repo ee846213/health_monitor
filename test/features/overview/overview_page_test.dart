@@ -33,7 +33,7 @@ void main() {
     expect(find.text('今天的节奏'), findsOneWidget);
     expect(find.text('今日状态'), findsOneWidget);
     expect(find.text('活动'), findsOneWidget);
-    expect(find.text('姿势'), findsOneWidget);
+    expect(find.text('久坐'), findsOneWidget);
     expect(find.text('环境噪音'), findsOneWidget);
     expect(find.text('数字习惯'), findsOneWidget);
     await tester.scrollUntilVisible(

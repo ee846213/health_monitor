@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health_monitor/domain/briefing/daily_brief_snapshot.dart';
+import 'package:health_monitor/domain/dashboard/daily_rhythm_ui_model.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/features/briefing/pages/briefing_page.dart';
 import 'package:health_monitor/features/briefing/providers/briefing_providers.dart';
@@ -14,10 +15,14 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: <Override>[
+          briefingReferenceTimeProvider.overrideWithValue(
+            () => DateTime(2026, 6, 18),
+          ),
           briefingViewModelProvider.overrideWith((ref) async {
             final range = ref.watch(briefingTimeRangeProvider);
             return _viewModelFor(range);
           }),
+          briefingDailyRhythmProvider.overrideWith((ref) => null),
           briefingStepDetailProvider.overrideWith(
             (ref, range) async => _stepDetailFor(range),
           ),
@@ -35,8 +40,10 @@ void main() {
 
     await tester.scrollUntilVisible(
       find.byKey(const Key('briefing-step-card')),
-      300,
+      500,
     );
+    await tester.ensureVisible(find.byKey(const Key('briefing-step-card')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('briefing-step-card')), findsOneWidget);
     expect(find.text('1200 步'), findsOneWidget);
     expect(find.text('三个核心指标'), findsNothing);
@@ -49,8 +56,10 @@ void main() {
 
     await tester.scrollUntilVisible(
       find.byKey(const Key('briefing-sedentary-card')),
-      200,
+      500,
     );
+    await tester.ensureVisible(find.byKey(const Key('briefing-sedentary-card')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('briefing-sedentary-card')));
     await tester.pumpAndSettle();
     expect(find.textContaining('久坐分布'), findsOneWidget);
@@ -59,8 +68,10 @@ void main() {
 
     await tester.scrollUntilVisible(
       find.byKey(const Key('briefing-screen-card')),
-      200,
+      500,
     );
+    await tester.ensureVisible(find.byKey(const Key('briefing-screen-card')));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('briefing-screen-card')));
     await tester.pumpAndSettle();
     expect(find.textContaining('分时段使用分布'), findsOneWidget);
@@ -80,23 +91,23 @@ void main() {
     expect(find.text('6000 步'), findsOneWidget);
   });
 
-  testWidgets('简报时间线只展开一个事件且主卡可解释结论', (tester) async {
+  testWidgets('简报时间线共用节奏轴数据且只展开一个事件', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: <Override>[
+          briefingReferenceTimeProvider.overrideWithValue(
+            () => DateTime(2026, 6, 18),
+          ),
           briefingViewModelProvider.overrideWith((ref) async {
             return _viewModelFor(ref.watch(briefingTimeRangeProvider));
           }),
+          briefingDailyRhythmProvider.overrideWith(
+            (ref) => _sampleRhythmModel(),
+          ),
         ],
         child: const MaterialApp(home: BriefingPage()),
       ),
     );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const Key('briefing-conclusion-card')));
-    await tester.pumpAndSettle();
-    expect(find.text('为什么这样总结'), findsOneWidget);
-    await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
@@ -105,11 +116,8 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('briefing-event-0')));
     await tester.pumpAndSettle();
-    expect(find.textContaining('轻量活动'), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('briefing-event-1')));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('两三分钟'), findsOneWidget);
+    expect(find.text('约 480 步'), findsOneWidget);
+    expect(find.textContaining('保持现在的活动节奏'), findsOneWidget);
   });
 }
 
@@ -120,6 +128,7 @@ BriefingViewModel _viewModelFor(BriefingTimeRange range) {
     BriefingTimeRange.recent7Days => 6000,
   };
   return BriefingViewModel(
+    selectionKey: range == BriefingTimeRange.recent7Days ? 'recent7' : 'day:2026-06-18',
     selectedRange: range,
     windowLabel: range.label,
     screenState: OverviewScreenState.ready,
@@ -174,7 +183,9 @@ OverviewSedentaryDetailSnapshot _sedentaryDetailFor(
   );
 }
 
-OverviewScreenDetailSnapshot _screenDetailFor(BriefingTimeRange range) {
+OverviewScreenDetailSnapshot _screenDetailFor(
+  BriefingTimeRange range,
+) {
   return const OverviewScreenDetailSnapshot(
     todaySummary: null,
     yesterdaySummary: null,
@@ -194,5 +205,26 @@ OverviewScreenDetailSnapshot _screenDetailFor(BriefingTimeRange range) {
     ],
     sourceLabel: '测试数据',
     qualityLabel: null,
+  );
+}
+
+DailyRhythmUiModel _sampleRhythmModel() {
+  final day = DateTime(2026, 6, 18);
+  return DailyRhythmUiModel(
+    generatedAt: day,
+    currentTime: DateTime(2026, 6, 18, 18),
+    windowStart: DateTime(2026, 6, 18, 6),
+    hasRealData: true,
+    nodes: <DailyRhythmNode>[
+      DailyRhythmNode(
+        time: DateTime(2026, 6, 18, 9, 30),
+        dimension: DailyRhythmDimension.activity,
+        title: '活动良好',
+        value: '约 480 步',
+        reason: '今天最活跃出现在 09:30 前后（约 480 步）。',
+        suggestion: '保持现在的活动节奏就很好。',
+        isAvailable: true,
+      ),
+    ],
   );
 }

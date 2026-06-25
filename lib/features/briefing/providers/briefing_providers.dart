@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_monitor/domain/briefing/daily_brief_snapshot.dart';
 import 'package:health_monitor/domain/environment/ambient_light_sample.dart';
@@ -6,7 +8,12 @@ import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/metrics/daily_metrics.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
+import 'package:health_monitor/domain/dashboard/daily_rhythm_ui_builder.dart';
+import 'package:health_monitor/domain/dashboard/daily_rhythm_ui_model.dart';
+import 'package:health_monitor/domain/dashboard/daily_rhythm_window.dart';
+import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
 import 'package:health_monitor/features/briefing/briefing_suggestion_builder.dart';
+import 'package:health_monitor/features/overview/providers/daily_rhythm_clock_provider.dart';
 import 'package:health_monitor/features/overview/providers/overview_detail_providers.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
 import 'package:health_monitor/rules/input/rule_input.dart';
@@ -37,6 +44,7 @@ extension BriefingTimeRangeLabel on BriefingTimeRange {
 
 class BriefingViewModel {
   const BriefingViewModel({
+    required this.selectionKey,
     required this.selectedRange,
     required this.windowLabel,
     required this.screenState,
@@ -44,13 +52,16 @@ class BriefingViewModel {
     required this.permissionStatuses,
     required this.hasRealData,
     required this.isLoading,
+    this.dashboard,
     this.missingDimensions = const <String>[],
   });
 
+  final String selectionKey;
   final BriefingTimeRange selectedRange;
   final String windowLabel;
   final OverviewScreenState screenState;
   final DailyBriefSnapshot briefSnapshot;
+  final DashboardSnapshot? dashboard;
   final Map<PermissionType, PermissionGrantStatus> permissionStatuses;
   final List<String> missingDimensions;
   final bool hasRealData;
@@ -70,6 +81,18 @@ final briefingTimeRangeProvider = StateProvider<BriefingTimeRange>((Ref ref) {
 /// 选择具体自然日时记录日期；最近 7 日汇总使用 `null`。
 final briefingSelectedDateProvider = StateProvider<DateTime?>((Ref ref) {
   return null;
+});
+
+/// 当前 UI 选中的简报范围键，用于避免切换日期时短暂展示旧数据。
+final briefingCurrentSelectionKeyProvider = Provider<String>((Ref ref) {
+  final selectedRange = ref.watch(briefingTimeRangeProvider);
+  final selectedDate = ref.watch(briefingSelectedDateProvider);
+  final actualNow = ref.watch(briefingReferenceTimeProvider)();
+  return _selectionKey(
+    range: selectedRange,
+    selectedDate: selectedDate,
+    actualNow: actualNow,
+  );
 });
 
 final briefingRangeRevisionProvider = Provider<String>((Ref ref) {
@@ -94,14 +117,27 @@ final briefingViewModelProvider =
   final selectedDate = ref.watch(briefingSelectedDateProvider);
   final permissionStatuses = await ref.watch(permissionStatusProvider.future);
   final insightService = ref.watch(healthInsightServiceProvider);
+  final dashboardService = ref.watch(dashboardServiceProvider);
   final actualNow = ref.watch(briefingReferenceTimeProvider)();
   final now = selectedDate ?? actualNow;
   final snapshot = await insightService.buildSnapshot(
     window: _windowForRange(selectedRange, referenceTime: now),
     referenceTime: now,
   );
+  final dashboard = selectedRange == BriefingTimeRange.recent7Days
+      ? null
+      : await dashboardService.buildFromInsight(
+          insight: snapshot,
+          referenceTime: now,
+        );
+  final selectionKey = _selectionKey(
+    range: selectedRange,
+    selectedDate: selectedDate,
+    actualNow: actualNow,
+  );
 
   return BriefingViewModel(
+    selectionKey: selectionKey,
     selectedRange: selectedRange,
     windowLabel: _windowLabelForSelection(
       selectedRange,
@@ -114,6 +150,7 @@ final briefingViewModelProvider =
       hasReminderHistory: snapshot.reminderHistory.isNotEmpty,
     ),
     briefSnapshot: _buildDailyBriefSnapshot(snapshot),
+    dashboard: dashboard,
     permissionStatuses: permissionStatuses,
     missingDimensions: snapshot.input.missingDimensions
         .map(localizedDimensionLabel)
@@ -123,62 +160,41 @@ final briefingViewModelProvider =
   );
 });
 
-final _briefingViewModelCacheProvider =
-    NotifierProvider<_BriefingViewModelCacheNotifier, BriefingViewModel?>(
-  _BriefingViewModelCacheNotifier.new,
-);
-
 final briefingViewModelStateProvider = Provider<BriefingViewModel?>((Ref ref) {
-  return ref.watch(_briefingViewModelCacheProvider);
+  final currentKey = ref.watch(briefingCurrentSelectionKeyProvider);
+  final value = ref.watch(briefingViewModelProvider).valueOrNull;
+  if (value != null && value.selectionKey == currentKey) {
+    return value;
+  }
+  return null;
 });
 
-class _BriefingViewModelCacheNotifier extends Notifier<BriefingViewModel?> {
-  @override
-  BriefingViewModel? build() {
-    ref.listen<AsyncValue<BriefingViewModel>>(
-      briefingViewModelProvider,
-      (
-        AsyncValue<BriefingViewModel>? previous,
-        AsyncValue<BriefingViewModel> next,
-      ) {
-        final nextValue = next.valueOrNull;
-        if (nextValue != null) {
-          state = nextValue;
-        }
-      },
-      fireImmediately: true,
-    );
-    return ref.read(briefingViewModelProvider).valueOrNull;
-  }
-}
+/// 与 [briefingViewModelStateProvider] 相同，语义上强调「当前选中范围已就绪」。
+final briefingEffectiveViewModelProvider = briefingViewModelStateProvider;
+
+final briefingContentLoadingProvider = Provider<bool>((Ref ref) {
+  return ref.watch(briefingViewModelStateProvider) == null;
+});
 
 final briefingPageRangeProvider =
     Provider<AsyncValue<BriefingTimeRange>>((Ref ref) {
-  final cachedRange = ref.watch(
-    briefingViewModelStateProvider.select(
-      (BriefingViewModel? viewModel) => viewModel?.selectedRange,
-    ),
-  );
-  if (cachedRange != null) {
-    return AsyncData<BriefingTimeRange>(cachedRange);
-  }
-  return ref.watch(briefingViewModelProvider).whenData(
-        (BriefingViewModel viewModel) => viewModel.selectedRange,
-      );
+  return AsyncData<BriefingTimeRange>(ref.watch(briefingTimeRangeProvider));
 });
 
 final briefingWindowLabelProvider = Provider<String>((Ref ref) {
-  return ref.watch(
-        briefingViewModelStateProvider.select(
-          (BriefingViewModel? viewModel) => viewModel?.windowLabel,
-        ),
-      ) ??
-      ref.watch(briefingTimeRangeProvider).label;
+  final viewModel = ref.watch(briefingViewModelStateProvider);
+  if (viewModel != null) {
+    return viewModel.windowLabel;
+  }
+  final selectedRange = ref.watch(briefingTimeRangeProvider);
+  final selectedDate = ref.watch(briefingSelectedDateProvider);
+  final actualNow = ref.watch(briefingReferenceTimeProvider)();
+  return _windowLabelForSelection(selectedRange, selectedDate, actualNow);
 });
 
 final briefingHasRealDataProvider = Provider<bool>((Ref ref) {
   return ref.watch(
-        briefingViewModelStateProvider.select(
+        briefingEffectiveViewModelProvider.select(
           (BriefingViewModel? viewModel) => viewModel?.hasRealData,
         ),
       ) ??
@@ -187,7 +203,7 @@ final briefingHasRealDataProvider = Provider<bool>((Ref ref) {
 
 final briefingHeadlineProvider = Provider<String>((Ref ref) {
   return ref.watch(
-        briefingViewModelStateProvider.select(
+        briefingEffectiveViewModelProvider.select(
           (BriefingViewModel? viewModel) => viewModel?.briefSnapshot.headline,
         ),
       ) ??
@@ -196,7 +212,7 @@ final briefingHeadlineProvider = Provider<String>((Ref ref) {
 
 final briefingSupportingDetailProvider = Provider<String>((Ref ref) {
   return ref.watch(
-        briefingViewModelStateProvider.select(
+        briefingEffectiveViewModelProvider.select(
           (BriefingViewModel? viewModel) =>
               viewModel?.briefSnapshot.supportingDetail,
         ),
@@ -206,7 +222,7 @@ final briefingSupportingDetailProvider = Provider<String>((Ref ref) {
 
 final briefingMetricsProvider = Provider<List<DailyBriefMetric>>((Ref ref) {
   return ref.watch(
-        briefingViewModelStateProvider.select(
+        briefingEffectiveViewModelProvider.select(
           (BriefingViewModel? viewModel) => viewModel?.briefSnapshot.metrics,
         ),
       ) ??
@@ -215,7 +231,7 @@ final briefingMetricsProvider = Provider<List<DailyBriefMetric>>((Ref ref) {
 
 final briefingSuggestionsProvider = Provider<List<String>>((Ref ref) {
   return ref.watch(
-        briefingViewModelStateProvider.select(
+        briefingEffectiveViewModelProvider.select(
           (BriefingViewModel? viewModel) =>
               viewModel?.briefSnapshot.suggestions,
         ),
@@ -225,9 +241,45 @@ final briefingSuggestionsProvider = Provider<List<String>>((Ref ref) {
 
 final briefingQualityNoteProvider = Provider<String?>((Ref ref) {
   return ref.watch(
-    briefingViewModelStateProvider.select(
+    briefingEffectiveViewModelProvider.select(
       (BriefingViewModel? viewModel) => viewModel?.briefSnapshot.qualityNote,
     ),
+  );
+});
+
+final briefingDailyRhythmProvider = Provider<DailyRhythmUiModel?>((Ref ref) {
+  final selectedRange = ref.watch(briefingTimeRangeProvider);
+  if (selectedRange == BriefingTimeRange.recent7Days) {
+    return null;
+  }
+
+  final viewModel = ref.watch(briefingEffectiveViewModelProvider);
+  final dashboard = viewModel?.dashboard;
+  if (dashboard == null) {
+    return null;
+  }
+
+  final actualNow = ref.watch(briefingReferenceTimeProvider)();
+  final selectedDate =
+      ref.watch(briefingSelectedDateProvider) ?? actualNow;
+  final calendarDay = DateTime(
+    selectedDate.year,
+    selectedDate.month,
+    selectedDate.day,
+  );
+  final isToday = DateKey.fromDate(calendarDay) == DateKey.fromDate(actualNow);
+  final windowEnd = isToday
+      ? _maxDateTime(
+          ref.watch(dailyRhythmClockProvider),
+          dashboard.generatedAt,
+        )
+      : DailyRhythmWindow.endOfCalendarDay(calendarDay);
+
+  return buildDailyRhythmUiModel(
+    dashboard: dashboard,
+    missingDimensions: viewModel!.missingDimensions,
+    calendarDay: calendarDay,
+    windowEnd: windowEnd,
   );
 });
 
@@ -281,43 +333,77 @@ final briefingSedentaryDetailProvider =
     FutureProvider.family<OverviewSedentaryDetailSnapshot, BriefingTimeRange>(
   (Ref ref, range) async {
     ref.watch(dataCollectorMetricsRevisionProvider);
-    final repository = ref.watch(activityRepositoryProvider);
     final referenceTime = ref.watch(briefingSelectedDateProvider) ??
         ref.watch(briefingReferenceTimeProvider)();
+    final anchorDate = _anchorDateForRange(range, referenceTime);
+
+    if (range == BriefingTimeRange.recent7Days) {
+      final metricsRepository = ref.watch(metricsRepositoryProvider);
+      final metrics = await metricsRepository.listRecentDays(
+        7,
+        referenceDate: anchorDate,
+      );
+      final minutesByKey = <String, int>{
+        for (final item in metrics)
+          DateKey.fromDate(item.date): item.sedentaryDuration.inMinutes,
+      };
+      final points = <OverviewSedentaryTrendPoint>[];
+      for (var offset = 6; offset >= 0; offset -= 1) {
+        final date = DateTime(
+          anchorDate.year,
+          anchorDate.month,
+          anchorDate.day,
+        ).subtract(Duration(days: offset));
+        final key = DateKey.fromDate(date);
+        points.add(
+          OverviewSedentaryTrendPoint(
+            date: date,
+            minutes: minutesByKey[key] ?? 0,
+            isHighlight: offset == 0,
+          ),
+        );
+      }
+      const dailyReferenceMinutes = 120;
+      final totalMinutes =
+          points.fold<int>(0, (total, point) => total + point.minutes);
+      final longestMinutes = points.fold<int>(
+        0,
+        (current, point) => math.max(current, point.minutes),
+      );
+      final rangeReferenceMinutes = dailyReferenceMinutes * 7;
+      return OverviewSedentaryDetailSnapshot(
+        totalDuration: Duration(minutes: totalMinutes),
+        longestDuration: Duration(minutes: longestMinutes),
+        segments: const <OverviewSedentarySegmentSnapshot>[],
+        dailyPoints: points,
+        referenceMinutes: rangeReferenceMinutes,
+        rangeProgress: rangeReferenceMinutes == 0
+            ? 0
+            : totalMinutes / rangeReferenceMinutes,
+      );
+    }
+
+    final repository = ref.watch(activityRepositoryProvider);
     final window = _windowForRange(range, referenceTime: referenceTime);
     final samples = await repository.listByWindow(window);
-    final input = RuleInput(
-      window: window,
+    final summary = summarizeSedentaryForWindow(
       activitySamples: samples,
-      locationSummaries: const <LocationSummary>[],
-      noiseSamples: const <NoiseSample>[],
-      ambientLightSamples: const <AmbientLightSample>[],
-      usageSummaries: const <DigitalUsageSummary>[],
-      dailyMetricsList: const <DailyMetrics>[],
-      missingDimensions: const <String>[],
+      window: window,
     );
-    final segments = input.sedentarySegments
+    final segments = summary.segments
         .map(
-          (segment) => OverviewSedentarySegmentSnapshot(
+          (SedentaryActivitySegment segment) =>
+              OverviewSedentarySegmentSnapshot(
             startedAt: segment.startedAt,
             endedAt: segment.endedAt,
             duration: segment.duration,
           ),
         )
         .toList(growable: false);
-    final totalDuration = segments.fold<Duration>(
-      Duration.zero,
-      (total, segment) => total + segment.duration,
-    );
-    final longestDuration = segments.fold<Duration>(
-      Duration.zero,
-      (longest, segment) =>
-          segment.duration > longest ? segment.duration : longest,
-    );
 
     return OverviewSedentaryDetailSnapshot(
-      totalDuration: totalDuration,
-      longestDuration: longestDuration,
+      totalDuration: summary.totalDuration,
+      longestDuration: summary.longestDuration,
       segments: segments,
     );
   },
@@ -493,4 +579,20 @@ String _dayKey(DateTime dateTime) {
   final month = dateTime.month.toString().padLeft(2, '0');
   final day = dateTime.day.toString().padLeft(2, '0');
   return '${dateTime.year}-$month-$day';
+}
+
+String _selectionKey({
+  required BriefingTimeRange range,
+  required DateTime? selectedDate,
+  required DateTime actualNow,
+}) {
+  if (range == BriefingTimeRange.recent7Days) {
+    return 'recent7';
+  }
+  final date = selectedDate ?? actualNow;
+  return 'day:${_dayKey(date)}';
+}
+
+DateTime _maxDateTime(DateTime left, DateTime right) {
+  return left.isAfter(right) ? left : right;
 }

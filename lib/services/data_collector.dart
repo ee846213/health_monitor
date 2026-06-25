@@ -34,7 +34,12 @@ import 'package:health_monitor/storage/repositories/query_window.dart';
 import 'package:health_monitor/storage/repositories/reminder_repository.dart';
 import 'package:health_monitor/storage/repositories/usage_summary_repository.dart';
 import 'package:health_monitor/services/android_risk_event_bridge.dart';
+import 'package:health_monitor/services/android_step_delta_bridge.dart';
+import 'package:health_monitor/services/background_step_delta_sync_service.dart';
+import 'package:health_monitor/services/health_connect_bridge.dart';
+import 'package:health_monitor/services/health_connect_step_sync_service.dart';
 import 'package:health_monitor/services/platform_bridge_service.dart';
+import 'package:health_monitor/storage/repositories/reminder_preferences_repository.dart';
 
 typedef DataCollectorRevisionCallback = void Function();
 typedef DataCollectorDayRevisionCallback = void Function(DateTime changedAt);
@@ -501,9 +506,12 @@ class DataCollector {
   AndroidUsageCapabilityStatus? _latestUsageCapabilityStatus;
   Future<void>? _usageSummarySyncFuture;
   Future<void>? _riskEventSyncFuture;
+  Future<void>? _stepCountSyncFuture;
   final Map<String, DateTime> _lastSampleAtByStreamKey = <String, DateTime>{};
   final Set<String> _startedStreamKeys = <String>{};
   Timer? _batchFlushTimer;
+  Timer? _reminderDeliveryTimer;
+  static const Duration _reminderDeliveryRetryInterval = Duration(minutes: 5);
   Future<void> _flushSerial = Future<void>.value();
   bool _flushRunning = false;
   int _droppedSamples = 0;
@@ -538,6 +546,7 @@ class DataCollector {
     unawaited(syncUsageSummary());
     unawaited(_rebuildDailyMetrics(DateTime.now()));
     unawaited(_runRetentionCleanupIfNeeded(DateTime.now()));
+    _startReminderDeliveryRetryTimer();
     resumeForegroundCapture();
     unawaited(_ensureUsageCollectionInitialized());
   }
@@ -653,6 +662,8 @@ class DataCollector {
 
   Future<void> dispose() async {
     _started = false;
+    _reminderDeliveryTimer?.cancel();
+    _reminderDeliveryTimer = null;
     await pauseForegroundCapture();
     await _stopLifecycleUsageCollection();
     await _flushSerial;
@@ -955,6 +966,83 @@ class DataCollector {
     }
     _onRemindersChanged?.call();
     _onDataChanged?.call();
+  }
+
+  Future<void> syncNativeStepCount({DateTime? referenceTime}) {
+    final runningSync = _stepCountSyncFuture;
+    if (runningSync != null) {
+      return runningSync;
+    }
+    final syncFuture = _syncNativeStepCountOnce(referenceTime: referenceTime);
+    _stepCountSyncFuture = syncFuture;
+    return syncFuture.whenComplete(() {
+      if (identical(_stepCountSyncFuture, syncFuture)) {
+        _stepCountSyncFuture = null;
+      }
+    });
+  }
+
+  Future<void> _syncNativeStepCountOnce({DateTime? referenceTime}) async {
+    final now = referenceTime ?? DateTime.now();
+    final platformBridge = PlatformBridgeService();
+
+    await HealthConnectStepSyncService(
+      bridge: HealthConnectBridge(platformBridgeService: platformBridge),
+      activityRepository: activityRepository,
+      metricsRepository: metricsRepository,
+    ).syncForDay(referenceTime: now);
+
+    final drainedCount = await BackgroundStepDeltaSyncService(
+      bridge: AndroidStepDeltaBridge(platformBridgeService: platformBridge),
+      activityRepository: activityRepository,
+      metricsRepository: metricsRepository,
+    ).syncDrainedEvents();
+
+    final stepState = await _stepCounterService.readCurrent();
+    if (stepState.isAvailable) {
+      _latestStepCountState = stepState;
+      await _observeSample(streamSteps, stepState.capturedAt);
+    }
+
+    final signatureBefore = _lastDailyMetricsSignature;
+    await _rebuildDailyMetrics(now);
+    final metricsChanged = _lastDailyMetricsSignature != signatureBefore;
+
+    if (drainedCount > 0 || stepState.isAvailable || metricsChanged) {
+      if (drainedCount > 0) {
+        await _captureHealthService.recordNativeSummaryDrained(
+          streamSteps,
+          detail: '后台步数增量已同步到本地仓储。',
+        );
+      }
+      _onDataChanged?.call();
+      if (metricsChanged) {
+        _onMetricsChanged?.call();
+      }
+    }
+  }
+
+  void _startReminderDeliveryRetryTimer() {
+    if (_deliverRuleReminders == null || _reminderDeliveryTimer != null) {
+      return;
+    }
+    _reminderDeliveryTimer = Timer.periodic(
+      _reminderDeliveryRetryInterval,
+      (_) {
+        unawaited(
+          _attemptDeliverRuleReminders(DateTime.now()).catchError(
+            (Object _, StackTrace __) {},
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _attemptDeliverRuleReminders(DateTime referenceTime) async {
+    if (_deliverRuleReminders == null) {
+      return;
+    }
+    await _deliverRuleReminders!.call(referenceTime);
   }
 
   Future<void> syncUsageSummary({
@@ -1398,6 +1486,7 @@ final dataCollectorProvider = Provider<DataCollector>((Ref ref) {
     onUsageChanged: usageRevisionThrottle.markChanged,
     onRemindersChanged: reminderRevisionThrottle.markChanged,
     persistRuleReminders: (DateTime referenceTime) async {
+      final isar = await ref.read(appIsarProvider.future);
       final insightService = HealthInsightService(
         activityRepository: ref.read(sharedActivityRepo),
         ambientLightRepository: ref.read(sharedAmbientLightRepo),
@@ -1406,8 +1495,10 @@ final dataCollectorProvider = Provider<DataCollector>((Ref ref) {
         usageRepository: ref.read(sharedUsageRepo),
         metricsRepository: ref.read(sharedMetricsRepo),
         reminderRepositoryLoader: () async {
-          final isar = await ref.read(appIsarProvider.future);
           return IsarReminderRepository(isar);
+        },
+        reminderPreferencesRepositoryLoader: () async {
+          return IsarReminderPreferencesRepository(isar);
         },
         androidRiskEventBridge: AndroidRiskEventBridge(
           platformBridgeService: PlatformBridgeService(),
@@ -1419,6 +1510,7 @@ final dataCollectorProvider = Provider<DataCollector>((Ref ref) {
       await insightService.persistRuleReminders(referenceTime: referenceTime);
     },
     syncNativeRiskEvents: () async {
+      final isar = await ref.read(appIsarProvider.future);
       final insightService = HealthInsightService(
         activityRepository: ref.read(sharedActivityRepo),
         ambientLightRepository: ref.read(sharedAmbientLightRepo),
@@ -1427,8 +1519,10 @@ final dataCollectorProvider = Provider<DataCollector>((Ref ref) {
         usageRepository: ref.read(sharedUsageRepo),
         metricsRepository: ref.read(sharedMetricsRepo),
         reminderRepositoryLoader: () async {
-          final isar = await ref.read(appIsarProvider.future);
           return IsarReminderRepository(isar);
+        },
+        reminderPreferencesRepositoryLoader: () async {
+          return IsarReminderPreferencesRepository(isar);
         },
         androidRiskEventBridge: AndroidRiskEventBridge(
           platformBridgeService: PlatformBridgeService(),
@@ -1446,6 +1540,7 @@ final dataCollectorProvider = Provider<DataCollector>((Ref ref) {
       final reminderDeliveryService = ReminderDeliveryService(
         notificationPreferenceRepository:
             IsarNotificationPreferenceRepository(isar),
+        reminderPreferencesRepository: IsarReminderPreferencesRepository(isar),
         notificationPermissionReader: () async {
           final statuses =
               await const PermissionHandlerStatusService().getStatuses();
@@ -1454,6 +1549,7 @@ final dataCollectorProvider = Provider<DataCollector>((Ref ref) {
         },
       );
       final localNotificationService = LocalNotificationService();
+      await localNotificationService.initialize();
       final startOfDay = DateTime(
         referenceTime.year,
         referenceTime.month,
@@ -1474,6 +1570,9 @@ final dataCollectorProvider = Provider<DataCollector>((Ref ref) {
         plan.readyRecords,
         deliveredAt: referenceTime,
       );
+      if (plan.readyRecords.isNotEmpty) {
+        ref.read(dataCollectorReminderRevisionProvider.notifier).state += 1;
+      }
     },
   );
   collector.start();

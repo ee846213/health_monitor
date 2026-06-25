@@ -9,19 +9,29 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import java.util.Calendar
 
 /**
  * 在原生检测命中后立即发送安全提醒。
  *
  * 事件仍会进入 SharedPreferences 队列，供 Flutter 恢复前台后写入提醒历史；
  * 本通知不依赖 Dart isolate 或页面生命周期，因此可在应用退到后台时及时送达。
+ * 发送前会读取 [AndroidReminderPolicyStore]，与 Flutter 侧的提醒偏好和勿扰窗口保持一致。
  */
 class AndroidWalkingScreenRiskNotifier(
     private val context: Context,
     private val notificationManager: NotificationManager,
+    private val policyStore: AndroidReminderPolicyStore,
 ) {
     fun show(event: AndroidWalkingScreenRiskEvent): Boolean {
         if (!canPostNotifications()) {
+            return false
+        }
+
+        val calendar = Calendar.getInstance()
+        val nowMinutes =
+            calendar.get(Calendar.HOUR_OF_DAY) * 60 + calendar.get(Calendar.MINUTE)
+        if (!policyStore.shouldDeliverWalkingScreenReminder(nowMinutes)) {
             return false
         }
 

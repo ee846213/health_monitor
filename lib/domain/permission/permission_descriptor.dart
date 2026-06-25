@@ -4,6 +4,7 @@ enum PermissionType {
   microphone,
   notification,
   usageAccess,
+  healthConnect,
   backgroundCapture,
 }
 
@@ -92,6 +93,17 @@ class PermissionDescriptor {
         analysisUsage: '用于生成查看频率、深夜活跃和应用类别偏好等数字生活分析。',
         missingImpact: '不开启后，Android 端将失去完整数字生活分析，仅保留替代指标。',
         degradeBehavior: '拒绝后降级为只输出基础用机频率或 iPhone 同等级替代指标。',
+        availability: PermissionAvailability.androidOnly,
+        required: false,
+        isHighFriction: true,
+      ),
+      PermissionDescriptor(
+        type: PermissionType.healthConnect,
+        title: 'Health Connect 步数',
+        whyNeeded: '用于在晚开 App 时按小时还原今日步数分布，支撑节奏轴活动节点。',
+        analysisUsage: '读取系统健康数据中的小时步数桶，定位活动集中时段。',
+        missingImpact: '不开启后，晚开 App 时只能看到当日总步数，节奏轴可能缺少活动时刻。',
+        degradeBehavior: '拒绝后降级为仅使用 App 运行期间的实时计步增量。',
         availability: PermissionAvailability.androidOnly,
         required: false,
         isHighFriction: true,

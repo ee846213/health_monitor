@@ -69,7 +69,7 @@ class RuleInput {
 
     for (final ActivitySample sample in sorted) {
       if (sample.type != ActivityType.stationary) {
-        if (current != null && current.isEffective) {
+        if (current != null) {
           segments.add(current);
         }
         current = null;
@@ -87,16 +87,24 @@ class RuleInput {
         continue;
       }
 
-      if (current.isEffective) {
-        segments.add(current);
-      }
+      segments.add(current);
       current = candidate;
     }
 
-    if (current != null && current.isEffective) {
+    if (current != null) {
       segments.add(current);
     }
-    return segments;
+    return _coalesceSedentarySegments(segments)
+        .where((SedentaryActivitySegment segment) => segment.isEffective)
+        .toList(growable: false);
+  }
+
+  /// 将间隔不超过 [SedentaryActivitySegment.maxGap] 的相邻片段再合并一轮，
+  /// 避免短暂起身把同一段久坐拆得过碎。
+  static List<SedentaryActivitySegment> _coalesceSedentarySegments(
+    List<SedentaryActivitySegment> segments,
+  ) {
+    return SedentaryActivitySegment.coalesce(segments);
   }
 
   /// 总步数合计。
@@ -381,7 +389,8 @@ class SedentaryActivitySegment {
   }
 
   static const Duration minimumDuration = Duration(minutes: 3);
-  static const Duration maxGap = Duration(seconds: 30);
+  /// 相邻静坐样本或片段之间允许合并的最大间隔。
+  static const Duration maxGap = Duration(minutes: 3);
 
   final DateTime startedAt;
   final DateTime endedAt;
@@ -390,15 +399,175 @@ class SedentaryActivitySegment {
   bool get isEffective => duration >= minimumDuration;
 
   bool canMerge(SedentaryActivitySegment other) {
-    return !other.startedAt.isAfter(endedAt.add(maxGap));
+    return !other.startedAt.isAfter(effectiveEndedAt.add(maxGap));
   }
 
   SedentaryActivitySegment merge(SedentaryActivitySegment other) {
-    final mergedEnd = other.endedAt.isAfter(endedAt) ? other.endedAt : endedAt;
+    final mergedStart =
+        startedAt.isBefore(other.startedAt) ? startedAt : other.startedAt;
+    final mergedWallEnd =
+        endedAt.isAfter(other.endedAt) ? endedAt : other.endedAt;
+    final mergedEffectiveEnd = effectiveEndedAt.isAfter(other.effectiveEndedAt)
+        ? effectiveEndedAt
+        : other.effectiveEndedAt;
+    final Duration mergedDuration;
+    if (!other.startedAt.isAfter(effectiveEndedAt)) {
+      // 时间重叠时取并集，避免同一段静坐被拆成多条重叠记录。
+      mergedDuration = mergedEffectiveEnd.difference(mergedStart);
+    } else {
+      mergedDuration = duration + other.duration;
+    }
     return SedentaryActivitySegment(
-      startedAt: startedAt,
-      endedAt: mergedEnd,
-      duration: mergedEnd.difference(startedAt),
+      startedAt: mergedStart,
+      endedAt: mergedWallEnd,
+      duration: mergedDuration,
     );
   }
+
+  /// 合并后的真实静坐结束时刻（不含中间短暂起身间隔）。
+  DateTime get effectiveEndedAt => startedAt.add(duration);
+
+  /// 供展示使用：结束时刻与 [duration] 对齐。
+  SedentaryActivitySegment forDisplay() {
+    final end = effectiveEndedAt;
+    if (endedAt == end) {
+      return this;
+    }
+    return SedentaryActivitySegment(
+      startedAt: startedAt,
+      endedAt: end,
+      duration: duration,
+    );
+  }
+
+  /// 将片段裁剪到 [window] 内；与窗口无交集时返回 null。
+  SedentaryActivitySegment? clipTo(QueryWindow window) {
+    final display = forDisplay();
+    final effectiveEnd = display.effectiveEndedAt;
+    if (!effectiveEnd.isAfter(window.startAt) ||
+        !display.startedAt.isBefore(window.endAt)) {
+      return null;
+    }
+    final clippedStart = display.startedAt.isBefore(window.startAt)
+        ? window.startAt
+        : display.startedAt;
+    final clippedEnd =
+        effectiveEnd.isAfter(window.endAt) ? window.endAt : effectiveEnd;
+    if (!clippedEnd.isAfter(clippedStart)) {
+      return null;
+    }
+    final clippedDuration = clippedEnd.difference(clippedStart);
+    return SedentaryActivitySegment(
+      startedAt: clippedStart,
+      endedAt: clippedEnd,
+      duration: clippedDuration,
+    );
+  }
+
+  /// 按查询窗口裁剪久坐片段；跨自然日时会拆成多段。
+  static List<SedentaryActivitySegment> clippedToWindow(
+    Iterable<SedentaryActivitySegment> segments,
+    QueryWindow window,
+  ) {
+    final clipped = <SedentaryActivitySegment>[];
+    final days = window.dailyDates();
+    for (final SedentaryActivitySegment segment in segments) {
+      if (days.length <= 1) {
+        final part = segment.clipTo(window);
+        if (part != null) {
+          clipped.add(part);
+        }
+        continue;
+      }
+      for (final DateTime day in days) {
+        final part = segment.clipTo(
+          QueryWindow.calendarDay(referenceDate: day),
+        );
+        if (part != null) {
+          clipped.add(part);
+        }
+      }
+    }
+    clipped.sort(
+      (SedentaryActivitySegment left, SedentaryActivitySegment right) =>
+          left.startedAt.compareTo(right.startedAt),
+    );
+    return coalesce(clipped);
+  }
+
+  /// 合并相邻或重叠的久坐片段（展示层使用真实静坐结束时刻判定间隔）。
+  static List<SedentaryActivitySegment> coalesce(
+    List<SedentaryActivitySegment> segments,
+  ) {
+    if (segments.isEmpty) {
+      return const <SedentaryActivitySegment>[];
+    }
+    final merged = <SedentaryActivitySegment>[segments.first];
+    for (var index = 1; index < segments.length; index++) {
+      final next = segments[index];
+      final previous = merged.last;
+      if (previous.canMerge(next)) {
+        merged[merged.length - 1] = previous.merge(next);
+      } else {
+        merged.add(next);
+      }
+    }
+    return merged;
+  }
+}
+
+/// 久坐窗口汇总，供首页卡片与详情浮层共用同一口径。
+class SedentaryWindowSummary {
+  const SedentaryWindowSummary({
+    required this.totalDuration,
+    required this.longestDuration,
+    required this.segments,
+  });
+
+  final Duration totalDuration;
+  final Duration longestDuration;
+  final List<SedentaryActivitySegment> segments;
+
+  int get totalMinutes => totalDuration.inMinutes;
+  int get longestMinutes => longestDuration.inMinutes;
+}
+
+/// 基于活动样本生成裁剪后的久坐统计，避免原始指标或跨天样本污染展示。
+SedentaryWindowSummary summarizeSedentaryForWindow({
+  required List<ActivitySample> activitySamples,
+  required QueryWindow window,
+  List<String> missingDimensions = const <String>[],
+}) {
+  final scopedSamples = activitySamples
+      .where((ActivitySample sample) => window.contains(sample.capturedAt))
+      .toList(growable: false);
+  final input = RuleInput(
+    window: window,
+    activitySamples: scopedSamples,
+    locationSummaries: const <LocationSummary>[],
+    noiseSamples: const <NoiseSample>[],
+    ambientLightSamples: const <AmbientLightSample>[],
+    usageSummaries: const <DigitalUsageSummary>[],
+    dailyMetricsList: const <DailyMetrics>[],
+    missingDimensions: missingDimensions,
+  );
+  final segments = SedentaryActivitySegment.clippedToWindow(
+    input.sedentarySegments,
+    window,
+  )
+      .where((SedentaryActivitySegment segment) => segment.isEffective)
+      .toList(growable: false);
+  var totalDuration = Duration.zero;
+  var longestDuration = Duration.zero;
+  for (final SedentaryActivitySegment segment in segments) {
+    totalDuration += segment.duration;
+    if (segment.duration > longestDuration) {
+      longestDuration = segment.duration;
+    }
+  }
+  return SedentaryWindowSummary(
+    totalDuration: totalDuration,
+    longestDuration: longestDuration,
+    segments: segments,
+  );
 }

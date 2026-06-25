@@ -1,4 +1,7 @@
 import 'package:health_monitor/domain/environment/environment_overview.dart';
+import 'package:health_monitor/domain/metrics/daily_metrics.dart';
+import 'package:health_monitor/domain/notification/reminder_category.dart';
+import 'package:health_monitor/domain/notification/reminder_preferences.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
 import 'package:health_monitor/domain/usage/screen_usage_habit_summary.dart';
@@ -17,6 +20,7 @@ import 'package:health_monitor/storage/repositories/location_summary_repository.
 import 'package:health_monitor/storage/repositories/metrics_repository.dart';
 import 'package:health_monitor/storage/repositories/noise_sample_repository.dart';
 import 'package:health_monitor/storage/repositories/query_window.dart';
+import 'package:health_monitor/storage/repositories/reminder_preferences_repository.dart';
 import 'package:health_monitor/storage/repositories/reminder_repository.dart';
 import 'package:health_monitor/storage/repositories/usage_summary_repository.dart';
 
@@ -65,6 +69,8 @@ class HealthInsightService {
     required UsageSummaryRepository usageRepository,
     required MetricsRepository metricsRepository,
     required Future<ReminderRepository> Function() reminderRepositoryLoader,
+    Future<ReminderPreferencesRepository> Function()?
+        reminderPreferencesRepositoryLoader,
     required AndroidRiskEventBridge androidRiskEventBridge,
     required AndroidUsageStatsBridge androidUsageStatsBridge,
     DateTime Function()? now,
@@ -78,6 +84,8 @@ class HealthInsightService {
         ),
         _usageRepository = usageRepository,
         _reminderRepositoryLoader = reminderRepositoryLoader,
+        _reminderPreferencesRepositoryLoader =
+            reminderPreferencesRepositoryLoader,
         _androidRiskEventBridge = androidRiskEventBridge,
         _androidUsageStatsBridge = androidUsageStatsBridge,
         _now = now ?? DateTime.now;
@@ -85,6 +93,8 @@ class HealthInsightService {
   final RuleInputService _inputService;
   final UsageSummaryRepository _usageRepository;
   final Future<ReminderRepository> Function() _reminderRepositoryLoader;
+  final Future<ReminderPreferencesRepository> Function()?
+      _reminderPreferencesRepositoryLoader;
   final AndroidRiskEventBridge _androidRiskEventBridge;
   final AndroidUsageStatsBridge _androidUsageStatsBridge;
   final DateTime Function() _now;
@@ -134,20 +144,35 @@ class HealthInsightService {
     DateTime? referenceTime,
   }) async {
     final now = referenceTime ?? _now();
+    final preferences = await _readReminderPreferences();
+    if (!preferences.masterEnabled) {
+      return;
+    }
     final snapshot = await buildSnapshot(
       window: QueryWindow.recentDay(referenceTime: now),
       referenceTime: now,
     );
-    if (snapshot.generatedReminders.isEmpty) {
+    final allowed = snapshot.generatedReminders
+        .where(
+          (ReminderRecord record) =>
+              preferences.isReminderTypeAllowed(record.reminderTypeKey),
+        )
+        .toList(growable: false);
+    if (allowed.isEmpty) {
       return;
     }
     final reminderRepository = await _reminderRepositoryLoader();
-    await reminderRepository.saveAll(snapshot.generatedReminders);
+    await reminderRepository.saveAll(allowed);
   }
 
   Future<List<ReminderRecord>> syncNativeWalkingScreenRiskEvents() async {
     final events = await _androidRiskEventBridge.drainWalkingScreenRiskEvents();
     if (events.isEmpty) {
+      return const <ReminderRecord>[];
+    }
+
+    final preferences = await _readReminderPreferences();
+    if (!preferences.isCategoryEnabled(ReminderCategory.walkingScreen)) {
       return const <ReminderRecord>[];
     }
 
@@ -194,6 +219,15 @@ class HealthInsightService {
       return;
     }
     await _usageRepository.upsertAll(_dedupeUsageSummaries(summaries));
+  }
+
+  Future<ReminderPreferences> _readReminderPreferences() async {
+    final loader = _reminderPreferencesRepositoryLoader;
+    if (loader == null) {
+      return ReminderPreferences.defaults;
+    }
+    final repository = await loader();
+    return repository.read();
   }
 }
 

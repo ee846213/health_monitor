@@ -1,11 +1,14 @@
-import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:health_monitor/app/theme/app_theme_extension.dart';
+import 'package:health_monitor/app/theme/health_motion_tokens.dart';
 import 'package:health_monitor/app/widgets/health_design_widgets.dart';
 import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
 import 'package:health_monitor/domain/trends/trend_snapshot.dart';
+
+const int _trendVisibleSlots = 7;
 
 class TrendChartPanel extends StatefulWidget {
   const TrendChartPanel({super.key, required this.snapshot});
@@ -17,36 +20,75 @@ class TrendChartPanel extends StatefulWidget {
 }
 
 class _TrendChartPanelState extends State<TrendChartPanel> {
+  late ScrollController _scrollController;
   int? _selectedIndex;
-  Timer? _restoreTimer;
 
   @override
   void initState() {
     super.initState();
-    _selectedIndex = widget.snapshot.defaultSelectedIndex;
+    _selectedIndex = _initialSelectedIndex();
+    _scrollController = ScrollController();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSelected());
   }
 
   @override
   void didUpdateWidget(covariant TrendChartPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.snapshot != widget.snapshot) {
-      _selectedIndex = widget.snapshot.defaultSelectedIndex;
+      _selectedIndex = _initialSelectedIndex();
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSelected());
     }
   }
 
   @override
   void dispose() {
-    _restoreTimer?.cancel();
+    _scrollController.dispose();
     super.dispose();
+  }
+
+  int? _initialSelectedIndex() {
+    final points = widget.snapshot.points;
+    if (points.isEmpty) {
+      return null;
+    }
+    return widget.snapshot.defaultSelectedIndex ?? points.length - 1;
+  }
+
+  void _scrollToSelected() {
+    if (!_scrollController.hasClients || _selectedIndex == null) {
+      return;
+    }
+    final slotWidth =
+        _scrollController.position.viewportDimension / _trendVisibleSlots;
+    if (slotWidth <= 0) {
+      return;
+    }
+    final target = (_selectedIndex! - (_trendVisibleSlots - 1)) * slotWidth;
+    final maxExtent = _scrollController.position.maxScrollExtent;
+    _scrollController.jumpTo(target.clamp(0.0, maxExtent).toDouble());
+  }
+
+  void _selectIndex(int index) {
+    if (index < 0 || index >= widget.snapshot.points.length) {
+      return;
+    }
+    setState(() => _selectedIndex = index);
+  }
+
+  TrendPoint? get _headlinePoint {
+    final points = widget.snapshot.points;
+    if (points.isEmpty || _selectedIndex == null) {
+      return null;
+    }
+    return points[_selectedIndex!.clamp(0, points.length - 1)];
   }
 
   @override
   Widget build(BuildContext context) {
     final snapshot = widget.snapshot;
-    final selected =
-        _selectedIndex == null || _selectedIndex! >= snapshot.points.length
-            ? null
-            : snapshot.points[_selectedIndex!];
+    final points = snapshot.points;
+    final headline = _headlinePoint;
+    final accent = _accentFor(snapshot.selectedTab, context);
     return HealthElevatedCard(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -62,10 +104,10 @@ class _TrendChartPanelState extends State<TrendChartPanel> {
                     Text(snapshot.title,
                         style: context.healthTheme.sectionTitleStyle),
                     const SizedBox(height: 4),
-                    Text(
-                      selected?.hasData == true
-                          ? '${selected!.value.round()} ${snapshot.unitLabel}'
-                          : '暂无可用数据',
+                    HealthAnimatedNumberText(
+                      value: headline == null
+                          ? '暂无可用数据'
+                          : '${headline.value.round()} ${snapshot.unitLabel}',
                       style: TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w700,
@@ -75,9 +117,9 @@ class _TrendChartPanelState extends State<TrendChartPanel> {
                   ],
                 ),
               ),
-              if (selected != null)
+              if (headline != null)
                 Text(
-                  selected.label,
+                  headline.label,
                   style: context.healthTheme.dataStyle.copyWith(
                     fontSize: 11,
                     color: context.healthTheme.textSecondary,
@@ -102,233 +144,297 @@ class _TrendChartPanelState extends State<TrendChartPanel> {
           else
             Semantics(
               label: _semanticSummary(snapshot),
-              child: HealthAnimatedValue(
-                key: ValueKey<Object>((snapshot.selectedTab, snapshot.range)),
-                value: 1,
-                duration: const Duration(milliseconds: 500),
-                builder: (context, progress, child) {
-                  return GestureDetector(
-                    key: const Key('trend-chart-gesture-area'),
-                    behavior: HitTestBehavior.opaque,
-                    onTapDown: (details) =>
-                        _selectAt(details.localPosition.dx, context),
-                    onHorizontalDragUpdate: (details) =>
-                        _selectAt(details.localPosition.dx, context),
-                    onHorizontalDragEnd: (_) => _scheduleRestore(),
-                    child: SizedBox(
-                      height: 214,
-                      child: CustomPaint(
-                        key: const Key('trend-chart-canvas'),
-                        painter: _TrendChartPainter(
-                          points: snapshot.points,
-                          progress: progress,
-                          selectedIndex: _selectedIndex,
-                          accent: _accentFor(snapshot.selectedTab, context),
-                          isBarChart:
-                              snapshot.selectedTab == TrendTab.sedentary,
-                        ),
-                        child: const SizedBox.expand(),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final viewportWidth = constraints.maxWidth;
+                  final slotWidth = viewportWidth / _trendVisibleSlots;
+                  final slotCount = math.max(points.length, _trendVisibleSlots);
+                  final contentWidth = slotWidth * slotCount;
+                  return Column(
+                    children: <Widget>[
+                      HealthAnimatedValue(
+                        key: ValueKey<String>(_trendAnimationKey(snapshot)),
+                        value: 1,
+                        duration: context.healthMotion.data,
+                        builder: (context, progress, child) {
+                          return SizedBox(
+                            height: 244,
+                            child: SingleChildScrollView(
+                              key: const Key('trend-chart-scroll-view'),
+                              controller: _scrollController,
+                              scrollDirection: Axis.horizontal,
+                              physics: const BouncingScrollPhysics(),
+                              child: SizedBox(
+                                width: contentWidth,
+                                child: _TrendScrollableChart(
+                                  points: points,
+                                  slotWidth: slotWidth,
+                                  progress: progress,
+                                  accent: accent,
+                                  selectedIndex: _selectedIndex,
+                                  onSelect: _selectIndex,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
                       ),
-                    ),
+                      if (points.length > _trendVisibleSlots) ...<Widget>[
+                        const SizedBox(height: 10),
+                        Text(
+                          '左右滑动查看更多日期',
+                          textAlign: TextAlign.center,
+                          style: context.healthTheme.dataStyle.copyWith(
+                            fontSize: 11,
+                            color: context.healthTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ],
                   );
                 },
               ),
             ),
-          const SizedBox(height: 10),
-          Row(
-            children: snapshot.points.map((point) {
-              return Expanded(
-                child: Column(
-                  children: <Widget>[
-                    Text(
-                      point.label,
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: context.healthTheme.dataStyle.copyWith(
-                        fontSize: 9,
-                        color: context.healthTheme.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      point.hasData ? point.value.round().toString() : '--',
-                      style: context.healthTheme.dataStyle.copyWith(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(growable: false),
-          ),
-          if (snapshot.dataQuality == TrendDataQuality.partial) ...<Widget>[
-            const SizedBox(height: 12),
-            Text(
-              '部分日期数据暂缺，曲线不会用 0 补齐。',
-              style: context.healthTheme.dataStyle.copyWith(
-                fontSize: 11,
-                color: context.healthTheme.textSecondary,
-              ),
-            ),
-          ],
         ],
       ),
     );
   }
-
-  void _selectAt(double dx, BuildContext context) {
-    final count = widget.snapshot.points.length;
-    if (count == 0) return;
-    final width = context.size?.width ?? 1;
-    final index = ((dx / width) * count).floor().clamp(0, count - 1);
-    if (widget.snapshot.points[index].hasData) {
-      _restoreTimer?.cancel();
-      setState(() => _selectedIndex = index);
-    }
-  }
-
-  void _scheduleRestore() {
-    _restoreTimer?.cancel();
-    _restoreTimer = Timer(const Duration(milliseconds: 1500), () {
-      if (mounted) {
-        setState(() => _selectedIndex = widget.snapshot.defaultSelectedIndex);
-      }
-    });
-  }
 }
 
-class _TrendChartPainter extends CustomPainter {
-  _TrendChartPainter({
+class _TrendScrollableChart extends StatelessWidget {
+  const _TrendScrollableChart({
     required this.points,
+    required this.slotWidth,
     required this.progress,
-    required this.selectedIndex,
     required this.accent,
-    required this.isBarChart,
+    required this.selectedIndex,
+    required this.onSelect,
   });
 
   final List<TrendPoint> points;
+  final double slotWidth;
   final double progress;
-  final int? selectedIndex;
   final Color accent;
-  final bool isBarChart;
+  final int? selectedIndex;
+  final ValueChanged<int> onSelect;
+
+  double get _chartMinX => -0.5;
+
+  double get _chartMaxX => math.max(points.length, _trendVisibleSlots) - 0.5;
+
+  List<FlSpot> get _spots => List<FlSpot>.generate(
+        points.length,
+        (index) => FlSpot(index.toDouble(), points[index].value.toDouble()),
+      );
+
+  List<FlSpot> _visibleSpots(List<FlSpot> spots, double progress) {
+    if (spots.length <= 1) {
+      return spots;
+    }
+    final clampedProgress = progress.clamp(0.0, 1.0).toDouble();
+    final lastPosition = (spots.length - 1) * clampedProgress;
+    final lastWholeIndex = lastPosition.floor().clamp(0, spots.length - 1);
+    final visible = <FlSpot>[
+      for (var index = 0; index <= lastWholeIndex; index += 1) spots[index],
+    ];
+    if (lastWholeIndex < spots.length - 1) {
+      final segmentProgress = lastPosition - lastWholeIndex;
+      if (segmentProgress > 0) {
+        final from = spots[lastWholeIndex];
+        final to = spots[lastWholeIndex + 1];
+        visible.add(
+          FlSpot(
+            from.x + (to.x - from.x) * segmentProgress,
+            from.y + (to.y - from.y) * segmentProgress,
+          ),
+        );
+      }
+    }
+    return visible;
+  }
 
   @override
-  void paint(Canvas canvas, Size size) {
-    if (points.isEmpty) return;
-    final rect = Rect.fromLTWH(8, 16, size.width - 16, size.height - 30);
-    final guide = Paint()
-      ..color = const Color(0xFFE8E2D9)
-      ..strokeWidth = 1;
-    for (var index = 0; index < 4; index++) {
-      final y = rect.top + rect.height * index / 3;
-      canvas.drawLine(Offset(rect.left, y), Offset(rect.right, y), guide);
-    }
-    final available = points.where((point) => point.hasData).toList();
-    if (available.isEmpty) return;
-    final maxValue = available
-        .map((point) => point.value.toDouble())
-        .fold<double>(1, math.max);
-
-    if (isBarChart) {
-      _paintBars(canvas, rect, maxValue);
-    } else {
-      _paintLineSegments(canvas, rect, maxValue);
-    }
-    _paintSelection(canvas, rect, maxValue);
-  }
-
-  Offset _offsetFor(int index, Rect rect, double maxValue) {
-    final x = rect.left + rect.width * index / math.max(points.length - 1, 1);
-    final ratio = points[index].value.toDouble() / maxValue;
-    return Offset(x, rect.bottom - rect.height * ratio * .84);
-  }
-
-  void _paintBars(Canvas canvas, Rect rect, double maxValue) {
-    final width = rect.width / points.length;
-    final paint = Paint()..color = accent.withValues(alpha: .72);
-    for (var index = 0; index < points.length; index++) {
-      if (!points[index].hasData) continue;
-      final point = _offsetFor(index, rect, maxValue);
-      final bar = Rect.fromLTRB(
-        rect.left + index * width + width * .24,
-        rect.bottom - (rect.bottom - point.dy) * progress,
-        rect.left + (index + 1) * width - width * .24,
-        rect.bottom,
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(bar, const Radius.circular(10)),
-        paint,
-      );
-    }
-  }
-
-  void _paintLineSegments(Canvas canvas, Rect rect, double maxValue) {
-    final stroke = Paint()
-      ..color = accent
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    final dot = Paint()..color = accent;
-    Path? segment;
-    var segmentHasPoint = false;
-    for (var index = 0; index < points.length; index++) {
-      if (!points[index].hasData) {
-        if (segment != null) {
-          _drawAnimatedPath(canvas, segment, stroke);
-          segment = null;
-          segmentHasPoint = false;
-        }
-        continue;
-      }
-      final offset = _offsetFor(index, rect, maxValue);
-      segment ??= Path();
-      if (!segmentHasPoint) {
-        segment.moveTo(offset.dx, offset.dy);
-        segmentHasPoint = true;
-      } else {
-        segment.lineTo(offset.dx, offset.dy);
-      }
-      canvas.drawCircle(offset, 3.5 * progress, dot);
-    }
-    if (segment != null) _drawAnimatedPath(canvas, segment, stroke);
-  }
-
-  void _drawAnimatedPath(Canvas canvas, Path path, Paint paint) {
-    for (final metric in path.computeMetrics()) {
-      canvas.drawPath(
-        metric.extractPath(0, metric.length * progress),
-        paint,
-      );
-    }
-  }
-
-  void _paintSelection(Canvas canvas, Rect rect, double maxValue) {
-    final index = selectedIndex;
-    if (index == null || index >= points.length || !points[index].hasData) {
-      return;
-    }
-    final point = _offsetFor(index, rect, maxValue);
-    canvas.drawLine(
-      Offset(point.dx, rect.top),
-      Offset(point.dx, rect.bottom),
-      Paint()
-        ..color = accent.withValues(alpha: .3)
-        ..strokeWidth = 1,
+  Widget build(BuildContext context) {
+    final motion = context.healthMotion;
+    final maxValue =
+        points.map((point) => point.value.toDouble()).fold<double>(1, math.max);
+    final spots = _spots;
+    final visibleSpots = _visibleSpots(spots, progress);
+    return Column(
+      children: <Widget>[
+        Expanded(
+          child: Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              IgnorePointer(
+                child: LineChart(
+                  key: const Key('trend-line-chart'),
+                  transformationConfig: const FlTransformationConfig(
+                    panEnabled: false,
+                    scaleEnabled: false,
+                  ),
+                  LineChartData(
+                    minX: _chartMinX,
+                    maxX: _chartMaxX,
+                    minY: 0,
+                    maxY: maxValue * 1.12,
+                    gridData: FlGridData(
+                      show: true,
+                      drawVerticalLine: false,
+                      horizontalInterval: maxValue / 3,
+                      getDrawingHorizontalLine: (_) => const FlLine(
+                        color: Color(0xFFE8E2D9),
+                        strokeWidth: 1,
+                      ),
+                    ),
+                    borderData: FlBorderData(show: false),
+                    titlesData: const FlTitlesData(
+                      leftTitles: AxisTitles(),
+                      topTitles: AxisTitles(),
+                      rightTitles: AxisTitles(),
+                      bottomTitles: AxisTitles(),
+                    ),
+                    lineTouchData: const LineTouchData(enabled: false),
+                    lineBarsData: <LineChartBarData>[
+                      LineChartBarData(
+                        spots: visibleSpots,
+                        isCurved: true,
+                        curveSmoothness: 0.28,
+                        color: accent,
+                        barWidth: 3,
+                        isStrokeCapRound: true,
+                        dotData: FlDotData(
+                          show: true,
+                          getDotPainter: (spot, percent, bar, index) {
+                            final pointIndex = spot.x.round();
+                            final selected = pointIndex == selectedIndex;
+                            return FlDotCirclePainter(
+                              radius: selected ? 5 : 3.5,
+                              color: accent,
+                              strokeWidth: selected ? 2 : 0,
+                              strokeColor: Colors.white,
+                            );
+                          },
+                        ),
+                        belowBarData: BarAreaData(show: false),
+                      ),
+                    ],
+                  ),
+                  duration: context.motionDuration(motion.fast),
+                  curve: motion.standardCurve,
+                ),
+              ),
+              Positioned.fill(
+                child: _TrendChartTapLayer(
+                  slotWidth: slotWidth,
+                  pointCount: points.length,
+                  onSelect: onSelect,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 6),
+        SizedBox(
+          height: 32,
+          child: Row(
+            children: List<Widget>.generate(
+              math.max(points.length, _trendVisibleSlots),
+              (int index) {
+                if (index >= points.length) {
+                  return SizedBox(width: slotWidth, height: 32);
+                }
+                final point = points[index];
+                final selected = index == selectedIndex;
+                return SizedBox(
+                  width: slotWidth,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => onSelect(index),
+                    child: Column(
+                      children: <Widget>[
+                        Text(
+                          '${point.value.round()}',
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.fade,
+                          style: context.healthTheme.dataStyle.copyWith(
+                            fontSize: 9,
+                            fontWeight:
+                                selected ? FontWeight.w700 : FontWeight.w600,
+                            color: selected
+                                ? context.healthTheme.textPrimary
+                                : context.healthTheme.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          point.label,
+                          textAlign: TextAlign.center,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.healthTheme.dataStyle.copyWith(
+                            fontSize: 9,
+                            fontWeight:
+                                selected ? FontWeight.w700 : FontWeight.w500,
+                            color: selected
+                                ? context.healthTheme.textPrimary
+                                : context.healthTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
     );
-    canvas.drawCircle(point, 8, Paint()..color = Colors.white);
-    canvas.drawCircle(point, 5, Paint()..color = accent);
   }
+}
+
+class _TrendChartTapLayer extends StatefulWidget {
+  const _TrendChartTapLayer({
+    required this.slotWidth,
+    required this.pointCount,
+    required this.onSelect,
+  });
+
+  final double slotWidth;
+  final int pointCount;
+  final ValueChanged<int> onSelect;
 
   @override
-  bool shouldRepaint(covariant _TrendChartPainter oldDelegate) {
-    return oldDelegate.points != points ||
-        oldDelegate.progress != progress ||
-        oldDelegate.selectedIndex != selectedIndex ||
-        oldDelegate.accent != accent ||
-        oldDelegate.isBarChart != isBarChart;
+  State<_TrendChartTapLayer> createState() => _TrendChartTapLayerState();
+}
+
+class _TrendChartTapLayerState extends State<_TrendChartTapLayer> {
+  Offset? _downPosition;
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (event) => _downPosition = event.localPosition,
+      onPointerCancel: (_) => _downPosition = null,
+      onPointerUp: (event) {
+        final down = _downPosition;
+        _downPosition = null;
+        if (down == null || widget.slotWidth <= 0) {
+          return;
+        }
+        if ((event.localPosition - down).distance > 18) {
+          return;
+        }
+        final index = (event.localPosition.dx / widget.slotWidth)
+            .floor()
+            .clamp(0, widget.pointCount - 1);
+        widget.onSelect(index);
+      },
+      child: const SizedBox.expand(),
+    );
   }
 }
 
@@ -336,14 +442,30 @@ Color _accentFor(TrendTab tab, BuildContext context) {
   return switch (tab) {
     TrendTab.steps => context.healthTheme.sage,
     TrendTab.sedentary => context.healthTheme.sand,
-    TrendTab.environment => context.healthTheme.coral,
     TrendTab.screen => context.healthTheme.blue,
   };
 }
 
+String _trendAnimationKey(TrendSnapshot snapshot) {
+  final buffer = StringBuffer()
+    ..write(snapshot.selectedTab.name)
+    ..write('|')
+    ..write(snapshot.range.name)
+    ..write('|');
+  for (final point in snapshot.points) {
+    buffer
+      ..write(point.label)
+      ..write(':')
+      ..write(point.value)
+      ..write(':')
+      ..write(point.hasData)
+      ..write(';');
+  }
+  return buffer.toString();
+}
+
 String _semanticSummary(TrendSnapshot snapshot) {
   final values = snapshot.points
-      .where((point) => point.hasData)
       .map((point) =>
           '${point.label} ${point.value.round()}${snapshot.unitLabel}')
       .join('，');

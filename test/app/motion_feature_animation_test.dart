@@ -1,3 +1,4 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -38,10 +39,12 @@ void main() {
       ),
     );
 
+    expect(_trendSpotCount(tester), 1);
     expect(_trendProgress(tester), 0);
     await tester.pump(const Duration(milliseconds: 250));
     expect(_trendProgress(tester), inExclusiveRange(0, 1));
     await tester.pumpAndSettle();
+    expect(_trendSpotCount(tester), _snapshot.points.length);
     expect(_trendProgress(tester), 1);
   });
 
@@ -82,7 +85,7 @@ void main() {
     await tester.pump();
 
     align = tester.widget(find.byType(AnimatedAlign));
-    expect((align.alignment as Alignment).x, closeTo(-1 / 3, 0.001));
+    expect((align.alignment as Alignment).x, closeTo(0, 0.001));
     expect(align.duration, const Duration(milliseconds: 220));
   });
 }
@@ -96,11 +99,25 @@ double _scoreRingProgress(WidgetTester tester) {
 }
 
 double _trendProgress(WidgetTester tester) {
-  final customPaint = tester.widget<CustomPaint>(
-    find.byKey(const Key('trend-chart-canvas')),
+  final lineChart = tester.widget<LineChart>(
+    find.byKey(const Key('trend-line-chart')),
   );
-  final dynamic painter = customPaint.painter;
-  return painter.progress as double;
+  final spots = lineChart.data.lineBarsData.single.spots;
+  if (spots.isEmpty) {
+    return 0;
+  }
+  final maxX = _snapshot.points.length - 1;
+  if (maxX <= 0) {
+    return 1;
+  }
+  return (spots.last.x / maxX).clamp(0.0, 1.0).toDouble();
+}
+
+int _trendSpotCount(WidgetTester tester) {
+  final lineChart = tester.widget<LineChart>(
+    find.byKey(const Key('trend-line-chart')),
+  );
+  return lineChart.data.lineBarsData.single.spots.length;
 }
 
 final TrendSnapshot _snapshot = TrendSnapshot(

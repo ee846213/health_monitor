@@ -94,6 +94,7 @@ class AndroidUsageStatsReader(
         var nighttimeUsageDurationMillis = 0L
         var focusSessionBreakCount = 0
         var longestContinuousUsageDurationMillis = 0L
+        var longestContinuousUsageStartedAtMillis: Long? = null
         var lastSessionEndedAt: Long? = null
         val activePackages = mutableMapOf<String, Long>()
         val packageForegroundDurations = mutableMapOf<String, Long>()
@@ -121,8 +122,10 @@ class AndroidUsageStatsReader(
                     ) { startedAt, endedAt ->
                         val duration = (endedAt - startedAt).coerceAtLeast(0L)
                         nighttimeUsageDurationMillis += nightOverlapMillis(startedAt, endedAt)
-                        longestContinuousUsageDurationMillis =
-                            max(longestContinuousUsageDurationMillis, duration)
+                        if (duration > longestContinuousUsageDurationMillis) {
+                            longestContinuousUsageDurationMillis = duration
+                            longestContinuousUsageStartedAtMillis = startedAt
+                        }
                         lastSessionEndedAt = endedAt
                     }
                     closeForegroundPackages(
@@ -180,8 +183,10 @@ class AndroidUsageStatsReader(
                     ) { startedAt, endedAt ->
                         val duration = (endedAt - startedAt).coerceAtLeast(0L)
                         nighttimeUsageDurationMillis += nightOverlapMillis(startedAt, endedAt)
-                        longestContinuousUsageDurationMillis =
-                            max(longestContinuousUsageDurationMillis, duration)
+                        if (duration > longestContinuousUsageDurationMillis) {
+                            longestContinuousUsageDurationMillis = duration
+                            longestContinuousUsageStartedAtMillis = startedAt
+                        }
                         lastSessionEndedAt = endedAt
                     }
                     closeForegroundPackages(
@@ -202,8 +207,10 @@ class AndroidUsageStatsReader(
         ) { startedAt, endedAt ->
             val duration = (endedAt - startedAt).coerceAtLeast(0L)
             nighttimeUsageDurationMillis += nightOverlapMillis(startedAt, endedAt)
-            longestContinuousUsageDurationMillis =
-                max(longestContinuousUsageDurationMillis, duration)
+            if (duration > longestContinuousUsageDurationMillis) {
+                longestContinuousUsageDurationMillis = duration
+                longestContinuousUsageStartedAtMillis = startedAt
+            }
         }
         closeForegroundPackages(
             activePackages = activePackages,
@@ -225,6 +232,7 @@ class AndroidUsageStatsReader(
             nighttimeUsageDurationMillis = nighttimeUsageDurationMillis,
             focusSessionBreakCount = focusSessionBreakCount,
             longestContinuousUsageDurationMillis = longestContinuousUsageDurationMillis,
+            longestContinuousUsageStartedAtMillis = longestContinuousUsageStartedAtMillis,
             topCategoryKey = resolveTopCategory(packageForegroundDurations),
         )
     }

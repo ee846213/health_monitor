@@ -83,6 +83,7 @@ class _AppLifecycleRefreshScopeState
     }
 
     ref.read(dataCollectorProvider).resumeForegroundCapture();
+    unawaited(ref.read(dataCollectorProvider).syncNativeStepCount());
     unawaited(
         ref.read(androidBackgroundCaptureBootstrapServiceProvider).sync());
     unawaited(ref.read(dataCollectorProvider).syncUsageSummary());

@@ -3,18 +3,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:health_monitor/app/router.dart';
 import 'package:health_monitor/app/theme/app_theme_extension.dart';
+import 'package:health_monitor/app/theme/health_motion_tokens.dart';
 import 'package:health_monitor/app/widgets/health_design_widgets.dart';
 import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
 import 'package:health_monitor/app/widgets/health_vector_icon.dart';
 import 'package:health_monitor/domain/dashboard/daily_rhythm_ui_model.dart';
 import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
 import 'package:health_monitor/domain/trends/trend_snapshot.dart';
+import 'package:health_monitor/features/overview/providers/daily_rhythm_clock_provider.dart';
 import 'package:health_monitor/features/overview/providers/daily_rhythm_provider.dart';
 import 'package:health_monitor/features/overview/providers/overview_metric_trend_provider.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
 import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 import 'package:health_monitor/features/overview/widgets/daily_rhythm_timeline.dart';
 import 'package:health_monitor/features/overview/widgets/metric_detail_sheets.dart';
+import 'package:health_monitor/features/overview/widgets/rhythm_node_detail_sheet.dart';
 import 'package:health_monitor/features/state_pages/state_pages.dart';
 import 'package:health_monitor/features/trends/providers/trend_analysis_provider.dart';
 
@@ -81,13 +84,14 @@ class _OverviewReadyBody extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboard = ref.watch(overviewDashboardSnapshotProvider);
     final rhythm = ref.watch(dailyRhythmUiModelProvider);
-    if (dashboard == null || rhythm == null) {
+    if (dashboard == null) {
       return const Center(child: CircularProgressIndicator());
     }
 
     return RefreshIndicator(
       color: context.healthTheme.sage,
       onRefresh: () async {
+        ref.invalidate(dailyRhythmClockProvider);
         ref.invalidate(overviewReadyDataProvider);
         await ref.read(overviewReadyDataProvider.future);
       },
@@ -102,19 +106,17 @@ class _OverviewReadyBody extends ConsumerWidget {
               onSensingTap: () => _showSensingSheet(context, ref),
             ),
           ),
-          const SizedBox(height: 10),
-          HealthStaggeredEntrance(
-            index: 1,
-            child: DailyRhythmTimeline(
-              model: rhythm,
-              onNodeTap: (DailyRhythmNode node) {
-                _showRhythmNodeSheet(context, node);
-              },
-              onCurrentTimeTap: (DateTime time) {
-                _showCurrentStateSheet(context, dashboard, time);
-              },
+          if (rhythm != null) ...<Widget>[
+            HealthStaggeredEntrance(
+              index: 1,
+              child: DailyRhythmTimeline(
+                model: rhythm,
+                onNodeTap: (DailyRhythmNode node) {
+                  showRhythmNodeDetailSheet(context, node);
+                },
+              ),
             ),
-          ),
+          ],
           HealthStaggeredEntrance(
             index: 2,
             child: _SummaryCard(
@@ -133,7 +135,7 @@ class _OverviewReadyBody extends ConsumerWidget {
               dashboard: dashboard,
               onActivityTap: () => _showStepDetailSheet(context, ref),
               onPostureTap: () => _showSedentaryDetailSheet(context, ref),
-              onNoiseTap: () => _openTrend(context, ref, TrendTab.environment),
+              onNoiseTap: () => _showEnvironmentDetailSheet(context, ref),
               onDigitalTap: () => _showScreenDetailSheet(context, ref),
             ),
           ),
@@ -357,29 +359,15 @@ class _MetricGroup extends ConsumerWidget {
         key: const Key('metric-sedentary-card'),
         dimension: DailyRhythmDimension.posture,
         icon: 'chair_alt',
-        label: '姿势',
+        label: '久坐',
         value: _hours(dashboard.sedentaryCard.totalMinutes),
         unit: '小时',
-        status: dashboard.sedentaryCard.totalMinutes >= 120 ? '专注时段' : '平稳',
+        status: dashboard.sedentaryCard.totalMinutes >= 120 ? '偏多' : '正常',
         caption: '最长 ${dashboard.sedentaryCard.longestSingleMinutes} 分钟',
         color: const Color(0xFFA77A42),
         background: tokens.sandSoft,
         values: trendData.posture,
         onTap: onPostureTap,
-      ),
-      _MetricRowData(
-        key: const Key('metric-noise-card'),
-        dimension: DailyRhythmDimension.noise,
-        icon: 'graphic_eq',
-        label: '环境噪音',
-        value: dashboard.environmentSnapshot.noiseLabel,
-        unit: '',
-        status: dashboard.environmentSnapshot.noiseLabel == '嘈杂' ? '偏高' : '平稳',
-        caption: '最近有效样本',
-        color: tokens.coral,
-        background: tokens.coralSoft,
-        values: trendData.noise,
-        onTap: onNoiseTap,
       ),
       _MetricRowData(
         key: const Key('metric-screen-card'),
@@ -395,6 +383,21 @@ class _MetricGroup extends ConsumerWidget {
         values: trendData.digital,
         onTap: onDigitalTap,
       ),
+      _MetricRowData(
+        key: const Key('metric-noise-card'),
+        dimension: DailyRhythmDimension.noise,
+        icon: 'graphic_eq',
+        label: '环境噪音',
+        value: dashboard.environmentSnapshot.noiseLabel,
+        unit: '',
+        status: dashboard.environmentSnapshot.noiseLabel == '嘈杂' ? '偏高' : '平稳',
+        caption: '点击查看当前环境',
+        color: tokens.coral,
+        background: tokens.coralSoft,
+        values: const <double>[],
+        showMiniTrend: false,
+        onTap: onNoiseTap,
+      ),
     ];
 
     return HealthElevatedCard(
@@ -403,7 +406,7 @@ class _MetricGroup extends ConsumerWidget {
         children: List<Widget>.generate(rows.length, (int index) {
           return Column(
             children: <Widget>[
-              _MetricRow(data: rows[index]),
+              _MetricRow(data: rows[index], staggerIndex: index),
               if (index != rows.length - 1)
                 Divider(height: 1, color: tokens.divider),
             ],
@@ -415,9 +418,12 @@ class _MetricGroup extends ConsumerWidget {
 }
 
 class _MetricRow extends StatelessWidget {
-  const _MetricRow({required this.data});
+  const _MetricRow({required this.data, required this.staggerIndex});
 
   final _MetricRowData data;
+
+  /// 在四维分组中的位置，用于驱动趋势线“逐条错峰生长”的入场顺序。
+  final int staggerIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -479,17 +485,15 @@ class _MetricRow extends StatelessWidget {
               ),
             ),
             Expanded(
-              child: SizedBox(
-                height: 34,
-                child: CustomPaint(
-                  key: Key('metric-${data.dimension.name}-trend'),
-                  painter: _MiniTrendPainter(
-                    values: data.values,
-                    color: data.color,
-                    baseline: data.background,
-                  ),
-                ),
-              ),
+              child: data.showMiniTrend
+                  ? SizedBox(
+                      height: 34,
+                      child: _AnimatedMiniTrend(
+                        data: data,
+                        staggerIndex: staggerIndex,
+                      ),
+                    )
+                  : const SizedBox.shrink(),
             ),
             const SizedBox(width: 10),
             SizedBox(
@@ -537,11 +541,16 @@ class _MiniTrendPainter extends CustomPainter {
     required this.values,
     required this.color,
     required this.baseline,
+    required this.progress,
   });
 
   final List<double> values;
   final Color color;
   final Color baseline;
+
+  /// 入场绘制进度（0→1）。基线为静态引导线不参与动画，
+  /// 仅真实折线按进度从左向右生长，末端数据点同步缩放淡入。
+  final double progress;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -560,7 +569,7 @@ class _MiniTrendPainter extends CustomPainter {
       // 单个真实值不足以表达趋势，仅绘制当前数据点，避免暗示不存在的变化。
       canvas.drawCircle(
         Offset(size.width - 5, size.height / 2),
-        3.5,
+        3.5 * progress,
         Paint()..color = color,
       );
       return;
@@ -578,30 +587,154 @@ class _MiniTrendPainter extends CustomPainter {
         path.lineTo(point.dx, point.dy);
       }
     }
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = color
-        ..strokeWidth = 1.8
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round,
-    );
+    final stroke = Paint()
+      ..color = color
+      ..strokeWidth = 1.8
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    // 折线按进度截取，实现从起点向末端生长的入场效果。
+    for (final metric in path.computeMetrics()) {
+      canvas.drawPath(
+        metric.extractPath(0, metric.length * progress),
+        stroke,
+      );
+    }
     final last = values.last;
     canvas.drawCircle(
       Offset(
         size.width - 5,
         size.height - 5 - last * (size.height - 10),
       ),
-      3.5,
+      3.5 * progress,
       Paint()..color = color,
     );
   }
 
   @override
   bool shouldRepaint(covariant _MiniTrendPainter oldDelegate) {
-    return oldDelegate.values != values || oldDelegate.color != color;
+    return oldDelegate.values != values ||
+        oldDelegate.color != color ||
+        oldDelegate.progress != progress;
   }
+}
+
+/// 数据图表入场容器：自管 [AnimationController]，让趋势线满足两条诉求：
+///
+/// - 首次进入时四条折线按 [staggerIndex] 依次错峰生长，给用户清晰的视觉节拍；
+/// - 数据真正变化时（折线值发生改变）重新从 0 生长，让“图表更新”这件事被看见。
+///
+/// 仅在折线数值改变时重启动画，保留同维度同帧重建的稳定性，避免无意义重绘抖动。
+/// 系统“减少动态效果”下直接以 [progress] = 1 绘制最终态，不做位移与缩放。
+class _AnimatedMiniTrend extends StatefulWidget {
+  const _AnimatedMiniTrend({
+    required this.data,
+    required this.staggerIndex,
+  });
+
+  final _MetricRowData data;
+  final int staggerIndex;
+
+  @override
+  State<_AnimatedMiniTrend> createState() => _AnimatedMiniTrendState();
+}
+
+class _AnimatedMiniTrendState extends State<_AnimatedMiniTrend>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _controller;
+  Animation<double>? _progress;
+
+  // 三条趋势线之间的错峰节拍。比卡片级 stagger 略长一些，
+  // 让用户能依次感知“活动 → 姿势 → 数字习惯”三条线的生长。
+  static const Duration _perLineStagger = Duration(milliseconds: 90);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_controller != null) {
+      return;
+    }
+    final motion = context.healthMotion;
+    final delay = _perLineStagger * widget.staggerIndex;
+    final total = delay + motion.data;
+    final startFraction = total.inMicroseconds == 0
+        ? 0.0
+        : delay.inMicroseconds / total.inMicroseconds;
+    _controller = AnimationController(vsync: this, duration: total);
+    _progress = CurvedAnimation(
+      parent: _controller!,
+      // 用 Interval 把“等待 → 生长”包成一个动画曲线，
+      // 这样所有行可以同时 forward，但前几行先停留在 0，再依序进入生长阶段。
+      curve: Interval(
+        startFraction.clamp(0, 1).toDouble(),
+        1,
+        curve: motion.standardCurve,
+      ),
+    );
+    _controller!.forward();
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnimatedMiniTrend oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_valuesEqual(oldWidget.data.values, widget.data.values)) {
+      // 数据真正变化（折线值列表不等）时才重新生长。
+      // 同维度同帧的非数据重建（例如父级 InheritedWidget 变化）不会触发重启。
+      _controller?.reset();
+      _controller?.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final painterKey = Key('metric-${widget.data.dimension.name}-trend');
+    if (context.reduceMotion || _progress == null) {
+      return CustomPaint(
+        key: painterKey,
+        painter: _MiniTrendPainter(
+          values: widget.data.values,
+          color: widget.data.color,
+          baseline: widget.data.background,
+          progress: 1,
+        ),
+      );
+    }
+    return AnimatedBuilder(
+      animation: _progress!,
+      builder: (BuildContext context, _) {
+        return CustomPaint(
+          key: painterKey,
+          painter: _MiniTrendPainter(
+            values: widget.data.values,
+            color: widget.data.color,
+            baseline: widget.data.background,
+            progress: _progress!.value,
+          ),
+        );
+      },
+    );
+  }
+}
+
+bool _valuesEqual(List<double> left, List<double> right) {
+  if (identical(left, right)) {
+    return true;
+  }
+  if (left.length != right.length) {
+    return false;
+  }
+  for (var index = 0; index < left.length; index++) {
+    if (left[index] != right[index]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 class _ActionCard extends StatelessWidget {
@@ -709,6 +842,7 @@ class _MetricRowData {
     required this.background,
     required this.values,
     required this.onTap,
+    this.showMiniTrend = true,
   });
 
   final Key key;
@@ -723,6 +857,7 @@ class _MetricRowData {
   final Color background;
   final List<double> values;
   final VoidCallback onTap;
+  final bool showMiniTrend;
 }
 
 void _openTrend(BuildContext context, WidgetRef ref, TrendTab tab) {
@@ -772,42 +907,16 @@ Future<void> _showScreenDetailSheet(BuildContext context, WidgetRef ref) {
   );
 }
 
-Future<void> _showRhythmNodeSheet(
-  BuildContext context,
-  DailyRhythmNode node,
-) {
-  final tokens = context.healthTheme;
-  return showModalBottomSheet<void>(
-    context: context,
-    backgroundColor: tokens.surface,
-    showDragHandle: true,
-    builder: (BuildContext context) {
-      return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                '${_time(node.time)} · ${node.title}',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: tokens.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(node.value, style: tokens.sectionTitleStyle),
-              const SizedBox(height: 12),
-              Text(node.reason, style: tokens.bodyStyle),
-              const SizedBox(height: 12),
-              Text(node.suggestion, style: tokens.bodyStyle),
-            ],
-          ),
-        ),
-      );
-    },
+Future<void> _showEnvironmentDetailSheet(BuildContext context, WidgetRef ref) {
+  final dashboard = ref.read(overviewDashboardSnapshotProvider);
+  if (dashboard == null) {
+    return Future<void>.value();
+  }
+  return showMetricDetailSheet(
+    context,
+    EnvironmentSnapshotDetailSheet(
+      snapshot: dashboard.environmentSnapshot,
+    ),
   );
 }
 

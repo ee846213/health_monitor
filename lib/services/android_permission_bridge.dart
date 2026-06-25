@@ -5,6 +5,12 @@ abstract class AndroidPermissionBridge {
   Future<bool> hasUsageAccess();
 
   Future<bool> openUsageAccessSettings();
+
+  Future<bool> hasHealthConnectStepsPermission();
+
+  Future<bool> requestHealthConnectStepsPermission();
+
+  Future<bool> openHealthConnectSettings();
 }
 
 class PlatformAndroidPermissionBridge implements AndroidPermissionBridge {
@@ -18,6 +24,42 @@ class PlatformAndroidPermissionBridge implements AndroidPermissionBridge {
   @override
   Future<bool> openUsageAccessSettings() {
     return _invokeBool('android.permissions.openUsageAccessSettings');
+  }
+
+  @override
+  Future<bool> hasHealthConnectStepsPermission() async {
+    try {
+      final platformBridgeService = PlatformBridgeService();
+      final payload = await platformBridgeService.methodChannel
+              .invokeMapMethod<Object?, Object?>('android.healthConnect.getStatus') ??
+          const <Object?, Object?>{};
+      return payload['hasStepsPermission'] as bool? ?? false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> requestHealthConnectStepsPermission() async {
+    try {
+      final platformBridgeService = PlatformBridgeService();
+      final payload = await platformBridgeService.methodChannel
+          .invokeMapMethod<Object?, Object?>(
+        'android.healthConnect.requestPermissions',
+      );
+      return payload?['granted'] as bool? ?? false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> openHealthConnectSettings() {
+    return _invokeBool('android.healthConnect.openSettings');
   }
 
   Future<bool> _invokeBool(String method) async {

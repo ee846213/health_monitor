@@ -121,6 +121,7 @@ class _DigitalUsageAccumulator {
     required this.focusSessionBreakCount,
     required this.viewCount,
     required this.longestContinuousUsageDuration,
+    required this.longestContinuousUsageStartedAt,
     required this.sessionStartedAt,
     required this.lastForegroundExitAt,
   });
@@ -135,6 +136,7 @@ class _DigitalUsageAccumulator {
       focusSessionBreakCount: 0,
       viewCount: 0,
       longestContinuousUsageDuration: Duration.zero,
+      longestContinuousUsageStartedAt: null,
       sessionStartedAt: null,
       lastForegroundExitAt: null,
     );
@@ -149,6 +151,7 @@ class _DigitalUsageAccumulator {
       focusSessionBreakCount: summary.focusSessionBreakCount,
       viewCount: summary.effectiveViewCount,
       longestContinuousUsageDuration: summary.longestContinuousUsageDuration,
+      longestContinuousUsageStartedAt: summary.longestContinuousUsageStartedAt,
       sessionStartedAt: null,
       lastForegroundExitAt: null,
     );
@@ -161,6 +164,7 @@ class _DigitalUsageAccumulator {
   int focusSessionBreakCount;
   int viewCount;
   Duration longestContinuousUsageDuration;
+  DateTime? longestContinuousUsageStartedAt;
   DateTime? sessionStartedAt;
   DateTime? lastForegroundExitAt;
 
@@ -192,6 +196,8 @@ class _DigitalUsageAccumulator {
           );
           if (duration > longestContinuousUsageDuration) {
             longestContinuousUsageDuration = duration;
+            // 记录“最长连续使用”的起点，作为数字习惯节点的真实代表时刻。
+            longestContinuousUsageStartedAt = sessionStartedAt;
           }
         }
         sessionStartedAt = null;
@@ -208,6 +214,7 @@ class _DigitalUsageAccumulator {
       focusSessionBreakCount: focusSessionBreakCount,
       viewCount: viewCount,
       longestContinuousUsageDuration: longestContinuousUsageDuration,
+      longestContinuousUsageStartedAt: longestContinuousUsageStartedAt,
       topCategory: UsageCategory.unknown,
       source: DigitalUsageSource.lifecycleAlternative,
     );
@@ -229,6 +236,7 @@ class _DigitalUsageAccumulator {
         );
         if (partialDuration > longestContinuousUsageDuration) {
           longestContinuousUsageDuration = partialDuration;
+          longestContinuousUsageStartedAt = sessionStartedAt;
         }
       }
       sessionStartedAt = DateTime(
@@ -245,6 +253,7 @@ class _DigitalUsageAccumulator {
     focusSessionBreakCount = 0;
     viewCount = 0;
     longestContinuousUsageDuration = Duration.zero;
+    longestContinuousUsageStartedAt = null;
     lastForegroundExitAt = null;
   }
 

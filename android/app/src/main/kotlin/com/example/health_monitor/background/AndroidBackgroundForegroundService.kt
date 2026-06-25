@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import com.example.health_monitor.healthconnect.AndroidHealthConnectReader
 import com.example.health_monitor.stepcounter.AndroidStepCounterReader
 import com.example.health_monitor.usagestats.AndroidUsageStatsReader
 import com.example.health_monitor.usagestats.SharedPreferencesAndroidUsageSummarySnapshotStore
@@ -43,8 +44,24 @@ class AndroidBackgroundForegroundService : Service() {
     private val stepCounterReader by lazy {
         AndroidStepCounterReader(this)
     }
+    private val stepDeltaRecorder by lazy {
+        AndroidBackgroundStepDeltaRecorder(
+            context = this,
+            stepCounterReader = stepCounterReader,
+            eventStore = SharedPreferencesAndroidBackgroundStepDeltaStore(
+                getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
+            ),
+            healthConnectReader = AndroidHealthConnectReader(this),
+            sharedPreferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
+        )
+    }
     private val walkingScreenRiskEventStore by lazy {
         SharedPreferencesAndroidWalkingScreenRiskEventStore(
+            getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
+        )
+    }
+    private val reminderPolicyStore by lazy {
+        AndroidReminderPolicyStore(
             getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
         )
     }
@@ -52,6 +69,7 @@ class AndroidBackgroundForegroundService : Service() {
         val notifier = AndroidWalkingScreenRiskNotifier(
             context = this,
             notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager,
+            policyStore = reminderPolicyStore,
         )
         AndroidWalkingScreenRiskMonitor(
             context = this,
@@ -86,6 +104,11 @@ class AndroidBackgroundForegroundService : Service() {
                     return START_NOT_STICKY
                 }
                 stepCounterReader.startListening()
+                if (request.enableMotion) {
+                    stepDeltaRecorder.start(request.sampleIntervalMinutes)
+                } else {
+                    stepDeltaRecorder.stop()
+                }
                 if (request.enableMotion && request.enableDigitalUsage) {
                     walkingScreenRiskMonitor.start()
                 }
@@ -104,6 +127,11 @@ class AndroidBackgroundForegroundService : Service() {
                     return START_NOT_STICKY
                 }
                 stepCounterReader.startListening()
+                if (request.enableMotion) {
+                    stepDeltaRecorder.start(request.sampleIntervalMinutes)
+                } else {
+                    stepDeltaRecorder.stop()
+                }
                 if (request.enableMotion && request.enableDigitalUsage) {
                     walkingScreenRiskMonitor.start()
                 }
@@ -114,6 +142,7 @@ class AndroidBackgroundForegroundService : Service() {
 
             AndroidBackgroundForegroundServiceIntentFactory.ACTION_STOP -> {
                 walkingScreenRiskMonitor.stop()
+                stepDeltaRecorder.stop()
                 stepCounterReader.stopListening()
                 runtime.stop()
                 stopForeground(true)
@@ -143,6 +172,7 @@ class AndroidBackgroundForegroundService : Service() {
 
     override fun onDestroy() {
         walkingScreenRiskMonitor.stop()
+        stepDeltaRecorder.stop()
         stepCounterReader.stopListening()
         AndroidBackgroundServiceRuntimeState.markStopped()
         super.onDestroy()

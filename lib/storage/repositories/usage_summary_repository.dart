@@ -194,6 +194,14 @@ DigitalUsageSummary mergeUsageSummaryPreservingProgress(
       existing.longestContinuousUsageDuration,
       incoming.longestContinuousUsageDuration,
     ),
+    // 最长会话起点必须跟随被保留的“最长时长”，否则会出现时长来自一份摘要、
+    // 起点来自另一份摘要的错配。时长相等时优先采用 incoming 的最新观测。
+    longestContinuousUsageStartedAt:
+        incoming.longestContinuousUsageDuration >=
+                existing.longestContinuousUsageDuration
+            ? (incoming.longestContinuousUsageStartedAt ??
+                existing.longestContinuousUsageStartedAt)
+            : existing.longestContinuousUsageStartedAt,
     topCategory: incoming.topCategory == UsageCategory.unknown
         ? existing.topCategory
         : incoming.topCategory,

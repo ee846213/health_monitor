@@ -38,33 +38,38 @@ const UsageSummaryRecordSchema = CollectionSchema(
       name: r'longestContinuousUsageSeconds',
       type: IsarType.long,
     ),
-    r'nighttimeUsageSeconds': PropertySchema(
+    r'longestContinuousUsageStartedAtMillis': PropertySchema(
       id: 4,
+      name: r'longestContinuousUsageStartedAtMillis',
+      type: IsarType.long,
+    ),
+    r'nighttimeUsageSeconds': PropertySchema(
+      id: 5,
       name: r'nighttimeUsageSeconds',
       type: IsarType.long,
     ),
     r'screenOnSeconds': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'screenOnSeconds',
       type: IsarType.long,
     ),
     r'sourceKey': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'sourceKey',
       type: IsarType.string,
     ),
     r'topCategoryKey': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'topCategoryKey',
       type: IsarType.string,
     ),
     r'unlockCount': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'unlockCount',
       type: IsarType.long,
     ),
     r'viewCount': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'viewCount',
       type: IsarType.long,
     )
@@ -120,12 +125,13 @@ void _usageSummaryRecordSerialize(
   writer.writeString(offsets[1], object.dateKey);
   writer.writeLong(offsets[2], object.focusSessionBreakCount);
   writer.writeLong(offsets[3], object.longestContinuousUsageSeconds);
-  writer.writeLong(offsets[4], object.nighttimeUsageSeconds);
-  writer.writeLong(offsets[5], object.screenOnSeconds);
-  writer.writeString(offsets[6], object.sourceKey);
-  writer.writeString(offsets[7], object.topCategoryKey);
-  writer.writeLong(offsets[8], object.unlockCount);
-  writer.writeLong(offsets[9], object.viewCount);
+  writer.writeLong(offsets[4], object.longestContinuousUsageStartedAtMillis);
+  writer.writeLong(offsets[5], object.nighttimeUsageSeconds);
+  writer.writeLong(offsets[6], object.screenOnSeconds);
+  writer.writeString(offsets[7], object.sourceKey);
+  writer.writeString(offsets[8], object.topCategoryKey);
+  writer.writeLong(offsets[9], object.unlockCount);
+  writer.writeLong(offsets[10], object.viewCount);
 }
 
 UsageSummaryRecord _usageSummaryRecordDeserialize(
@@ -140,12 +146,14 @@ UsageSummaryRecord _usageSummaryRecordDeserialize(
   object.focusSessionBreakCount = reader.readLong(offsets[2]);
   object.id = id;
   object.longestContinuousUsageSeconds = reader.readLong(offsets[3]);
-  object.nighttimeUsageSeconds = reader.readLong(offsets[4]);
-  object.screenOnSeconds = reader.readLong(offsets[5]);
-  object.sourceKey = reader.readString(offsets[6]);
-  object.topCategoryKey = reader.readString(offsets[7]);
-  object.unlockCount = reader.readLong(offsets[8]);
-  object.viewCount = reader.readLong(offsets[9]);
+  object.longestContinuousUsageStartedAtMillis =
+      reader.readLongOrNull(offsets[4]);
+  object.nighttimeUsageSeconds = reader.readLong(offsets[5]);
+  object.screenOnSeconds = reader.readLong(offsets[6]);
+  object.sourceKey = reader.readString(offsets[7]);
+  object.topCategoryKey = reader.readString(offsets[8]);
+  object.unlockCount = reader.readLong(offsets[9]);
+  object.viewCount = reader.readLong(offsets[10]);
   return object;
 }
 
@@ -165,16 +173,18 @@ P _usageSummaryRecordDeserializeProp<P>(
     case 3:
       return (reader.readLong(offset)) as P;
     case 4:
-      return (reader.readLong(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 5:
       return (reader.readLong(offset)) as P;
     case 6:
-      return (reader.readString(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 7:
       return (reader.readString(offset)) as P;
     case 8:
-      return (reader.readLong(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 9:
+      return (reader.readLong(offset)) as P;
+    case 10:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -763,6 +773,80 @@ extension UsageSummaryRecordQueryFilter
   }
 
   QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      longestContinuousUsageStartedAtMillisIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'longestContinuousUsageStartedAtMillis',
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      longestContinuousUsageStartedAtMillisIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'longestContinuousUsageStartedAtMillis',
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      longestContinuousUsageStartedAtMillisEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'longestContinuousUsageStartedAtMillis',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      longestContinuousUsageStartedAtMillisGreaterThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'longestContinuousUsageStartedAtMillis',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      longestContinuousUsageStartedAtMillisLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'longestContinuousUsageStartedAtMillis',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
+      longestContinuousUsageStartedAtMillisBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'longestContinuousUsageStartedAtMillis',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterFilterCondition>
       nighttimeUsageSecondsEqualTo(int value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -1324,6 +1408,22 @@ extension UsageSummaryRecordQuerySortBy
   }
 
   QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
+      sortByLongestContinuousUsageStartedAtMillis() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(
+          r'longestContinuousUsageStartedAtMillis', Sort.asc);
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
+      sortByLongestContinuousUsageStartedAtMillisDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(
+          r'longestContinuousUsageStartedAtMillis', Sort.desc);
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
       sortByNighttimeUsageSeconds() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'nighttimeUsageSeconds', Sort.asc);
@@ -1481,6 +1581,22 @@ extension UsageSummaryRecordQuerySortThenBy
   }
 
   QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
+      thenByLongestContinuousUsageStartedAtMillis() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(
+          r'longestContinuousUsageStartedAtMillis', Sort.asc);
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
+      thenByLongestContinuousUsageStartedAtMillisDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(
+          r'longestContinuousUsageStartedAtMillis', Sort.desc);
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QAfterSortBy>
       thenByNighttimeUsageSeconds() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'nighttimeUsageSeconds', Sort.asc);
@@ -1597,6 +1713,13 @@ extension UsageSummaryRecordQueryWhereDistinct
   }
 
   QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QDistinct>
+      distinctByLongestContinuousUsageStartedAtMillis() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'longestContinuousUsageStartedAtMillis');
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, UsageSummaryRecord, QDistinct>
       distinctByNighttimeUsageSeconds() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'nighttimeUsageSeconds');
@@ -1672,6 +1795,13 @@ extension UsageSummaryRecordQueryProperty
       longestContinuousUsageSecondsProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'longestContinuousUsageSeconds');
+    });
+  }
+
+  QueryBuilder<UsageSummaryRecord, int?, QQueryOperations>
+      longestContinuousUsageStartedAtMillisProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'longestContinuousUsageStartedAtMillis');
     });
   }
 

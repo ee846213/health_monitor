@@ -1,11 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health_monitor/domain/notification/notification_preference.dart';
+import 'package:health_monitor/domain/notification/reminder_category.dart';
 import 'package:health_monitor/domain/notification/reminder_delivery_plan.dart';
+import 'package:health_monitor/domain/notification/reminder_preferences.dart';
 import 'package:health_monitor/domain/reminder/reminder_record.dart';
 import 'package:health_monitor/rules/engine/rule_verdict.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
 import 'package:health_monitor/services/reminder_delivery_service.dart';
 import 'package:health_monitor/storage/repositories/notification_preference_repository.dart';
+import 'package:health_monitor/storage/repositories/reminder_preferences_repository.dart';
 
 void main() {
   test('提醒投递服务在勿扰时段内拦截发送，在非勿扰时段内放行', () async {
@@ -20,6 +23,7 @@ void main() {
           endMinute: 0,
         ),
       ),
+      reminderPreferencesRepository: InMemoryReminderPreferencesRepository(),
       notificationPermissionReader: () async => PermissionGrantStatus.granted,
     );
     final reminder = ReminderRecord.fromVerdict(
@@ -59,6 +63,7 @@ void main() {
           endMinute: 0,
         ),
       ),
+      reminderPreferencesRepository: InMemoryReminderPreferencesRepository(),
       notificationPermissionReader: () async => PermissionGrantStatus.denied,
     );
     final reminder = ReminderRecord.fromVerdict(
@@ -82,6 +87,42 @@ void main() {
     expect(
       plan.blockedRecords.single.reason,
       DeliveryBlockReason.notificationPermissionDenied,
+    );
+  });
+
+  test('提醒投递服务在用户关闭对应类别时不发送', () async {
+    final service = ReminderDeliveryService(
+      notificationPreferenceRepository:
+          InMemoryNotificationPreferenceRepository(),
+      reminderPreferencesRepository: InMemoryReminderPreferencesRepository(
+        initialValue: ReminderPreferences.defaults.toggleCategory(
+          ReminderCategory.nightUsage,
+          false,
+        ),
+      ),
+      notificationPermissionReader: () async => PermissionGrantStatus.granted,
+    );
+    final reminder = ReminderRecord.fromVerdict(
+      verdict: const RuleVerdict(
+        dimension: 'digital_usage',
+        level: 'warning',
+        summary: '先让眼睛休息一下',
+        detail: '最近这段时间亮屏偏长',
+        shouldRemind: true,
+        reminderType: 'nightUsage',
+      ),
+      now: DateTime(2026, 6, 16, 20),
+    );
+
+    final plan = await service.buildPlan(
+      records: <ReminderRecord>[reminder],
+      referenceTime: DateTime(2026, 6, 16, 20),
+    );
+
+    expect(plan.readyRecords, isEmpty);
+    expect(
+      plan.blockedRecords.single.reason,
+      DeliveryBlockReason.reminderPreferenceDisabled,
     );
   });
 }

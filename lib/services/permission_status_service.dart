@@ -63,6 +63,12 @@ class PermissionHandlerStatusService implements PermissionStatusService {
         return hasUsageAccess
             ? PermissionGrantStatus.granted
             : PermissionGrantStatus.restricted;
+      case PermissionType.healthConnect:
+        final hasHealthConnectPermission =
+            await _androidPermissionBridge.hasHealthConnectStepsPermission();
+        return hasHealthConnectPermission
+            ? PermissionGrantStatus.granted
+            : PermissionGrantStatus.restricted;
       case PermissionType.backgroundCapture:
       case PermissionType.motion:
       case PermissionType.location:
@@ -144,6 +150,9 @@ class PermissionHandlerInteractionService
     if (type == PermissionType.usageAccess) {
       return _handleUsageAccessTap();
     }
+    if (type == PermissionType.healthConnect) {
+      return _handleHealthConnectTap();
+    }
     return _coordinator.resolvePermissionAction(type);
   }
 
@@ -166,6 +175,25 @@ class PermissionHandlerInteractionService
     }
 
     final opened = await _androidPermissionBridge.openUsageAccessSettings();
+    return opened
+        ? PermissionActionResult.openedSettings
+        : PermissionActionResult.settingsUnavailable;
+  }
+
+  Future<PermissionActionResult> _handleHealthConnectTap() async {
+    final hasPermission =
+        await _androidPermissionBridge.hasHealthConnectStepsPermission();
+    if (hasPermission) {
+      return PermissionActionResult.granted;
+    }
+
+    final granted =
+        await _androidPermissionBridge.requestHealthConnectStepsPermission();
+    if (granted) {
+      return PermissionActionResult.granted;
+    }
+
+    final opened = await _androidPermissionBridge.openHealthConnectSettings();
     return opened
         ? PermissionActionResult.openedSettings
         : PermissionActionResult.settingsUnavailable;
@@ -238,6 +266,8 @@ permission_handler.Permission mapPermissionType(PermissionType type) {
       // 这里只保留给历史上的 runtime 映射调用；真正的 Usage Access
       // 已由专用 Android 桥接接管，避免走错成 overlay 权限。
       return permission_handler.Permission.systemAlertWindow;
+    case PermissionType.healthConnect:
+      return permission_handler.Permission.activityRecognition;
     case PermissionType.backgroundCapture:
       return permission_handler.Permission.ignoreBatteryOptimizations;
   }

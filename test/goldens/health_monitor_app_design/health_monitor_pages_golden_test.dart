@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health_monitor/app/theme.dart';
 import 'package:health_monitor/domain/briefing/daily_brief_snapshot.dart';
+import 'package:health_monitor/domain/dashboard/daily_rhythm_signals.dart';
 import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
 import 'package:health_monitor/domain/notification/notification_preference.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
@@ -15,6 +16,7 @@ import 'package:health_monitor/domain/trends/trend_snapshot.dart';
 import 'package:health_monitor/features/briefing/pages/briefing_page.dart';
 import 'package:health_monitor/features/briefing/providers/briefing_providers.dart';
 import 'package:health_monitor/features/overview/pages/overview_page.dart';
+import 'package:health_monitor/features/overview/providers/daily_rhythm_clock_provider.dart';
 import 'package:health_monitor/features/overview/providers/overview_metric_trend_provider.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
 import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
@@ -46,6 +48,9 @@ void main() {
       tester,
       const OverviewPage(),
       <Override>[
+        dailyRhythmClockProvider.overrideWith(
+          (Ref ref) => DateTime(2026, 6, 22, 22),
+        ),
         overviewScreenStateProvider.overrideWith(
           (ref) => const AsyncData(OverviewScreenState.ready),
         ),
@@ -54,7 +59,6 @@ void main() {
           (ref) async => const OverviewMetricTrendData(
             activity: <double>[.25, .34, .3, .48, .38, .55, .64],
             posture: <double>[.22, .28, .26, .44, .39, .72, .55],
-            noise: <double>[.2, .3, .24, .5, .4, .66, .45],
             digital: <double>[.2, .2, .34, .29, .42, .4, .61],
           ),
         ),
@@ -222,6 +226,15 @@ DashboardSnapshot _dashboard() => DashboardSnapshot(
       dailyAdviceBubble: DailyAdviceBubble(
         text: '晚饭后散步 15 分钟会更稳。',
         source: DailyAdviceSource.llm,
+      ),
+      rhythmSignals: DailyRhythmSignals(
+        activityPeakAt: DateTime(2026, 6, 22, 9, 30),
+        activityPeakSteps: 480,
+        sedentaryStartAt: DateTime(2026, 6, 22, 14, 30),
+        sedentaryLongestMinutes: 65,
+        digitalUsageAt: DateTime(2026, 6, 22, 21),
+        digitalUsageIsPrecise: true,
+        digitalLongestSessionMinutes: 35,
       ),
       hasRealData: true,
       hasReminderHistory: true,

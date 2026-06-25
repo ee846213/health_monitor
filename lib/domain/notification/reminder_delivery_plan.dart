@@ -3,6 +3,7 @@ import 'package:health_monitor/domain/reminder/reminder_record.dart';
 enum DeliveryBlockReason {
   doNotDisturb,
   notificationPermissionDenied,
+  reminderPreferenceDisabled,
 }
 
 class ReminderDeliveryEntry {
@@ -51,6 +52,17 @@ class ReminderDeliveryEntry {
       record: record,
       plannedAt: plannedAt,
       reason: DeliveryBlockReason.notificationPermissionDenied,
+    );
+  }
+
+  factory ReminderDeliveryEntry.blockedByPreference(
+    ReminderRecord record, {
+    DateTime? plannedAt,
+  }) {
+    return ReminderDeliveryEntry._(
+      record: record,
+      plannedAt: plannedAt,
+      reason: DeliveryBlockReason.reminderPreferenceDisabled,
     );
   }
 }

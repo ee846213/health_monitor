@@ -25,7 +25,9 @@ class StepCounterService {
     return _parsePayload(payload);
   }
 
-  Stream<StepCountState> watchStepCounts() async* {
+  Stream<StepCountState> watchStepCounts({
+    Duration pollInterval = const Duration(seconds: 30),
+  }) async* {
     if (!_isAndroid()) {
       return;
     }
@@ -35,7 +37,7 @@ class StepCounterService {
       if (current.isAvailable) {
         yield current;
       }
-      await Future<void>.delayed(const Duration(minutes: 1));
+      await Future<void>.delayed(pollInterval);
     }
   }
 

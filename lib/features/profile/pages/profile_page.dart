@@ -14,24 +14,19 @@ import 'package:health_monitor/domain/trends/trend_snapshot.dart';
 import 'package:health_monitor/features/diagnostics/providers/diagnostics_providers.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
 import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
+import 'package:health_monitor/domain/notification/reminder_category.dart';
+import 'package:health_monitor/features/profile/providers/reminder_preferences_provider.dart';
 import 'package:health_monitor/features/profile/widgets/do_not_disturb_section.dart';
 import 'package:health_monitor/features/trends/providers/trend_analysis_provider.dart';
 import 'package:health_monitor/services/permission_status_service.dart';
 
-final _profileReminderPreferencesProvider =
-    StateProvider<Map<ReminderTypePreference, bool>>((ref) {
-  return <ReminderTypePreference, bool>{
-    for (final type in ReminderTypePreference.values) type: true,
-  };
-});
-
-enum ReminderTypePreference {
-  all,
-  sedentary,
-  walkingScreen,
-  nightUsage,
-  noisyEnvironment,
-}
+/// 提醒偏好页展示的细分类别（不含总开关）。
+const List<ReminderCategory> _profileReminderCategories = <ReminderCategory>[
+  ReminderCategory.sedentary,
+  ReminderCategory.walkingScreen,
+  ReminderCategory.nightUsage,
+  ReminderCategory.noisyEnvironment,
+];
 
 final profileNowProvider = Provider<DateTime>((ref) => DateTime.now());
 
@@ -542,39 +537,95 @@ Future<void> _showReminderPreferences(
 ) {
   return showModalBottomSheet<void>(
     context: context,
+    isScrollControlled: true,
     showDragHandle: true,
     backgroundColor: context.healthTheme.surface,
     builder: (context) => SafeArea(
       child: Consumer(
         builder: (context, ref, child) {
-          final values = ref.watch(_profileReminderPreferencesProvider);
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(18, 4, 18, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text('提醒偏好', style: context.healthTheme.sectionTitleStyle),
-                ...ReminderTypePreference.values.map(
-                  (type) => SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(_preferenceLabel(type)),
-                    value: values[type] ?? true,
-                    onChanged: (enabled) {
-                      final next = {...values, type: enabled};
-                      if (type == ReminderTypePreference.all) {
-                        for (final item in ReminderTypePreference.values) {
-                          next[item] = enabled;
+          final preferencesAsync = ref.watch(reminderPreferencesProvider);
+          return preferencesAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (error, stackTrace) => Padding(
+              padding: const EdgeInsets.fromLTRB(18, 4, 18, 20),
+              child: Text(
+                '提醒偏好加载失败',
+                style: context.healthTheme.bodyStyle,
+              ),
+            ),
+            data: (preferences) {
+              return Padding(
+                padding: EdgeInsets.fromLTRB(
+                  18,
+                  4,
+                  18,
+                  20 + MediaQuery.viewInsetsOf(context).bottom,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                    Text('提醒偏好', style: context.healthTheme.sectionTitleStyle),
+                    const SizedBox(height: 6),
+                    Text(
+                      '关闭后不会写入提醒记录，也不会发送系统通知。',
+                      style: context.healthTheme.bodyStyle,
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('总提醒开关'),
+                      value: preferences.masterEnabled,
+                      onChanged: (enabled) async {
+                        try {
+                          await ref
+                              .read(reminderPreferencesProvider.notifier)
+                              .save(preferences.toggleMaster(enabled));
+                        } catch (_) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('保存失败，已恢复原设置')),
+                          );
                         }
-                      }
-                      ref
-                          .read(_profileReminderPreferencesProvider.notifier)
-                          .state = next;
-                    },
+                      },
+                    ),
+                    ..._profileReminderCategories.map(
+                      (category) => SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(category.displayLabel),
+                        value: preferences.isCategoryEnabled(category),
+                        onChanged: preferences.masterEnabled
+                            ? (enabled) async {
+                                try {
+                                  await ref
+                                      .read(
+                                          reminderPreferencesProvider.notifier)
+                                      .save(
+                                        preferences.toggleCategory(
+                                          category,
+                                          enabled,
+                                        ),
+                                      );
+                                } catch (_) {
+                                  if (!context.mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('保存失败，已恢复原设置'),
+                                    ),
+                                  );
+                                }
+                              }
+                            : null,
+                      ),
+                    ),
+                  ],
                   ),
                 ),
-              ],
-            ),
+              );
+            },
           );
         },
       ),
@@ -636,12 +687,4 @@ String _permissionResultMessage(String title, PermissionActionResult result) =>
       PermissionActionResult.denied => '$title 未开启，将继续降级运行',
       PermissionActionResult.openedSettings => '已打开系统设置，请完成后返回',
       PermissionActionResult.settingsUnavailable => '暂时无法打开系统设置',
-    };
-
-String _preferenceLabel(ReminderTypePreference type) => switch (type) {
-      ReminderTypePreference.all => '总提醒开关',
-      ReminderTypePreference.sedentary => '久坐提醒',
-      ReminderTypePreference.walkingScreen => '移动看屏提醒',
-      ReminderTypePreference.nightUsage => '夜间使用提醒',
-      ReminderTypePreference.noisyEnvironment => '环境噪音提醒',
     };

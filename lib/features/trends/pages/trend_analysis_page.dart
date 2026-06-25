@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_monitor/app/router.dart';
 import 'package:health_monitor/app/theme/app_theme_extension.dart';
+import 'package:health_monitor/app/theme/health_motion_tokens.dart';
 import 'package:health_monitor/app/widgets/health_design_widgets.dart';
 import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
 import 'package:health_monitor/app/widgets/health_vector_icon.dart';
@@ -43,33 +44,19 @@ class _TrendAnalysisPageState extends ConsumerState<TrendAnalysisPage> {
         bottom: false,
         child: ListView(
           controller: _controller,
-          padding: const EdgeInsets.fromLTRB(18, 22, 18, 112),
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 112),
           children: <Widget>[
-            HealthStaggeredEntrance(
+            const HealthStaggeredEntrance(
               index: 0,
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Text(
-                      '趋势分析',
-                      style: TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.w700,
-                        color: context.healthTheme.textPrimary,
-                      ),
-                    ),
-                  ),
-                  HealthIconBubble(
-                    icon: 'show_chart',
-                    foreground: context.healthTheme.sage,
-                    background: context.healthTheme.sageSoft,
-                    size: 40,
-                    iconSize: 21,
-                  ),
-                ],
+              child: HealthPageHeader(
+                title: '趋势分析',
+                trailing: HealthNavIconButton(
+                  icon: 'calendar_month',
+                  semanticLabel: '日历',
+                ),
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 17),
             HealthStaggeredEntrance(
               index: 1,
               child: HealthSegmentedControl<TrendRange>(
@@ -191,7 +178,12 @@ class _DailyComparisonSectionState
     if (snapshot == null || snapshot.points.isEmpty) {
       return const SizedBox.shrink();
     }
+    final motion = context.healthMotion;
     final selected = _selectedIndex ?? snapshot.defaultSelectedIndex ?? 0;
+    final max = snapshot.points.where((item) => item.hasData).fold<num>(
+          1,
+          (value, item) => item.value > value ? item.value : value,
+        );
     return HealthElevatedCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -210,49 +202,92 @@ class _DailyComparisonSectionState
           const SizedBox(height: 16),
           SizedBox(
             height: 86,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: List<Widget>.generate(snapshot.points.length, (index) {
-                final point = snapshot.points[index];
-                final max = snapshot.points
-                    .where((item) => item.hasData)
-                    .fold<num>(
-                        1,
-                        (value, item) =>
-                            item.value > value ? item.value : value);
-                final active = index == selected;
-                return Expanded(
-                  child: Semantics(
-                    button: true,
-                    label: '${point.label} ${point.value}${snapshot.unitLabel}',
-                    child: InkWell(
-                      onTap: () => setState(() => _selectedIndex = index),
-                      borderRadius: BorderRadius.circular(12),
-                      child: Align(
-                        alignment: Alignment.bottomCenter,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 220),
-                          width: snapshot.points.length > 12 ? 7 : 18,
-                          height:
-                              point.hasData ? 18 + 58 * point.value / max : 4,
-                          decoration: BoxDecoration(
-                            color: active
-                                ? context.healthTheme.sage
-                                : context.healthTheme.sageSoft,
-                            borderRadius: BorderRadius.circular(9),
+            child: HealthAnimatedValue(
+              key: ValueKey<String>(_dailyComparisonAnimationKey(snapshot)),
+              value: 1,
+              duration: motion.data,
+              builder: (context, progress, child) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children:
+                      List<Widget>.generate(snapshot.points.length, (index) {
+                    final point = snapshot.points[index];
+                    final active = index == selected;
+                    final barProgress = _staggeredBarProgress(
+                      progress,
+                      index,
+                      snapshot.points.length,
+                    );
+                    final targetHeight =
+                        point.hasData ? 18 + 58 * point.value / max : 4;
+                    final animatedHeight = point.hasData
+                        ? 4 + (targetHeight - 4) * barProgress
+                        : 4;
+                    return Expanded(
+                      child: Semantics(
+                        button: true,
+                        label:
+                            '${point.label} ${point.value}${snapshot.unitLabel}',
+                        child: InkWell(
+                          onTap: () => setState(() => _selectedIndex = index),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Align(
+                            alignment: Alignment.bottomCenter,
+                            child: AnimatedContainer(
+                              duration: context.motionDuration(motion.fast),
+                              curve: motion.standardCurve,
+                              width: snapshot.points.length > 12 ? 7 : 18,
+                              height: animatedHeight.toDouble(),
+                              decoration: BoxDecoration(
+                                color: active
+                                    ? context.healthTheme.sage
+                                    : context.healthTheme.sageSoft,
+                                borderRadius: BorderRadius.circular(9),
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
+                    );
+                  }),
                 );
-              }),
+              },
             ),
           ),
         ],
       ),
     );
   }
+}
+
+String _dailyComparisonAnimationKey(TrendSnapshot snapshot) {
+  final buffer = StringBuffer()
+    ..write(snapshot.selectedTab.name)
+    ..write('|')
+    ..write(snapshot.range.name)
+    ..write('|daily|');
+  for (final point in snapshot.points) {
+    buffer
+      ..write(point.label)
+      ..write(':')
+      ..write(point.value)
+      ..write(':')
+      ..write(point.hasData)
+      ..write(';');
+  }
+  return buffer.toString();
+}
+
+double _staggeredBarProgress(double progress, int index, int total) {
+  if (total <= 1) {
+    return progress.clamp(0.0, 1.0).toDouble();
+  }
+  final delay = (index / total) * 0.28;
+  final available = 1 - delay;
+  if (available <= 0) {
+    return 1;
+  }
+  return ((progress - delay) / available).clamp(0.0, 1.0).toDouble();
 }
 
 class _CardLoadingPlaceholder extends StatelessWidget {

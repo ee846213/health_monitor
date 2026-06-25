@@ -152,6 +152,186 @@ class HealthSegmentedControl<T> extends StatelessWidget {
   }
 }
 
+/// 设计稿顶部导航圆形图标按钮：36×36、半透明白底、双层阴影。
+class HealthNavIconButton extends StatelessWidget {
+  const HealthNavIconButton({
+    super.key,
+    required this.icon,
+    this.onTap,
+    this.semanticLabel,
+    this.iconSize = 18,
+    this.weight = 400,
+  });
+
+  final String icon;
+  final VoidCallback? onTap;
+  final String? semanticLabel;
+  final double iconSize;
+  final int weight;
+
+  static const List<BoxShadow> _shadow = <BoxShadow>[
+    BoxShadow(
+      color: Color(0x0A3D392F),
+      blurRadius: 8,
+      offset: Offset(0, 3),
+    ),
+    BoxShadow(
+      color: Color(0x123D392F),
+      blurRadius: 30,
+      offset: Offset(0, 14),
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.healthTheme;
+    return Semantics(
+      button: onTap != null,
+      label: semanticLabel,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: Ink(
+            width: 36,
+            height: 36,
+            decoration: const BoxDecoration(
+              color: Color(0xCCFFFFFF),
+              shape: BoxShape.circle,
+              boxShadow: _shadow,
+            ),
+            child: Center(
+              child: HealthVectorIcon(
+                icon,
+                size: iconSize,
+                weight: weight,
+                color: tokens.textPrimary,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 提醒记录页顶部筛选胶囊，对齐设计稿「全部 ▾」样式。
+class HealthNavFilterChip extends StatelessWidget {
+  const HealthNavFilterChip({
+    super.key,
+    required this.label,
+    required this.onTap,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.healthTheme;
+    return Semantics(
+      button: true,
+      label: '筛选：$label',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(15),
+          child: Ink(
+            height: 30,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1EDE6),
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: tokens.textPrimary,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                HealthVectorIcon(
+                  'keyboard_arrow_down',
+                  size: 12,
+                  color: tokens.textSecondary,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 一级 / 二级页面统一顶部导航栏：居中 18pt 标题，左右对称操作区。
+class HealthPageHeader extends StatelessWidget {
+  const HealthPageHeader({
+    super.key,
+    required this.title,
+    this.onBack,
+    this.leading,
+    this.trailing,
+    this.trailingWidth = 36,
+  });
+
+  final String title;
+  final VoidCallback? onBack;
+  final Widget? leading;
+  final Widget? trailing;
+
+  /// 右侧控件宽度，用于在无返回按钮时保持标题居中。
+  final double trailingWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.healthTheme;
+    final Widget left = leading ??
+        (onBack != null
+            ? HealthNavIconButton(
+                icon: 'chevron_left',
+                iconSize: 19,
+                onTap: onBack,
+                semanticLabel: '返回',
+              )
+            : SizedBox(width: trailingWidth));
+    final Widget right = trailing ?? SizedBox(width: trailingWidth);
+
+    return SizedBox(
+      height: 36,
+      child: Stack(
+        alignment: Alignment.center,
+        children: <Widget>[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: <Widget>[left, right],
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 48),
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: tokens.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class HealthAnimatedExpand extends StatelessWidget {
   const HealthAnimatedExpand({
     super.key,

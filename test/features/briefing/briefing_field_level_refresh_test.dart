@@ -62,6 +62,7 @@ BriefingViewModel _buildViewModel({
   required String stepCount,
 }) {
   return BriefingViewModel(
+    selectionKey: 'day:2026-06-18',
     selectedRange: BriefingTimeRange.today,
     windowLabel: '今日',
     screenState: OverviewScreenState.ready,

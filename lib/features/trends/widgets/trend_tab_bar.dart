@@ -86,7 +86,5 @@ String _labelForTab(TrendTab tab) {
       return '姿势';
     case TrendTab.screen:
       return '屏幕';
-    case TrendTab.environment:
-      return '噪音';
   }
 }

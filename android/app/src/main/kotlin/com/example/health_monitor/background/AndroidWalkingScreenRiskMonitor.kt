@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
@@ -83,7 +84,15 @@ class AndroidWalkingScreenRiskMonitor(
             addAction(Intent.ACTION_USER_PRESENT)
             addAction(Intent.ACTION_USER_UNLOCKED)
         }
-        context.registerReceiver(screenReceiver, filter)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(
+                screenReceiver,
+                filter,
+                Context.RECEIVER_NOT_EXPORTED,
+            )
+        } else {
+            context.registerReceiver(screenReceiver, filter)
+        }
     }
 
     private fun syncInitialScreenState() {

@@ -1,3 +1,4 @@
+import 'package:health_monitor/domain/dashboard/daily_rhythm_signals.dart';
 import 'package:health_monitor/domain/notification/reminder_delivery_plan.dart';
 import 'package:health_monitor/domain/scoring/health_score_calculator.dart';
 import 'package:health_monitor/domain/trends/trend_snapshot.dart';
@@ -51,9 +52,11 @@ class DashboardScreenCard {
     required this.totalMinutes,
     required this.yesterdayDeltaMinutes,
     required this.changeDirection,
+    this.longestSingleMinutes = 0,
   });
 
   final int totalMinutes;
+  final int longestSingleMinutes;
   final int yesterdayDeltaMinutes;
   final DashboardChangeDirection changeDirection;
 }
@@ -77,6 +80,7 @@ class DashboardSnapshot {
     required this.screenCard,
     required this.environmentSnapshot,
     required this.dailyAdviceBubble,
+    this.rhythmSignals = const DailyRhythmSignals.empty(),
     this.trendSnapshot,
     this.reminderPlan,
     this.hasRealData = false,
@@ -90,6 +94,7 @@ class DashboardSnapshot {
   final DashboardScreenCard screenCard;
   final DashboardEnvironmentSnapshot environmentSnapshot;
   final DailyAdviceBubble dailyAdviceBubble;
+  final DailyRhythmSignals rhythmSignals;
   final TrendSnapshot? trendSnapshot;
   final ReminderDeliveryPlan? reminderPlan;
   final bool hasRealData;

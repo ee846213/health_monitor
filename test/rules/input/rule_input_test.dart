@@ -123,7 +123,7 @@ void main() {
       expect(input.hasFragmentedUsage, isTrue);
     });
 
-    test('stationary 片段应按 30 秒间隔合并并过滤 3 分钟以下片段', () {
+    test('stationary 片段应按 3 分钟间隔合并并过滤 3 分钟以下片段', () {
       final now = DateTime(2026, 6, 10, 9, 0);
       final input = RuleInput(
         window: QueryWindow.recentDay(referenceTime: now),
@@ -159,6 +159,158 @@ void main() {
 
       expect(input.sedentarySegments, hasLength(1));
       expect(input.sedentarySegments.single.duration.inMinutes, 4);
+    });
+
+    test('被不超过 3 分钟的起身打断的久坐应合并为一段', () {
+      final now = DateTime(2026, 6, 10, 9, 0);
+      final input = RuleInput(
+        window: QueryWindow.recentDay(referenceTime: now),
+        activitySamples: <ActivitySample>[
+          ActivitySample(
+            capturedAt: now,
+            duration: const Duration(minutes: 5),
+            type: ActivityType.stationary,
+            confidence: 0.9,
+            stepCount: 0,
+            source: MotionSampleSource.sensorFusion,
+          ),
+          ActivitySample(
+            capturedAt: now.add(const Duration(minutes: 5)),
+            duration: const Duration(minutes: 2),
+            type: ActivityType.walking,
+            confidence: 0.9,
+            stepCount: 120,
+            source: MotionSampleSource.sensorFusion,
+          ),
+          ActivitySample(
+            capturedAt: now.add(const Duration(minutes: 7)),
+            duration: const Duration(minutes: 5),
+            type: ActivityType.stationary,
+            confidence: 0.9,
+            stepCount: 0,
+            source: MotionSampleSource.sensorFusion,
+          ),
+        ],
+        locationSummaries: const <LocationSummary>[],
+        noiseSamples: const <NoiseSample>[],
+        usageSummaries: const <DigitalUsageSummary>[],
+        dailyMetricsList: const <DailyMetrics>[],
+        missingDimensions: const <String>[],
+      );
+
+      expect(input.sedentarySegments, hasLength(1));
+      expect(input.sedentarySegments.single.duration.inMinutes, 10);
+      expect(input.sedentarySegments.single.startedAt, now);
+      expect(input.sedentarySegments.single.endedAt, now.add(const Duration(minutes: 12)));
+    });
+
+    test('展示用结束时刻应与合并后的静坐时长对齐', () {
+      final now = DateTime(2026, 6, 10, 9, 0);
+      final input = RuleInput(
+        window: QueryWindow.recentDay(referenceTime: now),
+        activitySamples: <ActivitySample>[
+          ActivitySample(
+            capturedAt: now,
+            duration: const Duration(minutes: 5),
+            type: ActivityType.stationary,
+            confidence: 0.9,
+            stepCount: 0,
+            source: MotionSampleSource.sensorFusion,
+          ),
+          ActivitySample(
+            capturedAt: now.add(const Duration(minutes: 5)),
+            duration: const Duration(minutes: 2),
+            type: ActivityType.walking,
+            confidence: 0.9,
+            stepCount: 120,
+            source: MotionSampleSource.sensorFusion,
+          ),
+          ActivitySample(
+            capturedAt: now.add(const Duration(minutes: 7)),
+            duration: const Duration(minutes: 5),
+            type: ActivityType.stationary,
+            confidence: 0.9,
+            stepCount: 0,
+            source: MotionSampleSource.sensorFusion,
+          ),
+        ],
+        locationSummaries: const <LocationSummary>[],
+        noiseSamples: const <NoiseSample>[],
+        usageSummaries: const <DigitalUsageSummary>[],
+        dailyMetricsList: const <DailyMetrics>[],
+        missingDimensions: const <String>[],
+      );
+
+      final display = input.sedentarySegments.single.forDisplay();
+      expect(display.duration.inMinutes, 10);
+      expect(display.endedAt, now.add(const Duration(minutes: 10)));
+    });
+
+    test('跨自然日的久坐片段应按日裁剪，不累计昨日时长', () {
+      final dayStart = DateTime(2026, 6, 10);
+      final segment = SedentaryActivitySegment(
+        startedAt: dayStart.subtract(const Duration(hours: 1)),
+        endedAt: dayStart.add(const Duration(minutes: 37)),
+        duration: const Duration(hours: 1, minutes: 37),
+      );
+      final window = QueryWindow.calendarDay(referenceDate: dayStart);
+
+      final clipped = segment.clipTo(window);
+
+      expect(clipped, isNotNull);
+      expect(clipped!.startedAt, dayStart);
+      expect(clipped.endedAt, dayStart.add(const Duration(minutes: 37)));
+      expect(clipped.duration.inMinutes, 37);
+    });
+
+    test('墙钟跨度含间隔的相邻片段应被合并，避免展示重叠时段', () {
+      final dayStart = DateTime(2026, 6, 10);
+      final longSegment = SedentaryActivitySegment(
+        startedAt: dayStart,
+        endedAt: dayStart.add(const Duration(hours: 1, minutes: 7)),
+        duration: const Duration(minutes: 67),
+      );
+      final tailSegment = SedentaryActivitySegment(
+        startedAt: dayStart.add(const Duration(minutes: 58)),
+        endedAt: dayStart.add(const Duration(hours: 1, minutes: 2)),
+        duration: const Duration(minutes: 4),
+      );
+      final window = QueryWindow.calendarDay(referenceDate: dayStart);
+
+      final result = SedentaryActivitySegment.clippedToWindow(
+        <SedentaryActivitySegment>[longSegment, tailSegment],
+        window,
+      );
+
+      expect(result, hasLength(1));
+      expect(result.single.duration.inMinutes, 67);
+      expect(
+        result.single.forDisplay().endedAt,
+        dayStart.add(const Duration(minutes: 67)),
+      );
+    });
+
+    test('累计久坐统计应使用当日裁剪片段，而非原始指标累加', () {
+      final dayStart = DateTime(2026, 6, 10);
+      final samples = <ActivitySample>[
+        ActivitySample(
+          capturedAt: dayStart.add(const Duration(hours: 9)),
+          duration: const Duration(minutes: 42),
+          type: ActivityType.stationary,
+          confidence: 0.9,
+          stepCount: 0,
+          source: MotionSampleSource.sensorFusion,
+        ),
+      ];
+      final window = QueryWindow.calendarDay(referenceDate: dayStart);
+
+      final summary = summarizeSedentaryForWindow(
+        activitySamples: samples,
+        window: window,
+      );
+
+      expect(summary.totalMinutes, 42);
+      expect(summary.longestMinutes, 42);
     });
 
     test('isDimensionAvailable 判断维度可用性', () {

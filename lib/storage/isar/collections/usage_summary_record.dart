@@ -15,6 +15,7 @@ class UsageSummaryRecord {
   late int nighttimeUsageSeconds;
   late int focusSessionBreakCount;
   late int longestContinuousUsageSeconds;
+  int? longestContinuousUsageStartedAtMillis;
   late String topCategoryKey;
   late String sourceKey;
   late String completenessKey;
@@ -31,6 +32,8 @@ class UsageSummaryRecord {
       ..focusSessionBreakCount = summary.focusSessionBreakCount
       ..longestContinuousUsageSeconds =
           summary.longestContinuousUsageDuration.inSeconds
+      ..longestContinuousUsageStartedAtMillis =
+          summary.longestContinuousUsageStartedAt?.millisecondsSinceEpoch
       ..topCategoryKey = summary.topCategory.name
       ..sourceKey = summary.source.name
       ..completenessKey = summary.completeness.name;
@@ -47,6 +50,12 @@ class UsageSummaryRecord {
       longestContinuousUsageDuration: Duration(
         seconds: longestContinuousUsageSeconds,
       ),
+      longestContinuousUsageStartedAt:
+          longestContinuousUsageStartedAtMillis == null
+              ? null
+              : DateTime.fromMillisecondsSinceEpoch(
+                  longestContinuousUsageStartedAtMillis!,
+                ),
       topCategory: _mapUsageCategory(topCategoryKey),
       source: _mapUsageSource(sourceKey),
       completeness: _mapCompleteness(completenessKey),

@@ -44,6 +44,52 @@ void main() {
     await controller.close();
   });
 
+  test('应记录最长连续使用片段的真实起点', () async {
+    final controller = StreamController<AppUsageEvent>();
+    final service = DigitalUsageCaptureService(
+      lifecycleEventStreamFactory: () => controller.stream,
+    );
+
+    final future = service.watchUsageSummaries().take(4).toList();
+    controller
+      ..add(
+        AppUsageEvent(
+          occurredAt: DateTime(2026, 6, 9, 9, 0),
+          type: AppUsageEventType.foregroundEntered,
+        ),
+      )
+      ..add(
+        AppUsageEvent(
+          occurredAt: DateTime(2026, 6, 9, 9, 10),
+          type: AppUsageEventType.foregroundExited,
+        ),
+      )
+      ..add(
+        AppUsageEvent(
+          occurredAt: DateTime(2026, 6, 9, 14, 30),
+          type: AppUsageEventType.foregroundEntered,
+        ),
+      )
+      ..add(
+        AppUsageEvent(
+          occurredAt: DateTime(2026, 6, 9, 15, 5),
+          type: AppUsageEventType.foregroundExited,
+        ),
+      );
+
+    final summaries = await future;
+    final last = summaries.last;
+
+    expect(last.longestContinuousUsageDuration, const Duration(minutes: 35));
+    // 更长的一段从 14:30 开始，起点应随最长时长一起更新，而不是停留在第一段。
+    expect(
+      last.longestContinuousUsageStartedAt,
+      DateTime(2026, 6, 9, 14, 30),
+    );
+
+    await controller.close();
+  });
+
   test('夜间时段应累积夜间使用时长', () async {
     final controller = StreamController<AppUsageEvent>();
     final service = DigitalUsageCaptureService(

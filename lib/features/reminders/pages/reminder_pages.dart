@@ -24,49 +24,51 @@ class _ReminderListPageState extends ConsumerState<ReminderListPage> {
     final records = ref.watch(reminderListStateProvider);
     return Scaffold(
       backgroundColor: context.healthTheme.canvas,
-      appBar: AppBar(
-        backgroundColor: context.healthTheme.canvas,
-        surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          onPressed: () =>
-              context.canPop() ? context.pop() : context.go('/profile'),
-          icon: const HealthVectorIcon('chevron_left', size: 22),
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
+              child: HealthPageHeader(
+                title: '提醒记录',
+                onBack: () => context.canPop()
+                    ? context.pop()
+                    : context.go('/profile'),
+                trailing: HealthNavFilterChip(
+                  key: const Key('reminder-filter-button'),
+                  label: _filter == null ? '全部' : _typeLabel(_filter!),
+                  onTap: _showFilterSheet,
+                ),
+                trailingWidth: 55,
+              ),
+            ),
+            const SizedBox(height: 17),
+            Expanded(
+              child: records.when(
+                skipLoadingOnRefresh: true,
+                loading: () =>
+                    const Center(child: CircularProgressIndicator()),
+                error: (error, stackTrace) => Center(
+                  child: TextButton(
+                    onPressed: () => ref.invalidate(reminderListProvider),
+                    child: const Text('提醒记录加载失败，点击重试'),
+                  ),
+                ),
+                data: _buildRecords,
+              ),
+            ),
+          ],
         ),
-        title: Text(
-          '提醒记录',
-          style: TextStyle(
-            color: context.healthTheme.textPrimary,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        actions: <Widget>[
-          TextButton.icon(
-            key: const Key('reminder-filter-button'),
-            onPressed: _showFilterSheet,
-            icon: const HealthVectorIcon('keyboard_arrow_down', size: 18),
-            label: Text(_filter == null ? '全部' : _typeLabel(_filter!)),
-          ),
-        ],
-      ),
-      body: records.when(
-        skipLoadingOnRefresh: true,
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, stackTrace) => Center(
-          child: TextButton(
-            onPressed: () => ref.invalidate(reminderListProvider),
-            child: const Text('提醒记录加载失败，点击重试'),
-          ),
-        ),
-        data: _buildRecords,
       ),
     );
   }
 
   Widget _buildRecords(List<ReminderRecord> allRecords) {
-    final records = _filter == null
+    final filtered = _filter == null
         ? allRecords
         : allRecords.where((record) => record.type == _filter).toList();
-    if (records.isEmpty) {
+    if (filtered.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(28),
@@ -96,7 +98,7 @@ class _ReminderListPageState extends ConsumerState<ReminderListPage> {
     }
 
     final groups = <String, List<ReminderRecord>>{};
-    for (final record in records) {
+    for (final record in filtered) {
       groups
           .putIfAbsent(
             _dateKey(record.triggeredAt),
@@ -349,14 +351,22 @@ class _ReminderDetailPageState extends ConsumerState<ReminderDetailPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.healthTheme.canvas,
-      appBar: AppBar(
-        backgroundColor: context.healthTheme.canvas,
-        surfaceTintColor: Colors.transparent,
-        title: const Text('提醒详情'),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(18),
-        children: <Widget>[
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 0),
+              child: HealthPageHeader(
+                title: '提醒详情',
+                onBack: () => context.pop(),
+              ),
+            ),
+            const SizedBox(height: 17),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.fromLTRB(18, 0, 18, 28),
+                children: <Widget>[
           HealthStaggeredEntrance(
             index: 0,
             child: HealthElevatedCard(
@@ -423,7 +433,11 @@ class _ReminderDetailPageState extends ConsumerState<ReminderDetailPage> {
               ],
             ),
           ],
-        ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

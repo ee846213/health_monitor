@@ -21,8 +21,6 @@ final trendAnalysisServiceProvider = Provider<TrendAnalysisService>((Ref ref) {
   return TrendAnalysisService(
     metricsRepository: ref.watch(sharedMetricsRepo),
     usageRepository: ref.watch(sharedUsageRepo),
-    ambientLightRepository: ref.watch(sharedAmbientLightRepo),
-    noiseRepository: ref.watch(sharedNoiseRepo),
   );
 });
 
@@ -38,9 +36,6 @@ final trendAnalysisViewModelProvider = FutureProvider<TrendSnapshot>((
       break;
     case TrendTab.screen:
       ref.watch(dataCollectorUsageRevisionProvider);
-      break;
-    case TrendTab.environment:
-      ref.watch(dataCollectorEnvironmentRevisionProvider);
       break;
   }
   ref.watch(dataCollectorProvider);

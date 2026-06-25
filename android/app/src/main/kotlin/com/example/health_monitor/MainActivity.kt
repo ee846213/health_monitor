@@ -6,6 +6,8 @@ import android.content.Intent
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.ContextCompat
+import com.example.health_monitor.background.AndroidReminderPolicySnapshot
+import com.example.health_monitor.background.AndroidReminderPolicyStore
 import com.example.health_monitor.background.AndroidBackgroundCaptureController
 import com.example.health_monitor.background.AndroidBackgroundCaptureExecutor
 import com.example.health_monitor.background.AndroidBackgroundCaptureRequest
@@ -15,7 +17,9 @@ import com.example.health_monitor.background.AndroidBackgroundForegroundServiceI
 import com.example.health_monitor.background.AndroidBackgroundServiceRuntimeState
 import com.example.health_monitor.background.AndroidBackgroundWorkScheduler
 import com.example.health_monitor.background.AndroidForegroundServiceOrchestrator
+import com.example.health_monitor.background.SharedPreferencesAndroidBackgroundStepDeltaStore
 import com.example.health_monitor.background.SharedPreferencesAndroidBackgroundCaptureStateStore
+import com.example.health_monitor.background.toChannelMap
 import com.example.health_monitor.background.withRuntimeServiceState
 import com.example.health_monitor.light.AndroidAmbientLightStreamHandler
 import com.example.health_monitor.stepcounter.AndroidStepCounterReader
@@ -84,6 +88,11 @@ class MainActivity : FlutterActivity() {
     private val ambientLightStreamHandler by lazy {
         AndroidAmbientLightStreamHandler(this)
     }
+    private val reminderPolicyStore by lazy {
+        AndroidReminderPolicyStore(
+            getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
+        )
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -110,7 +119,9 @@ class MainActivity : FlutterActivity() {
                 METHOD_READ_RANGE_USAGE_SUMMARIES -> handleReadRangeUsageSummaries(call, result)
                 METHOD_DRAIN_PENDING_USAGE_SUMMARIES -> handleDrainPendingUsageSummaries(result)
                 METHOD_GET_STEP_COUNTER -> handleGetStepCounter(result)
+                METHOD_DRAIN_BACKGROUND_STEP_DELTAS -> handleDrainBackgroundStepDeltas(result)
                 METHOD_DRAIN_WALKING_SCREEN_RISK_EVENTS -> handleDrainWalkingScreenRiskEvents(result)
+                METHOD_UPDATE_REMINDER_POLICY -> handleUpdateReminderPolicy(call, result)
                 else -> result.notImplemented()
             }
         }
@@ -247,10 +258,35 @@ class MainActivity : FlutterActivity() {
         result.success(payload.toChannelMap())
     }
 
+    private fun handleDrainBackgroundStepDeltas(result: MethodChannel.Result) {
+        val payload = SharedPreferencesAndroidBackgroundStepDeltaStore(
+            getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
+        ).drain().map { event -> event.toChannelMap() }
+        result.success(payload)
+    }
+
     private fun handleDrainWalkingScreenRiskEvents(result: MethodChannel.Result) {
         val payload = walkingScreenRiskEventStore.drain()
             .map { event -> event.toChannelMap() }
         result.success(payload)
+    }
+
+    private fun handleUpdateReminderPolicy(call: MethodCall, result: MethodChannel.Result) {
+        val masterEnabled = call.argument<Boolean>("masterEnabled") ?: true
+        val walkingScreenEnabled = call.argument<Boolean>("walkingScreenEnabled") ?: true
+        val dndEnabled = call.argument<Boolean>("dndEnabled") ?: false
+        val dndStartMinutes = call.argument<Int>("dndStartMinutes") ?: 0
+        val dndEndMinutes = call.argument<Int>("dndEndMinutes") ?: 0
+        reminderPolicyStore.update(
+            AndroidReminderPolicySnapshot(
+                masterEnabled = masterEnabled,
+                walkingScreenEnabled = walkingScreenEnabled,
+                dndEnabled = dndEnabled,
+                dndStartMinutes = dndStartMinutes,
+                dndEndMinutes = dndEndMinutes,
+            ),
+        )
+        result.success(true)
     }
 
     private fun hasUsageAccess(): Boolean {
@@ -318,8 +354,11 @@ class MainActivity : FlutterActivity() {
         private const val METHOD_DRAIN_PENDING_USAGE_SUMMARIES =
             "android.usage.drainPendingSummaries"
         private const val METHOD_GET_STEP_COUNTER = "android.steps.current"
+        private const val METHOD_DRAIN_BACKGROUND_STEP_DELTAS =
+            "android.steps.drainBackgroundDeltas"
         private const val METHOD_DRAIN_WALKING_SCREEN_RISK_EVENTS =
             "android.riskEvents.drainWalkingScreenRisks"
+        private const val METHOD_UPDATE_REMINDER_POLICY = "android.reminder.updatePolicy"
     }
 }
 

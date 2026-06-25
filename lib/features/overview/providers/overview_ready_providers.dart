@@ -205,13 +205,18 @@ final overviewScreenCaptionTextProvider = Provider<String>((Ref ref) {
           if (card == null) {
             return null;
           }
+          final longestHint = card.longestSingleMinutes > 0
+              ? '最长一段 ${card.longestSingleMinutes} 分钟 · '
+              : '';
           switch (card.changeDirection) {
             case DashboardChangeDirection.up:
-              return '较昨日 ↑ ${card.yesterdayDeltaMinutes.abs()} 分钟';
+              return '${longestHint}较昨日 ↑ ${card.yesterdayDeltaMinutes.abs()} 分钟';
             case DashboardChangeDirection.down:
-              return '较昨日 ↓ ${card.yesterdayDeltaMinutes.abs()} 分钟';
+              return '${longestHint}较昨日 ↓ ${card.yesterdayDeltaMinutes.abs()} 分钟';
             case DashboardChangeDirection.steady:
-              return '和昨日基本持平';
+              return longestHint.isEmpty
+                  ? '和昨日基本持平'
+                  : '${longestHint}和昨日基本持平';
           }
         }),
       ) ??

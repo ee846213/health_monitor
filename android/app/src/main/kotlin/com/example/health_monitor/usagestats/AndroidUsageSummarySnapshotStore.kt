@@ -25,6 +25,9 @@ class SharedPreferencesAndroidUsageSummarySnapshotStore(
             .put("longestContinuousUsageDurationMillis", snapshot.longestContinuousUsageDurationMillis)
             .put("topCategoryKey", snapshot.topCategoryKey)
             .put("completenessKey", snapshot.completenessKey)
+        snapshot.longestContinuousUsageStartedAtMillis?.let {
+            payload.put("longestContinuousUsageStartedAtMillis", it)
+        }
         array.put(payload)
         sharedPreferences.edit().putString(KEY_QUEUE, array.toString()).apply()
     }
@@ -46,6 +49,12 @@ class SharedPreferencesAndroidUsageSummarySnapshotStore(
                     longestContinuousUsageDurationMillis = item.optLong("longestContinuousUsageDurationMillis"),
                     topCategoryKey = item.optString("topCategoryKey", "unknown"),
                     completenessKey = item.optString("completenessKey", "full"),
+                    longestContinuousUsageStartedAtMillis =
+                        if (item.has("longestContinuousUsageStartedAtMillis")) {
+                            item.optLong("longestContinuousUsageStartedAtMillis")
+                        } else {
+                            null
+                        },
                 ),
             )
         }

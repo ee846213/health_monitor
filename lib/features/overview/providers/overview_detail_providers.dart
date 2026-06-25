@@ -3,6 +3,8 @@ import 'package:health_monitor/domain/environment/ambient_light_sample.dart';
 import 'package:health_monitor/domain/environment/noise_sample.dart';
 import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/metrics/daily_metrics.dart';
+import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
+import 'package:health_monitor/domain/motion/activity_sample.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
 import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
 import 'package:health_monitor/rules/input/rule_input.dart';
@@ -38,6 +40,20 @@ class OverviewStepDetailSnapshot {
   final List<OverviewStepTrendPoint> points;
 }
 
+class OverviewSedentaryTrendPoint {
+  const OverviewSedentaryTrendPoint({
+    required this.date,
+    required this.minutes,
+    required this.isHighlight,
+  });
+
+  final DateTime date;
+  final int minutes;
+  final bool isHighlight;
+
+  String get label => isHighlight ? '最近' : '${date.month}/${date.day}';
+}
+
 class OverviewSedentarySegmentSnapshot {
   const OverviewSedentarySegmentSnapshot({
     required this.startedAt,
@@ -57,11 +73,17 @@ class OverviewSedentaryDetailSnapshot {
     required this.totalDuration,
     required this.longestDuration,
     required this.segments,
+    this.dailyPoints = const <OverviewSedentaryTrendPoint>[],
+    this.referenceMinutes,
+    this.rangeProgress,
   });
 
   final Duration totalDuration;
   final Duration longestDuration;
   final List<OverviewSedentarySegmentSnapshot> segments;
+  final List<OverviewSedentaryTrendPoint> dailyPoints;
+  final int? referenceMinutes;
+  final double? rangeProgress;
 }
 
 class OverviewScreenUsageBucket {
@@ -147,17 +169,12 @@ final overviewSedentaryDetailProvider =
   final samples = await repository.listByWindow(
     QueryWindow.calendarDay(referenceDate: now),
   );
-  final input = RuleInput(
-    window: QueryWindow.calendarDay(referenceDate: now),
+  final window = QueryWindow.calendarDay(referenceDate: now);
+  final summary = summarizeSedentaryForWindow(
     activitySamples: samples,
-    locationSummaries: const <LocationSummary>[],
-    noiseSamples: const <NoiseSample>[],
-    ambientLightSamples: const <AmbientLightSample>[],
-    usageSummaries: const <DigitalUsageSummary>[],
-    dailyMetricsList: const <DailyMetrics>[],
-    missingDimensions: const <String>[],
+    window: window,
   );
-  final segments = input.sedentarySegments
+  final segments = summary.segments
       .map(
         (SedentaryActivitySegment segment) => OverviewSedentarySegmentSnapshot(
           startedAt: segment.startedAt,
@@ -167,20 +184,9 @@ final overviewSedentaryDetailProvider =
       )
       .toList(growable: false);
 
-  final totalDuration = segments.fold<Duration>(
-    Duration.zero,
-    (Duration total, OverviewSedentarySegmentSnapshot segment) =>
-        total + segment.duration,
-  );
-  final longestDuration = segments.fold<Duration>(
-    Duration.zero,
-    (Duration longest, OverviewSedentarySegmentSnapshot segment) =>
-        segment.duration > longest ? segment.duration : longest,
-  );
-
   return OverviewSedentaryDetailSnapshot(
-    totalDuration: totalDuration,
-    longestDuration: longestDuration,
+    totalDuration: summary.totalDuration,
+    longestDuration: summary.longestDuration,
     segments: segments,
   );
 });
@@ -233,8 +239,90 @@ final overviewScreenDetailProvider =
   );
 });
 
+class OverviewEnvironmentDetailSnapshot {
+  const OverviewEnvironmentDetailSnapshot({
+    required this.lightLabel,
+    required this.noiseLabel,
+    this.lux,
+    this.decibel,
+    this.lightCapturedAt,
+    this.noiseCapturedAt,
+  });
+
+  final String lightLabel;
+  final String noiseLabel;
+  final double? lux;
+  final double? decibel;
+  final DateTime? lightCapturedAt;
+  final DateTime? noiseCapturedAt;
+}
+
+final overviewEnvironmentDetailProvider =
+    FutureProvider<OverviewEnvironmentDetailSnapshot>((Ref ref) async {
+  ref.watch(dataCollectorEnvironmentRevisionProvider);
+  final noiseRepository = ref.watch(sharedNoiseRepo);
+  final lightRepository = ref.watch(sharedAmbientLightRepo);
+  final dashboard = ref.watch(overviewDashboardSnapshotProvider);
+  final now = dashboard?.generatedAt ?? DateTime.now();
+  final window = QueryWindow.calendarDay(referenceDate: now);
+
+  final noiseSamples = await noiseRepository.listByWindow(window);
+  final lightSamples = await lightRepository.listByWindow(window);
+
+  AmbientLightSample? latestLight;
+  for (final AmbientLightSample sample in lightSamples) {
+    if (latestLight == null ||
+        sample.capturedAt.isAfter(latestLight.capturedAt)) {
+      latestLight = sample;
+    }
+  }
+
+  NoiseSample? latestNoise;
+  for (final NoiseSample sample in noiseSamples) {
+    if (latestNoise == null ||
+        sample.capturedAt.isAfter(latestNoise.capturedAt)) {
+      latestNoise = sample;
+    }
+  }
+
+  return OverviewEnvironmentDetailSnapshot(
+    lightLabel: dashboard?.environmentSnapshot.lightLabel ?? '等待采集',
+    noiseLabel: dashboard?.environmentSnapshot.noiseLabel ?? '等待采集',
+    lux: _finiteReading(latestLight?.lux),
+    decibel: _finiteReading(latestNoise?.decibel),
+    lightCapturedAt: latestLight?.capturedAt,
+    noiseCapturedAt: latestNoise?.capturedAt,
+  );
+});
+
+double? _finiteReading(double? value) {
+  if (value == null || !value.isFinite) {
+    return null;
+  }
+  return value;
+}
+
 String _clockLabel(DateTime value) {
   final hour = value.hour.toString().padLeft(2, '0');
   final minute = value.minute.toString().padLeft(2, '0');
   return '$hour:$minute';
+}
+
+List<OverviewSedentarySegmentSnapshot> mapSedentarySegmentsForWindow({
+  required List<ActivitySample> activitySamples,
+  required QueryWindow window,
+}) {
+  return summarizeSedentaryForWindow(
+    activitySamples: activitySamples,
+    window: window,
+  )
+      .segments
+      .map(
+        (SedentaryActivitySegment segment) => OverviewSedentarySegmentSnapshot(
+          startedAt: segment.startedAt,
+          endedAt: segment.endedAt,
+          duration: segment.duration,
+        ),
+      )
+      .toList(growable: false);
 }

@@ -153,6 +153,12 @@ class AndroidUsageStatsBridge {
         milliseconds:
             payload['longestContinuousUsageDurationMillis'] as int? ?? 0,
       ),
+      longestContinuousUsageStartedAt:
+          payload['longestContinuousUsageStartedAtMillis'] is int
+              ? DateTime.fromMillisecondsSinceEpoch(
+                  payload['longestContinuousUsageStartedAtMillis'] as int,
+                )
+              : null,
       topCategory: UsageCategory.values.firstWhere(
         (item) => item.name == (payload['topCategoryKey'] as String? ?? ''),
         orElse: () => UsageCategory.unknown,

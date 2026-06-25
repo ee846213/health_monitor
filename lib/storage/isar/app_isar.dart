@@ -12,6 +12,7 @@ import 'package:health_monitor/storage/isar/collections/location_summary_record.
 import 'package:health_monitor/storage/isar/collections/noise_sample_record.dart';
 import 'package:health_monitor/storage/isar/collections/notification_preference_record.dart';
 import 'package:health_monitor/storage/isar/collections/posture_sample_record.dart';
+import 'package:health_monitor/storage/isar/collections/reminder_preferences_record.dart';
 import 'package:health_monitor/storage/isar/collections/reminder_record_entity.dart';
 import 'package:health_monitor/storage/isar/collections/usage_summary_record.dart';
 import 'package:isar/isar.dart';
@@ -31,6 +32,7 @@ final List<CollectionSchema<dynamic>> appIsarSchemas =
   UsageSummaryRecordSchema,
   DailyMetricsRecordSchema,
   NotificationPreferenceRecordSchema,
+  ReminderPreferencesRecordSchema,
   AiSuggestionCacheRecordSchema,
   ReminderRecordEntitySchema,
 ];
