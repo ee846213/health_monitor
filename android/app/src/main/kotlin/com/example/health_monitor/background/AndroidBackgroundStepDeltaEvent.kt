@@ -5,6 +5,7 @@ data class AndroidBackgroundStepDeltaEvent(
     val capturedAtMillis: Long,
     val stepDelta: Int,
     val dayStepTotal: Int,
+    val stationaryDurationMillis: Long = 0L,
 )
 
 fun AndroidBackgroundStepDeltaEvent.toChannelMap(): Map<String, Any?> {
@@ -13,5 +14,6 @@ fun AndroidBackgroundStepDeltaEvent.toChannelMap(): Map<String, Any?> {
         "capturedAtMillis" to capturedAtMillis,
         "stepDelta" to stepDelta,
         "dayStepTotal" to dayStepTotal,
+        "stationaryDurationMillis" to stationaryDurationMillis,
     )
 }

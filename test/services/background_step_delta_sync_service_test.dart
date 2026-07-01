@@ -10,7 +10,8 @@ import 'package:health_monitor/storage/repositories/query_window.dart';
 
 void main() {
   test('后台步数增量应写入活动样本并更新日指标', () async {
-    final activityRepository = InMemoryActivityRepository(samples: <ActivitySample>[]);
+    final activityRepository =
+        InMemoryActivityRepository(samples: <ActivitySample>[]);
     final metricsRepository = _MemoryMetricsRepository();
     final service = BackgroundStepDeltaSyncService(
       bridge: _FakeStepDeltaBridge(
@@ -97,6 +98,82 @@ void main() {
     );
     expect(samples.last.capturedAt.hour, 18);
   });
+  test('后台无步数变化事件应补写静止片段用于久坐统计', () async {
+    final activityRepository =
+        InMemoryActivityRepository(samples: <ActivitySample>[]);
+    final metricsRepository = _MemoryMetricsRepository();
+    final service = BackgroundStepDeltaSyncService(
+      bridge: _FakeStepDeltaBridge(
+        events: <BackgroundStepDeltaEvent>[
+          BackgroundStepDeltaEvent(
+            eventId: 'stationary-1',
+            capturedAt: DateTime(2026, 6, 22, 10, 45),
+            stepDelta: 0,
+            dayStepTotal: 1200,
+            stationaryDuration: const Duration(minutes: 45),
+          ),
+        ],
+      ),
+      activityRepository: activityRepository,
+      metricsRepository: metricsRepository,
+    );
+
+    final syncedCount = await service.syncDrainedEvents();
+
+    expect(syncedCount, 1);
+    final samples = await activityRepository.listByWindow(
+      QueryWindow.calendarDay(referenceDate: DateTime(2026, 6, 22)),
+    );
+    expect(samples, hasLength(1));
+    expect(samples.single.type, ActivityType.stationary);
+    expect(samples.single.capturedAt, DateTime(2026, 6, 22, 10));
+    expect(samples.single.duration, const Duration(minutes: 45));
+    expect(samples.single.isSedentary, isTrue);
+  });
+
+  test('Health Connect 覆盖同小时步数时仍保留后台静止片段', () async {
+    final activityRepository = InMemoryActivityRepository(
+      samples: <ActivitySample>[
+        ActivitySample(
+          capturedAt: DateTime(2026, 6, 22, 10),
+          duration: const Duration(hours: 1),
+          type: ActivityType.walking,
+          confidence: 0.85,
+          stepCount: 3200,
+          source: MotionSampleSource.healthConnectHourly,
+        ),
+      ],
+    );
+    final metricsRepository = _MemoryMetricsRepository();
+    final service = BackgroundStepDeltaSyncService(
+      bridge: _FakeStepDeltaBridge(
+        events: <BackgroundStepDeltaEvent>[
+          BackgroundStepDeltaEvent(
+            eventId: 'stationary-1',
+            capturedAt: DateTime(2026, 6, 22, 10, 45),
+            stepDelta: 0,
+            dayStepTotal: 3200,
+            stationaryDuration: const Duration(minutes: 15),
+          ),
+        ],
+      ),
+      activityRepository: activityRepository,
+      metricsRepository: metricsRepository,
+    );
+
+    final syncedCount = await service.syncDrainedEvents();
+
+    expect(syncedCount, 1);
+    final samples = await activityRepository.listByWindow(
+      QueryWindow.calendarDay(referenceDate: DateTime(2026, 6, 22)),
+    );
+    expect(
+      samples.where(
+        (ActivitySample sample) => sample.type == ActivityType.stationary,
+      ),
+      hasLength(1),
+    );
+  });
 }
 
 class _FakeStepDeltaBridge extends AndroidStepDeltaBridge {
@@ -128,7 +205,8 @@ class _MemoryMetricsRepository implements MetricsRepository {
   }
 
   @override
-  Future<List<DailyMetrics>> listRecentDays(int days, {DateTime? referenceDate}) {
+  Future<List<DailyMetrics>> listRecentDays(int days,
+      {DateTime? referenceDate}) {
     throw UnimplementedError();
   }
 }

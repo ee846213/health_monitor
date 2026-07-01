@@ -58,6 +58,16 @@ class _AppLifecycleRefreshScopeState
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _runStartupSyncAfterFirstFrame();
+    });
+  }
+
+  void _runStartupSyncAfterFirstFrame() {
+    // 首帧先让应用壳可见；后台采集、使用统计和风险事件同步随后进入异步链路。
     unawaited(
         ref.read(androidBackgroundCaptureBootstrapServiceProvider).sync());
     unawaited(ref.read(dataCollectorProvider).syncUsageSummary());

@@ -31,7 +31,7 @@ class AndroidBackgroundStepDeltaRecorder(
                 stop()
                 return
             }
-            recordDeltaIfNeeded()
+            recordDeltaIfNeeded(allowStationaryEvent = true)
             handler.postDelayed(this, pollIntervalMillis)
         }
     }
@@ -48,7 +48,7 @@ class AndroidBackgroundStepDeltaRecorder(
             return
         }
         started = true
-        recordDeltaIfNeeded()
+        recordDeltaIfNeeded(allowStationaryEvent = false)
         handler.postDelayed(pollRunnable, pollIntervalMillis)
     }
 
@@ -60,7 +60,7 @@ class AndroidBackgroundStepDeltaRecorder(
         handler.removeCallbacks(pollRunnable)
     }
 
-    private fun recordDeltaIfNeeded() {
+    private fun recordDeltaIfNeeded(allowStationaryEvent: Boolean) {
         val payload = stepCounterReader.readCurrent()
         if (!payload.isAvailable) {
             return
@@ -92,7 +92,20 @@ class AndroidBackgroundStepDeltaRecorder(
                 sharedPreferences.edit()
                     .putInt(KEY_LAST_DAY_TOTAL, payload.stepCount)
                     .apply()
+                return
             }
+            if (!allowStationaryEvent) {
+                return
+            }
+            eventStore.append(
+                AndroidBackgroundStepDeltaEvent(
+                    eventId = "$dayKey-$now-stationary",
+                    capturedAtMillis = now,
+                    stepDelta = 0,
+                    dayStepTotal = payload.stepCount,
+                    stationaryDurationMillis = pollIntervalMillis,
+                ),
+            )
             return
         }
         sharedPreferences.edit()

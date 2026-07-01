@@ -4,6 +4,7 @@ class BackgroundStepDeltaEvent {
     required this.capturedAt,
     required this.stepDelta,
     required this.dayStepTotal,
+    this.stationaryDuration = Duration.zero,
   });
 
   factory BackgroundStepDeltaEvent.fromChannelPayload(
@@ -17,6 +18,9 @@ class BackgroundStepDeltaEvent {
           : DateTime.now(),
       stepDelta: _readInt(payload['stepDelta']),
       dayStepTotal: _readInt(payload['dayStepTotal']),
+      stationaryDuration: Duration(
+        milliseconds: _readInt(payload['stationaryDurationMillis']),
+      ),
     );
   }
 
@@ -34,6 +38,12 @@ class BackgroundStepDeltaEvent {
   final DateTime capturedAt;
   final int stepDelta;
   final int dayStepTotal;
+  final Duration stationaryDuration;
 
-  bool get isValid => eventId.isNotEmpty && stepDelta > 0;
+  bool get hasStepDelta => stepDelta > 0;
+
+  bool get hasStationaryDuration => stationaryDuration > Duration.zero;
+
+  bool get isValid =>
+      eventId.isNotEmpty && (hasStepDelta || hasStationaryDuration);
 }

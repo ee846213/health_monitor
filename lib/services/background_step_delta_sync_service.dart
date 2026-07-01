@@ -32,7 +32,8 @@ class BackgroundStepDeltaSyncService {
       return 0;
     }
 
-    final samples = filteredEvents.map(_toActivitySample).toList(growable: false);
+    final samples =
+        filteredEvents.map(_toActivitySample).toList(growable: false);
     await _activityRepository.saveAll(samples);
     await _upsertDailyMetricsFromEvents(filteredEvents);
     return filteredEvents.length;
@@ -48,7 +49,9 @@ class BackgroundStepDeltaSyncService {
         event.capturedAt.month,
         event.capturedAt.day,
       );
-      eventsByDay.putIfAbsent(dayStart, () => <BackgroundStepDeltaEvent>[]).add(event);
+      eventsByDay
+          .putIfAbsent(dayStart, () => <BackgroundStepDeltaEvent>[])
+          .add(event);
     }
 
     final filtered = <BackgroundStepDeltaEvent>[];
@@ -58,7 +61,8 @@ class BackgroundStepDeltaSyncService {
       );
       final coveredHours = healthConnectHourStarts(daySamples);
       for (final event in entry.value) {
-        if (!isCoveredByHealthConnectHour(event.capturedAt, coveredHours)) {
+        if (!event.hasStepDelta ||
+            !isCoveredByHealthConnectHour(event.capturedAt, coveredHours)) {
           filtered.add(event);
         }
       }
@@ -67,6 +71,17 @@ class BackgroundStepDeltaSyncService {
   }
 
   ActivitySample _toActivitySample(BackgroundStepDeltaEvent event) {
+    if (event.hasStationaryDuration) {
+      return ActivitySample(
+        capturedAt: event.capturedAt.subtract(event.stationaryDuration),
+        duration: event.stationaryDuration,
+        type: ActivityType.stationary,
+        confidence: 0.72,
+        stepCount: 0,
+        source: MotionSampleSource.platformActivity,
+      );
+    }
+
     return ActivitySample(
       capturedAt: event.capturedAt,
       duration: const Duration(seconds: 1),

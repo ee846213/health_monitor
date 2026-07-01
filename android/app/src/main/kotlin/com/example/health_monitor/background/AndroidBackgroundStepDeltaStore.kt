@@ -72,6 +72,7 @@ private fun AndroidBackgroundStepDeltaEvent.toJson(): JSONObject {
         put("capturedAtMillis", capturedAtMillis)
         put("stepDelta", stepDelta)
         put("dayStepTotal", dayStepTotal)
+        put("stationaryDurationMillis", stationaryDurationMillis)
     }
 }
 
@@ -81,5 +82,6 @@ private fun JSONObject.toEvent(): AndroidBackgroundStepDeltaEvent {
         capturedAtMillis = optLong("capturedAtMillis"),
         stepDelta = optInt("stepDelta"),
         dayStepTotal = optInt("dayStepTotal"),
+        stationaryDurationMillis = optLong("stationaryDurationMillis"),
     )
 }
