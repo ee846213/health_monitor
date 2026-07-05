@@ -33,6 +33,7 @@ import 'package:health_monitor/storage/repositories/notification_preference_repo
 import 'package:health_monitor/storage/repositories/query_window.dart';
 import 'package:health_monitor/storage/repositories/reminder_repository.dart';
 import 'package:health_monitor/storage/repositories/usage_summary_repository.dart';
+import 'package:health_monitor/rules/input/rule_input.dart';
 import 'package:health_monitor/services/android_risk_event_bridge.dart';
 import 'package:health_monitor/services/android_step_delta_bridge.dart';
 import 'package:health_monitor/services/background_step_delta_sync_service.dart';
@@ -43,6 +44,9 @@ import 'package:health_monitor/storage/repositories/reminder_preferences_reposit
 
 typedef DataCollectorRevisionCallback = void Function();
 typedef DataCollectorDayRevisionCallback = void Function(DateTime changedAt);
+typedef SyncHealthConnectStepsForDay = Future<HealthConnectStepSyncResult>
+    Function(DateTime referenceTime);
+typedef SyncBackgroundStepDeltas = Future<int> Function();
 
 class SharedActivityRepository extends InMemoryActivityRepository {
   SharedActivityRepository() : super(samples: <ActivitySample>[]);
@@ -421,6 +425,9 @@ class DataCollector {
     Future<void> Function(DateTime referenceTime)? persistRuleReminders,
     Future<void> Function(DateTime referenceTime)? deliverRuleReminders,
     Future<int> Function()? syncNativeRiskEvents,
+    SyncHealthConnectStepsForDay? syncHealthConnectStepsForDay,
+    SyncBackgroundStepDeltas? syncBackgroundStepDeltas,
+    int healthConnectBackfillDays = _maxHealthConnectBackfillDays,
     Duration dailyMetricsRefreshInterval = const Duration(seconds: 30),
     int maxBufferedSamplesPerStream = 120,
     Duration rawSampleRetention = const Duration(days: 9),
@@ -460,6 +467,30 @@ class DataCollector {
         _persistRuleReminders = persistRuleReminders,
         _deliverRuleReminders = deliverRuleReminders,
         _syncNativeRiskEvents = syncNativeRiskEvents,
+        _syncHealthConnectStepsForDay = syncHealthConnectStepsForDay ??
+            ((DateTime syncReferenceTime) {
+              final platformBridge = PlatformBridgeService();
+              return HealthConnectStepSyncService(
+                bridge: HealthConnectBridge(
+                  platformBridgeService: platformBridge,
+                ),
+                activityRepository: activityRepository,
+                metricsRepository: metricsRepository,
+              ).syncForDay(referenceTime: syncReferenceTime);
+            }),
+        _syncBackgroundStepDeltas = syncBackgroundStepDeltas ??
+            (() {
+              final platformBridge = PlatformBridgeService();
+              return BackgroundStepDeltaSyncService(
+                bridge: AndroidStepDeltaBridge(
+                  platformBridgeService: platformBridge,
+                ),
+                activityRepository: activityRepository,
+                metricsRepository: metricsRepository,
+              ).syncDrainedEvents();
+            }),
+        _healthConnectBackfillDays =
+            _clampHealthConnectBackfillDays(healthConnectBackfillDays),
         _batchFlushInterval = dailyMetricsRefreshInterval,
         _maxBufferedSamplesPerStream = maxBufferedSamplesPerStream,
         _rawSampleRetention = rawSampleRetention;
@@ -488,6 +519,9 @@ class DataCollector {
   final Future<void> Function(DateTime referenceTime)? _persistRuleReminders;
   final Future<void> Function(DateTime referenceTime)? _deliverRuleReminders;
   final Future<int> Function()? _syncNativeRiskEvents;
+  final SyncHealthConnectStepsForDay _syncHealthConnectStepsForDay;
+  final SyncBackgroundStepDeltas _syncBackgroundStepDeltas;
+  final int _healthConnectBackfillDays;
   final Duration _batchFlushInterval;
   final int _maxBufferedSamplesPerStream;
   final Duration _rawSampleRetention;
@@ -544,7 +578,7 @@ class DataCollector {
     _markStreamStarted(streamNativeRisk);
     unawaited(syncNativeRiskEvents());
     unawaited(syncUsageSummary());
-    unawaited(_rebuildDailyMetrics(DateTime.now()));
+    unawaited(_rebuildRecentDailyMetrics(DateTime.now()));
     unawaited(_runRetentionCleanupIfNeeded(DateTime.now()));
     _startReminderDeliveryRetryTimer();
     resumeForegroundCapture();
@@ -653,10 +687,13 @@ class DataCollector {
     _foregroundCaptureActive = false;
     _batchFlushTimer?.cancel();
     _batchFlushTimer = null;
-    for (final subscription in _captureSubscriptions) {
+    final subscriptions = List<StreamSubscription<dynamic>>.from(
+      _captureSubscriptions,
+    );
+    _captureSubscriptions.clear();
+    for (final subscription in subscriptions) {
       await subscription.cancel();
     }
-    _captureSubscriptions.clear();
     await flushPendingSamples();
   }
 
@@ -867,56 +904,7 @@ class DataCollector {
     var changed = false;
     for (final dayKey in dayKeys) {
       final referenceTime = _dateFromDayKey(dayKey);
-      final existing = await metricsRepository.getByDate(referenceTime) ??
-          DailyMetrics(
-            date: referenceTime,
-            stepCount: 0,
-            sedentaryDuration: Duration.zero,
-            screenOnDuration: Duration.zero,
-            outdoorDuration: Duration.zero,
-            postureRiskCount: 0,
-            highNoiseExposureDuration: Duration.zero,
-          );
-      final dayActivities = activities
-          .where((sample) => _dayKey(sample.capturedAt) == dayKey)
-          .toList(growable: false);
-      final dayNoises = noises
-          .where((sample) => _dayKey(sample.capturedAt) == dayKey)
-          .toList(growable: false);
-      final dayLocations = locations
-          .where((summary) => _dayKey(summary.date) == dayKey)
-          .toList(growable: false);
-      final dayLocation = dayLocations.isEmpty ? null : dayLocations.last;
-      final liveSteps = stepState?.isAvailable == true &&
-              _dayKey(stepState!.capturedAt) == dayKey
-          ? stepState.stepCount
-          : 0;
-      final next = DailyMetrics(
-        date: referenceTime,
-        stepCount:
-            existing.stepCount > liveSteps ? existing.stepCount : liveSteps,
-        sedentaryDuration: existing.sedentaryDuration +
-            dayActivities
-                .where((sample) => sample.type == ActivityType.stationary)
-                .fold<Duration>(
-                  Duration.zero,
-                  (total, sample) => total + sample.duration,
-                ),
-        screenOnDuration: existing.screenOnDuration,
-        outdoorDuration:
-            dayLocation?.outdoorDuration ?? existing.outdoorDuration,
-        postureRiskCount: existing.postureRiskCount +
-            dayActivities.where((sample) => sample.isSedentary).length,
-        highNoiseExposureDuration: existing.highNoiseExposureDuration +
-            dayNoises
-                .where((sample) => sample.level == NoiseLevel.loud)
-                .fold<Duration>(
-                  Duration.zero,
-                  (total, sample) => total + sample.duration,
-                ),
-      );
-      await metricsRepository.upsertMetrics(next);
-      changed = await _publishMetricsChanged(next, referenceTime) || changed;
+      changed = await _rebuildDailyMetrics(referenceTime) || changed;
     }
     return changed;
   }
@@ -984,19 +972,38 @@ class DataCollector {
 
   Future<void> _syncNativeStepCountOnce({DateTime? referenceTime}) async {
     final now = referenceTime ?? DateTime.now();
-    final platformBridge = PlatformBridgeService();
+    var syncedHistoricalSteps = false;
+    var healthConnectReadDayCount = 0;
+    var healthConnectSyncedDayCount = 0;
 
-    await HealthConnectStepSyncService(
-      bridge: HealthConnectBridge(platformBridgeService: platformBridge),
-      activityRepository: activityRepository,
-      metricsRepository: metricsRepository,
-    ).syncForDay(referenceTime: now);
+    final syncReferenceTimes = await _nativeStepSyncReferenceTimes(now);
+    for (final syncReferenceTime in syncReferenceTimes) {
+      final result = await _syncHealthConnectStepsForDay(syncReferenceTime);
+      if (result.outcome == HealthConnectStepSyncOutcome.unavailable ||
+          result.outcome == HealthConnectStepSyncOutcome.permissionDenied) {
+        break;
+      }
+      if (result.outcome == HealthConnectStepSyncOutcome.synced ||
+          result.outcome == HealthConnectStepSyncOutcome.empty) {
+        healthConnectReadDayCount += 1;
+      }
+      if (!result.didSync) {
+        continue;
+      }
+      healthConnectSyncedDayCount += 1;
+      if (_dayKey(syncReferenceTime) == _dayKey(now)) {
+        continue;
+      }
+      // 跨日或多日后打开应用时，Health Connect 小时桶需要回填到历史日指标。
+      // 历史日重建不触发提醒投递，避免把过去几天的规则提醒当作当前提醒发出。
+      await _rebuildDailyMetrics(
+        syncReferenceTime,
+        evaluateReminders: false,
+      );
+      syncedHistoricalSteps = true;
+    }
 
-    final drainedCount = await BackgroundStepDeltaSyncService(
-      bridge: AndroidStepDeltaBridge(platformBridgeService: platformBridge),
-      activityRepository: activityRepository,
-      metricsRepository: metricsRepository,
-    ).syncDrainedEvents();
+    final drainedCount = await _syncBackgroundStepDeltas();
 
     final stepState = await _stepCounterService.readCurrent();
     if (stepState.isAvailable) {
@@ -1008,7 +1015,19 @@ class DataCollector {
     await _rebuildDailyMetrics(now);
     final metricsChanged = _lastDailyMetricsSignature != signatureBefore;
 
-    if (drainedCount > 0 || stepState.isAvailable || metricsChanged) {
+    if (healthConnectReadDayCount > 0) {
+      await _captureHealthService.recordNativeSummaryDrained(
+        streamHealthConnectSteps,
+        detail: 'Health Connect 步数回补已检查 $healthConnectReadDayCount 天，'
+            '其中 $healthConnectSyncedDayCount 天写入小时步数桶。',
+      );
+    }
+
+    if (drainedCount > 0 ||
+        syncedHistoricalSteps ||
+        healthConnectReadDayCount > 0 ||
+        stepState.isAvailable ||
+        metricsChanged) {
       if (drainedCount > 0) {
         await _captureHealthService.recordNativeSummaryDrained(
           streamSteps,
@@ -1016,10 +1035,23 @@ class DataCollector {
         );
       }
       _onDataChanged?.call();
-      if (metricsChanged) {
+      if (metricsChanged || syncedHistoricalSteps) {
         _onMetricsChanged?.call();
       }
     }
+  }
+
+  Future<List<DateTime>> _nativeStepSyncReferenceTimes(
+    DateTime referenceTime,
+  ) async {
+    // Health Connect 的步数来源可能在用户授权后才开始同步，或由系统/健康 App 延迟写入。
+    // 因此 checkpoint 只能作为健康事件记录，不能用来截断历史窗口；否则一次空读就会让
+    // 昨天/前几天永远不再回补。这里固定滚动检查最近 30 天以内的窗口。
+    return _buildNativeStepSyncReferenceTimes(
+      referenceTime,
+      lastSyncedAt: null,
+      maxBackfillDays: _healthConnectBackfillDays,
+    );
   }
 
   void _startReminderDeliveryRetryTimer() {
@@ -1042,7 +1074,7 @@ class DataCollector {
     if (_deliverRuleReminders == null) {
       return;
     }
-    await _deliverRuleReminders!.call(referenceTime);
+    await _deliverRuleReminders.call(referenceTime);
   }
 
   Future<void> syncUsageSummary({
@@ -1247,7 +1279,21 @@ class DataCollector {
     await _publishMetricsChanged(next, dayStart);
   }
 
-  Future<void> _rebuildDailyMetrics(DateTime referenceTime) async {
+  Future<void> _rebuildRecentDailyMetrics(DateTime referenceTime) async {
+    final days =
+        _rawSampleRetention.inDays < 1 ? 1 : _rawSampleRetention.inDays;
+    for (var offset = days - 1; offset >= 0; offset -= 1) {
+      await _rebuildDailyMetrics(
+        _dayStart(referenceTime).subtract(Duration(days: offset)),
+        evaluateReminders: false,
+      );
+    }
+  }
+
+  Future<bool> _rebuildDailyMetrics(
+    DateTime referenceTime, {
+    bool evaluateReminders = true,
+  }) async {
     final dayStart = DateTime(
       referenceTime.year,
       referenceTime.month,
@@ -1271,13 +1317,6 @@ class DataCollector {
     final usageSummary = await usageFuture;
     final existingMetrics = await existingFuture;
 
-    final sedentaryDuration = dayActivities
-        .where(
-            (ActivitySample sample) => sample.type == ActivityType.stationary)
-        .fold<Duration>(
-          Duration.zero,
-          (Duration total, ActivitySample sample) => total + sample.duration,
-        );
     final activityStepCount = dayActivities.fold<int>(
       0,
       (int total, ActivitySample sample) => total + sample.stepCount,
@@ -1288,6 +1327,21 @@ class DataCollector {
         ? latestStepState.stepCount
         : 0;
     final persistedStepCount = existingMetrics?.stepCount ?? 0;
+    if (existingMetrics == null &&
+        dayActivities.isEmpty &&
+        dayNoises.isEmpty &&
+        locationSummary.isEmpty &&
+        usageSummary == null &&
+        liveStepCount == 0) {
+      return false;
+    }
+    final window = QueryWindow.calendarDay(referenceDate: dayStart);
+    final sedentarySummary = dayActivities.isEmpty
+        ? null
+        : summarizeSedentaryForWindow(
+            activitySamples: dayActivities,
+            window: window,
+          );
     // 当日步数是累计值。其他传感器先于计步流刷新时，不能用活动样本中的占位 0
     // 覆盖已经落库的系统步数；系统计步短暂回退时也保留当天已确认的最大值。
     final stepCount = <int>[
@@ -1305,24 +1359,31 @@ class DataCollector {
     final nextMetrics = DailyMetrics(
       date: dayStart,
       stepCount: stepCount,
-      sedentaryDuration: sedentaryDuration,
+      sedentaryDuration: sedentarySummary?.totalDuration ??
+          existingMetrics?.sedentaryDuration ??
+          Duration.zero,
       screenOnDuration: usageSummary?.screenOnDuration ?? Duration.zero,
       outdoorDuration: locationSummary.isNotEmpty
           ? locationSummary.last.outdoorDuration
           : Duration.zero,
-      postureRiskCount: dayActivities
-          .where((ActivitySample sample) => sample.isSedentary)
-          .length,
+      postureRiskCount: sedentarySummary?.segments.length ??
+          existingMetrics?.postureRiskCount ??
+          0,
       highNoiseExposureDuration: highNoiseExposureDuration,
     );
     await metricsRepository.upsertMetrics(nextMetrics);
-    await _publishMetricsChanged(nextMetrics, referenceTime);
+    return _publishMetricsChanged(
+      nextMetrics,
+      referenceTime,
+      evaluateReminders: evaluateReminders,
+    );
   }
 
   Future<bool> _publishMetricsChanged(
     DailyMetrics nextMetrics,
-    DateTime referenceTime,
-  ) async {
+    DateTime referenceTime, {
+    bool evaluateReminders = true,
+  }) async {
     final nextSignature = _DailyMetricsSignature.fromMetrics(nextMetrics);
     if (_lastDailyMetricsSignature != null &&
         _lastDailyMetricsSignature == nextSignature) {
@@ -1336,8 +1397,9 @@ class DataCollector {
     );
     final now = DateTime.now();
     final lastEvaluationAt = _lastReminderEvaluationAt;
-    if (lastEvaluationAt == null ||
-        now.difference(lastEvaluationAt) >= const Duration(minutes: 5)) {
+    if (evaluateReminders &&
+        (lastEvaluationAt == null ||
+            now.difference(lastEvaluationAt) >= const Duration(minutes: 5))) {
       _lastReminderEvaluationAt = now;
       if (_persistRuleReminders != null) {
         await _persistRuleReminders.call(referenceTime);
@@ -1605,6 +1667,52 @@ DateTime _dateFromDayKey(String dayKey) {
     int.parse(parts[1]),
     int.parse(parts[2]),
   );
+}
+
+const int _maxHealthConnectBackfillDays = 30;
+
+int _clampHealthConnectBackfillDays(int days) {
+  if (days < 1) {
+    return 1;
+  }
+  if (days > _maxHealthConnectBackfillDays) {
+    return _maxHealthConnectBackfillDays;
+  }
+  return days;
+}
+
+List<DateTime> _buildNativeStepSyncReferenceTimes(
+  DateTime referenceTime, {
+  required DateTime? lastSyncedAt,
+  required int maxBackfillDays,
+}) {
+  final todayStart = _dayStart(referenceTime);
+  final clampedBackfillDays = _clampHealthConnectBackfillDays(maxBackfillDays);
+  final earliestStart = todayStart.subtract(
+    Duration(days: clampedBackfillDays - 1),
+  );
+  final startDay = lastSyncedAt == null
+      ? earliestStart
+      : _maxDateTime(_dayStart(lastSyncedAt), earliestStart);
+  final result = <DateTime>[];
+  var cursor = startDay;
+  while (!cursor.isAfter(todayStart)) {
+    if (_dayKey(cursor) == _dayKey(todayStart)) {
+      result.add(referenceTime);
+    } else {
+      result.add(
+        cursor.add(const Duration(days: 1)).subtract(
+              const Duration(milliseconds: 1),
+            ),
+      );
+    }
+    cursor = cursor.add(const Duration(days: 1));
+  }
+  return result;
+}
+
+DateTime _maxDateTime(DateTime left, DateTime right) {
+  return left.isAfter(right) ? left : right;
 }
 
 List<DigitalUsageSummary> _dedupeUsageSummaries(

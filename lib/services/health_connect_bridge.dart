@@ -8,7 +8,8 @@ class HealthConnectBridge {
   HealthConnectBridge({
     PlatformBridgeService? platformBridgeService,
     bool Function()? isAndroid,
-  })  : _platformBridgeService = platformBridgeService ?? PlatformBridgeService(),
+  })  : _platformBridgeService =
+            platformBridgeService ?? PlatformBridgeService(),
         _isAndroid = isAndroid ?? (() => Platform.isAndroid);
 
   final PlatformBridgeService _platformBridgeService;
@@ -24,9 +25,16 @@ class HealthConnectBridge {
     }
     try {
       final payload = await _platformBridgeService.methodChannel
-              .invokeMapMethod<Object?, Object?>('android.healthConnect.getStatus') ??
+              .invokeMapMethod<Object?, Object?>(
+                  'android.healthConnect.getStatus') ??
           const <Object?, Object?>{};
       return HealthConnectStatus.fromChannelPayload(payload);
+    } on MissingPluginException {
+      return const HealthConnectStatus(
+        isAvailable: false,
+        hasStepsPermission: false,
+        needsInstall: false,
+      );
     } on PlatformException {
       return const HealthConnectStatus(
         isAvailable: false,
@@ -45,7 +53,8 @@ class HealthConnectBridge {
     }
     try {
       final payload = await _platformBridgeService.methodChannel
-          .invokeListMethod<Object?>('android.healthConnect.readHourlySteps', <String, Object>{
+          .invokeListMethod<Object?>(
+              'android.healthConnect.readHourlySteps', <String, Object>{
         'startMillis': startAt.millisecondsSinceEpoch,
         'endMillis': endAt.millisecondsSinceEpoch,
       });
@@ -54,6 +63,8 @@ class HealthConnectBridge {
               .where((HourlyStepBucket item) => item.isValid)
               .toList(growable: false) ??
           const <HourlyStepBucket>[];
+    } on MissingPluginException {
+      return const <HourlyStepBucket>[];
     } on PlatformException {
       return const <HourlyStepBucket>[];
     }
@@ -69,6 +80,8 @@ class HealthConnectBridge {
         'android.healthConnect.requestPermissions',
       );
       return payload?['granted'] as bool? ?? false;
+    } on MissingPluginException {
+      return false;
     } on PlatformException {
       return false;
     }
@@ -82,6 +95,8 @@ class HealthConnectBridge {
       return await _platformBridgeService.methodChannel
               .invokeMethod<bool>('android.healthConnect.openSettings') ??
           false;
+    } on MissingPluginException {
+      return false;
     } on PlatformException {
       return false;
     }

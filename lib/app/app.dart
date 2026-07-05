@@ -70,6 +70,7 @@ class _AppLifecycleRefreshScopeState
     // 首帧先让应用壳可见；后台采集、使用统计和风险事件同步随后进入异步链路。
     unawaited(
         ref.read(androidBackgroundCaptureBootstrapServiceProvider).sync());
+    unawaited(ref.read(dataCollectorProvider).syncNativeStepCount());
     unawaited(ref.read(dataCollectorProvider).syncUsageSummary());
     unawaited(ref.read(dataCollectorProvider).syncNativeRiskEvents());
   }

@@ -9,6 +9,7 @@ import 'package:health_monitor/app/widgets/health_motion_widgets.dart';
 import 'package:health_monitor/domain/trends/trend_snapshot.dart';
 
 const int _trendVisibleSlots = 7;
+const double _trendLineCurveSmoothness = 0.16;
 
 class TrendChartPanel extends StatefulWidget {
   const TrendChartPanel({super.key, required this.snapshot});
@@ -299,7 +300,7 @@ class _TrendScrollableChart extends StatelessWidget {
                       LineChartBarData(
                         spots: visibleSpots,
                         isCurved: true,
-                        curveSmoothness: 0.28,
+                        curveSmoothness: _trendLineCurveSmoothness,
                         color: accent,
                         barWidth: 3,
                         isStrokeCapRound: true,

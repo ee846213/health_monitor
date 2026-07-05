@@ -3,6 +3,7 @@ package com.example.health_monitor.healthconnect
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
@@ -84,27 +85,41 @@ class AndroidHealthConnectReader(
     }
 
     fun openHealthConnectSettings(): Boolean {
-        val intent = Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS)
+        val appPermissionIntent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            Intent(ACTION_MANAGE_HEALTH_PERMISSIONS)
+                .putExtra(Intent.EXTRA_PACKAGE_NAME, context.packageName)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        } else {
+            null
+        }
+        val fallbackIntent = Intent(HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val openedSettings = listOfNotNull(appPermissionIntent, fallbackIntent)
+            .any { intent ->
+                runCatching {
+                    context.startActivity(intent)
+                    true
+                }.getOrDefault(false)
+            }
+        if (openedSettings) {
+            return true
+        }
         return runCatching {
-            context.startActivity(intent)
-            true
-        }.getOrElse {
             val marketIntent = Intent(
                 Intent.ACTION_VIEW,
                 Uri.parse("market://details?id=com.google.android.apps.healthdata"),
             ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            runCatching {
-                context.startActivity(marketIntent)
-                true
-            }.getOrDefault(false)
-        }
+            context.startActivity(marketIntent)
+            true
+        }.getOrDefault(false)
     }
 
     companion object {
         private val STEP_READ_PERMISSIONS = setOf(
             HealthPermission.getReadPermission(StepsRecord::class),
         )
+        private const val ACTION_MANAGE_HEALTH_PERMISSIONS =
+            "android.health.connect.action.MANAGE_HEALTH_PERMISSIONS"
     }
 
     fun canReadHourlySteps(): Boolean {

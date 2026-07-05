@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:health_monitor/domain/metrics/daily_metrics.dart';
 import 'package:health_monitor/domain/motion/activity_sample.dart';
 import 'package:health_monitor/domain/motion/background_step_delta_event.dart';
+import 'package:health_monitor/domain/motion/native_step_day_summary.dart';
 import 'package:health_monitor/services/android_step_delta_bridge.dart';
 import 'package:health_monitor/services/background_step_delta_sync_service.dart';
 import 'package:health_monitor/storage/repositories/activity_repository.dart';
@@ -9,6 +10,70 @@ import 'package:health_monitor/storage/repositories/metrics_repository.dart';
 import 'package:health_monitor/storage/repositories/query_window.dart';
 
 void main() {
+  test('普通计步历史天汇总应写入跨日日指标', () async {
+    final activityRepository =
+        InMemoryActivityRepository(samples: <ActivitySample>[]);
+    final metricsRepository = _MemoryMetricsRepository();
+    final service = BackgroundStepDeltaSyncService(
+      bridge: _FakeStepDeltaBridge(
+        events: const <BackgroundStepDeltaEvent>[],
+        historicalSummaries: <NativeStepDaySummary>[
+          NativeStepDaySummary(
+            date: DateTime(2026, 7, 4),
+            capturedAt: DateTime(2026, 7, 4, 23, 58),
+            stepCount: 4860,
+          ),
+        ],
+      ),
+      activityRepository: activityRepository,
+      metricsRepository: metricsRepository,
+    );
+
+    final syncedCount = await service.syncDrainedEvents();
+
+    expect(syncedCount, 1);
+    final metrics = await metricsRepository.getByDate(DateTime(2026, 7, 4));
+    expect(metrics?.stepCount, 4860);
+  });
+
+  test('普通计步历史不应覆盖已有更高步数', () async {
+    final activityRepository =
+        InMemoryActivityRepository(samples: <ActivitySample>[]);
+    final metricsRepository = _MemoryMetricsRepository()
+      ..seed(
+        DailyMetrics(
+          date: DateTime(2026, 7, 4),
+          stepCount: 6200,
+          sedentaryDuration: const Duration(minutes: 40),
+          screenOnDuration: const Duration(minutes: 120),
+          outdoorDuration: Duration.zero,
+          postureRiskCount: 1,
+          highNoiseExposureDuration: Duration.zero,
+        ),
+      );
+    final service = BackgroundStepDeltaSyncService(
+      bridge: _FakeStepDeltaBridge(
+        events: const <BackgroundStepDeltaEvent>[],
+        historicalSummaries: <NativeStepDaySummary>[
+          NativeStepDaySummary(
+            date: DateTime(2026, 7, 4),
+            capturedAt: DateTime(2026, 7, 4, 23, 58),
+            stepCount: 4860,
+          ),
+        ],
+      ),
+      activityRepository: activityRepository,
+      metricsRepository: metricsRepository,
+    );
+
+    final syncedCount = await service.syncDrainedEvents();
+
+    expect(syncedCount, 0);
+    final metrics = await metricsRepository.getByDate(DateTime(2026, 7, 4));
+    expect(metrics?.stepCount, 6200);
+    expect(metrics?.screenOnDuration, const Duration(minutes: 120));
+  });
+
   test('后台步数增量应写入活动样本并更新日指标', () async {
     final activityRepository =
         InMemoryActivityRepository(samples: <ActivitySample>[]);
@@ -179,13 +244,22 @@ void main() {
 class _FakeStepDeltaBridge extends AndroidStepDeltaBridge {
   _FakeStepDeltaBridge({
     required this.events,
+    this.historicalSummaries = const <NativeStepDaySummary>[],
   }) : super(isAndroid: () => true);
 
   final List<BackgroundStepDeltaEvent> events;
+  final List<NativeStepDaySummary> historicalSummaries;
 
   @override
   Future<List<BackgroundStepDeltaEvent>> drainBackgroundStepDeltas() async {
     return events;
+  }
+
+  @override
+  Future<List<NativeStepDaySummary>> readHistoricalStepDays({
+    int maxDays = 30,
+  }) async {
+    return historicalSummaries;
   }
 }
 
@@ -193,6 +267,10 @@ class _MemoryMetricsRepository implements MetricsRepository {
   final Map<String, DailyMetrics> _store = <String, DailyMetrics>{};
 
   String _key(DateTime date) => '${date.year}-${date.month}-${date.day}';
+
+  void seed(DailyMetrics metrics) {
+    _store[_key(metrics.date)] = metrics;
+  }
 
   @override
   Future<DailyMetrics?> getByDate(DateTime date) async {

@@ -7,6 +7,7 @@ import 'package:health_monitor/storage/repositories/capture_health_repository.da
 
 const String streamMotion = 'motion';
 const String streamSteps = 'steps';
+const String streamHealthConnectSteps = 'steps_health_connect';
 const String streamNoise = 'noise';
 const String streamLight = 'light';
 const String streamLocation = 'location';

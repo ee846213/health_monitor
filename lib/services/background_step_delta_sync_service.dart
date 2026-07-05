@@ -1,13 +1,14 @@
 import 'package:health_monitor/domain/metrics/daily_metrics.dart';
 import 'package:health_monitor/domain/motion/activity_sample.dart';
 import 'package:health_monitor/domain/motion/background_step_delta_event.dart';
+import 'package:health_monitor/domain/motion/native_step_day_summary.dart';
 import 'package:health_monitor/domain/motion/rhythm_step_sample_dedup.dart';
 import 'package:health_monitor/services/android_step_delta_bridge.dart';
 import 'package:health_monitor/storage/repositories/activity_repository.dart';
 import 'package:health_monitor/storage/repositories/metrics_repository.dart';
 import 'package:health_monitor/storage/repositories/query_window.dart';
 
-/// 将后台定期记录的步数增量同步为活动样本，供节奏轴定位活动时段。
+/// 将后台定期记录的步数增量和普通计步历史同步到本地仓储。
 class BackgroundStepDeltaSyncService {
   const BackgroundStepDeltaSyncService({
     required AndroidStepDeltaBridge bridge,
@@ -22,21 +23,64 @@ class BackgroundStepDeltaSyncService {
   final MetricsRepository _metricsRepository;
 
   Future<int> syncDrainedEvents() async {
+    final syncedHistoryCount = await _syncHistoricalStepDays();
     final events = await _bridge.drainBackgroundStepDeltas();
     if (events.isEmpty) {
-      return 0;
+      return syncedHistoryCount;
     }
 
     final filteredEvents = await _filterEventsNotCoveredByHealthConnect(events);
     if (filteredEvents.isEmpty) {
-      return 0;
+      return syncedHistoryCount;
     }
 
     final samples =
         filteredEvents.map(_toActivitySample).toList(growable: false);
     await _activityRepository.saveAll(samples);
     await _upsertDailyMetricsFromEvents(filteredEvents);
-    return filteredEvents.length;
+    return syncedHistoryCount + filteredEvents.length;
+  }
+
+  Future<int> _syncHistoricalStepDays() async {
+    final summaries = await _bridge.readHistoricalStepDays();
+    if (summaries.isEmpty) {
+      return 0;
+    }
+    final latestByDay = <DateTime, NativeStepDaySummary>{};
+    for (final summary in summaries) {
+      final dayStart = DateTime(
+        summary.date.year,
+        summary.date.month,
+        summary.date.day,
+      );
+      final current = latestByDay[dayStart];
+      if (current == null || summary.capturedAt.isAfter(current.capturedAt)) {
+        latestByDay[dayStart] = summary;
+      }
+    }
+
+    var changedCount = 0;
+    for (final entry in latestByDay.entries) {
+      final existing = await _metricsRepository.getByDate(entry.key) ??
+          _emptyMetrics(entry.key);
+      final stepCount = entry.value.stepCount;
+      if (stepCount <= existing.stepCount) {
+        continue;
+      }
+      await _metricsRepository.upsertMetrics(
+        DailyMetrics(
+          date: entry.key,
+          stepCount: stepCount,
+          sedentaryDuration: existing.sedentaryDuration,
+          screenOnDuration: existing.screenOnDuration,
+          outdoorDuration: existing.outdoorDuration,
+          postureRiskCount: existing.postureRiskCount,
+          highNoiseExposureDuration: existing.highNoiseExposureDuration,
+        ),
+      );
+      changedCount += 1;
+    }
+    return changedCount;
   }
 
   Future<List<BackgroundStepDeltaEvent>> _filterEventsNotCoveredByHealthConnect(
@@ -112,15 +156,7 @@ class BackgroundStepDeltaSyncService {
       final dayStart = entry.key;
       final dayStepTotal = entry.value.dayStepTotal;
       final existing = await _metricsRepository.getByDate(dayStart) ??
-          DailyMetrics(
-            date: dayStart,
-            stepCount: 0,
-            sedentaryDuration: Duration.zero,
-            screenOnDuration: Duration.zero,
-            outdoorDuration: Duration.zero,
-            postureRiskCount: 0,
-            highNoiseExposureDuration: Duration.zero,
-          );
+          _emptyMetrics(dayStart);
       if (dayStepTotal <= existing.stepCount) {
         continue;
       }
@@ -136,5 +172,17 @@ class BackgroundStepDeltaSyncService {
         ),
       );
     }
+  }
+
+  DailyMetrics _emptyMetrics(DateTime dayStart) {
+    return DailyMetrics(
+      date: dayStart,
+      stepCount: 0,
+      sedentaryDuration: Duration.zero,
+      screenOnDuration: Duration.zero,
+      outdoorDuration: Duration.zero,
+      postureRiskCount: 0,
+      highNoiseExposureDuration: Duration.zero,
+    );
   }
 }

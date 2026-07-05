@@ -46,13 +46,15 @@ class _TrendAnalysisPageState extends ConsumerState<TrendAnalysisPage> {
           controller: _controller,
           padding: const EdgeInsets.fromLTRB(18, 8, 18, 112),
           children: <Widget>[
-            const HealthStaggeredEntrance(
+            HealthStaggeredEntrance(
               index: 0,
               child: HealthPageHeader(
                 title: '趋势分析',
                 trailing: HealthNavIconButton(
+                  key: const Key('trend-range-button'),
                   icon: 'calendar_month',
-                  semanticLabel: '日历',
+                  onTap: _openRangePicker,
+                  semanticLabel: '选择趋势范围',
                 ),
               ),
             ),
@@ -98,6 +100,55 @@ class _TrendAnalysisPageState extends ConsumerState<TrendAnalysisPage> {
           ],
         ),
       ),
+    );
+  }
+
+  Future<void> _openRangePicker() async {
+    final selectedTab = ref.read(trendSelectedTabProvider);
+    final selectedRange = ref.read(trendRangeForTabProvider(selectedTab));
+    final tokens = context.healthTheme;
+    final selected = await showModalBottomSheet<TrendRange>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: tokens.surface,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text('选择趋势范围', style: tokens.sectionTitleStyle),
+              const SizedBox(height: 8),
+              ...TrendRange.values.map((range) {
+                final active = range == selectedRange;
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  selected: active,
+                  selectedColor: tokens.sage,
+                  title: Text(range.label),
+                  subtitle: Text(
+                    range == TrendRange.days7 ? '观察最近一周变化' : '观察近 30 天变化',
+                  ),
+                  trailing: active
+                      ? Icon(Icons.check_rounded, color: tokens.sage, size: 20)
+                      : null,
+                  onTap: () => Navigator.of(context).pop(range),
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted || selected == null || selected == selectedRange) {
+      return;
+    }
+    ref.read(trendRangeForTabProvider(selectedTab).notifier).state = selected;
+    await _controller.animateTo(
+      0,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
     );
   }
 }

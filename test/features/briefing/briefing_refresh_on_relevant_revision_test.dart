@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:health_monitor/domain/briefing/daily_brief_snapshot.dart';
+import 'package:health_monitor/domain/dashboard/dashboard_snapshot.dart';
 import 'package:health_monitor/domain/environment/noise_sample.dart';
 import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/metrics/daily_metrics.dart';
@@ -11,6 +13,7 @@ import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
 import 'package:health_monitor/features/briefing/providers/briefing_providers.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
 import 'package:health_monitor/services/data_collector.dart';
+import 'package:health_monitor/services/dashboard_service.dart';
 import 'package:health_monitor/services/digital_usage_capture_service.dart';
 import 'package:health_monitor/services/location_capture_service.dart';
 import 'package:health_monitor/services/motion_capture_service.dart';
@@ -19,6 +22,24 @@ import 'package:health_monitor/services/permission_status_service.dart';
 import 'package:health_monitor/storage/repositories/reminder_repository.dart';
 
 void main() {
+  test('今日简报累计久坐时间应与首页使用相同的当日裁剪口径', () async {
+    final referenceTime = DateTime(2026, 6, 16, 10);
+    final container = _createContainer(
+      referenceTime: referenceTime,
+      todaySedentaryActivityMinutes: 42,
+      todaySedentaryMetricMinutes: 60,
+    );
+    addTearDown(container.dispose);
+
+    final viewModel = await container.read(briefingViewModelProvider.future);
+    final sedentaryMetric = viewModel.briefSnapshot.metrics.singleWhere(
+      (DailyBriefMetric metric) => metric.label == '久坐',
+    );
+
+    expect(viewModel.dashboard?.sedentaryCard.totalMinutes, 42);
+    expect(sedentaryMetric.value, '42');
+  });
+
   test('查看昨日简报时，今日全局版本推进不应触发重新计算', () async {
     final referenceTime = DateTime(2026, 6, 16, 10);
     final container = _createContainer(referenceTime: referenceTime);
@@ -99,7 +120,11 @@ void main() {
   });
 }
 
-ProviderContainer _createContainer({required DateTime referenceTime}) {
+ProviderContainer _createContainer({
+  required DateTime referenceTime,
+  int todaySedentaryActivityMinutes = 0,
+  int todaySedentaryMetricMinutes = 60,
+}) {
   final activityRepository = SharedActivityRepository();
   final ambientLightRepository = SharedAmbientLightRepository();
   final noiseRepository = SharedNoiseRepository();
@@ -157,6 +182,8 @@ ProviderContainer _createContainer({required DateTime referenceTime}) {
     stepCount: 1200,
     screenMinutes: 90,
     outdoorMinutes: 20,
+    sedentaryActivityMinutes: todaySedentaryActivityMinutes,
+    sedentaryMetricMinutes: todaySedentaryMetricMinutes,
   );
 
   return ProviderContainer(
@@ -175,6 +202,24 @@ ProviderContainer _createContainer({required DateTime referenceTime}) {
       reminderRepositoryProvider.overrideWith(
         (Ref ref) async => InMemoryReminderRepository(),
       ),
+      dashboardServiceProvider.overrideWith((Ref ref) {
+        final insightService = ref.watch(healthInsightServiceProvider);
+        return DashboardService(
+          loadInsightSnapshot: insightService.buildSnapshot,
+          buildDailyAdvice: ({
+            required referenceTime,
+            required input,
+            required metrics,
+            required verdicts,
+            required environmentOverview,
+          }) async {
+            return const DailyAdviceBubble(
+              text: '测试建议',
+              source: DailyAdviceSource.fallback,
+            );
+          },
+        );
+      }),
     ],
   );
 }
@@ -189,6 +234,8 @@ void _seedDay({
   required int stepCount,
   required int screenMinutes,
   required int outdoorMinutes,
+  int sedentaryActivityMinutes = 0,
+  int sedentaryMetricMinutes = 60,
 }) {
   activityRepository.addSample(
     ActivitySample(
@@ -200,6 +247,18 @@ void _seedDay({
       source: MotionSampleSource.sensorFusion,
     ),
   );
+  if (sedentaryActivityMinutes > 0) {
+    activityRepository.addSample(
+      ActivitySample(
+        capturedAt: day.add(const Duration(hours: 13)),
+        duration: Duration(minutes: sedentaryActivityMinutes),
+        type: ActivityType.stationary,
+        confidence: 0.9,
+        stepCount: 0,
+        source: MotionSampleSource.sensorFusion,
+      ),
+    );
+  }
   noiseRepository.addSample(
     NoiseSample(
       capturedAt: day.add(const Duration(hours: 12)),
@@ -236,7 +295,7 @@ void _seedDay({
       DailyMetrics(
         date: day,
         stepCount: stepCount,
-        sedentaryDuration: const Duration(minutes: 60),
+        sedentaryDuration: Duration(minutes: sedentaryMetricMinutes),
         screenOnDuration: Duration(minutes: screenMinutes),
         outdoorDuration: Duration(minutes: outdoorMinutes),
         postureRiskCount: 0,

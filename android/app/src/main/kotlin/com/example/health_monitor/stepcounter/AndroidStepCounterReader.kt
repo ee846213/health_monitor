@@ -12,6 +12,7 @@ import android.os.Build
 import androidx.core.content.ContextCompat
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicBoolean
+import org.json.JSONObject
 
 class AndroidStepCounterReader(
     private val context: Context,
@@ -39,6 +40,10 @@ class AndroidStepCounterReader(
         stateStore.stopListening(manager)
     }
 
+    fun readHistoricalDays(maxDays: Int = DEFAULT_HISTORY_DAYS): List<StepCounterDayPayload> {
+        return stateStore.readHistoricalDays(maxDays)
+    }
+
     private fun unavailable(reason: String): StepCounterPayload {
         return StepCounterPayload(
             capturedAtMillis = System.currentTimeMillis(),
@@ -56,6 +61,10 @@ class AndroidStepCounterReader(
             context,
             Manifest.permission.ACTIVITY_RECOGNITION,
         ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    companion object {
+        private const val DEFAULT_HISTORY_DAYS = 30
     }
 }
 
@@ -88,6 +97,7 @@ private class StepCounterStateStore(
         val state = readState() ?: return null
         val todayKey = dayKey(System.currentTimeMillis())
         if (state.dayKey != todayKey) {
+          persistDaySnapshot(state)
           return StepCounterPayload(
               capturedAtMillis = System.currentTimeMillis(),
               stepCount = 0,
@@ -119,6 +129,24 @@ private class StepCounterStateStore(
         )
     }
 
+    fun readHistoricalDays(maxDays: Int): List<StepCounterDayPayload> {
+        val state = readState()
+        if (state != null) {
+            persistDaySnapshot(state)
+        }
+        return readHistory()
+            .values
+            .sortedByDescending { it.dayKey }
+            .take(maxDays.coerceAtLeast(1))
+            .map {
+                StepCounterDayPayload(
+                    dayKey = it.dayKey,
+                    capturedAtMillis = it.capturedAtMillis,
+                    stepCount = it.stepCount,
+                )
+            }
+    }
+
     override fun onSensorChanged(event: SensorEvent) {
         if (event.sensor.type != Sensor.TYPE_STEP_COUNTER) {
             return
@@ -131,6 +159,9 @@ private class StepCounterStateStore(
         val currentState = readState()
         val nextState = when {
             currentDayKey != nowDayKey || currentState == null -> {
+                if (currentState != null) {
+                    persistDaySnapshot(currentState)
+                }
                 StepCounterState(
                     dayKey = nowDayKey,
                     capturedAtMillis = now,
@@ -141,6 +172,7 @@ private class StepCounterStateStore(
             }
 
             rawTotal < currentState.lastRaw -> {
+                persistDaySnapshot(currentState)
                 StepCounterState(
                     dayKey = nowDayKey,
                     capturedAtMillis = now,
@@ -162,12 +194,78 @@ private class StepCounterStateStore(
             }
         }
 
+        writeCurrentState(nextState)
+        persistDaySnapshot(nextState)
+    }
+
+    private fun writeCurrentState(state: StepCounterState) {
         sharedPreferences.edit()
-            .putString(KEY_DAY_KEY, nextState.dayKey)
-            .putInt(KEY_STEP_COUNT, nextState.stepCount)
-            .putFloat(KEY_DAY_START_RAW, nextState.dayStartRaw.toFloat())
-            .putFloat(KEY_LAST_RAW, nextState.lastRaw.toFloat())
-            .putLong(KEY_CAPTURED_AT, nextState.capturedAtMillis)
+            .putString(KEY_DAY_KEY, state.dayKey)
+            .putInt(KEY_STEP_COUNT, state.stepCount)
+            .putFloat(KEY_DAY_START_RAW, state.dayStartRaw.toFloat())
+            .putFloat(KEY_LAST_RAW, state.lastRaw.toFloat())
+            .putLong(KEY_CAPTURED_AT, state.capturedAtMillis)
+            .apply()
+    }
+
+    private fun persistDaySnapshot(state: StepCounterState) {
+        val history = readHistory()
+        val existing = history[state.dayKey]
+        if (existing == null ||
+            state.stepCount > existing.stepCount ||
+            (state.stepCount == existing.stepCount &&
+                state.capturedAtMillis >= existing.capturedAtMillis)
+        ) {
+            history[state.dayKey] = state
+        }
+        writeHistory(history)
+    }
+
+    private fun readHistory(): MutableMap<String, StepCounterState> {
+        val raw = sharedPreferences.getString(KEY_DAILY_HISTORY, null)
+            ?: return mutableMapOf()
+        val root = runCatching { JSONObject(raw) }.getOrElse { JSONObject() }
+        val result = mutableMapOf<String, StepCounterState>()
+        val keys = root.keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            val item = root.optJSONObject(key) ?: continue
+            val stepCount = item.optInt(KEY_STEP_COUNT, -1)
+            val capturedAtMillis = item.optLong(KEY_CAPTURED_AT, 0L)
+            val dayStartRaw = item.optDouble(KEY_DAY_START_RAW, -1.0)
+            val lastRaw = item.optDouble(KEY_LAST_RAW, -1.0)
+            if (stepCount < 0 || capturedAtMillis <= 0L || dayStartRaw < 0.0 || lastRaw < 0.0) {
+                continue
+            }
+            result[key] = StepCounterState(
+                dayKey = key,
+                capturedAtMillis = capturedAtMillis,
+                stepCount = stepCount,
+                dayStartRaw = dayStartRaw,
+                lastRaw = lastRaw,
+            )
+        }
+        return result
+    }
+
+    private fun writeHistory(history: Map<String, StepCounterState>) {
+        val trimmed = history.entries
+            .sortedByDescending { it.key }
+            .take(MAX_HISTORY_DAYS)
+        val root = JSONObject()
+        for ((dayKey, state) in trimmed) {
+            root.put(
+                dayKey,
+                JSONObject().apply {
+                    put(KEY_STEP_COUNT, state.stepCount)
+                    put(KEY_CAPTURED_AT, state.capturedAtMillis)
+                    put(KEY_DAY_START_RAW, state.dayStartRaw)
+                    put(KEY_LAST_RAW, state.lastRaw)
+                },
+            )
+        }
+        sharedPreferences.edit()
+            .putString(KEY_DAILY_HISTORY, root.toString())
             .apply()
     }
 
@@ -198,5 +296,13 @@ private class StepCounterStateStore(
         private const val KEY_DAY_START_RAW = "dayStartRaw"
         private const val KEY_LAST_RAW = "lastRaw"
         private const val KEY_CAPTURED_AT = "capturedAt"
+        private const val KEY_DAILY_HISTORY = "dailyHistory"
+        private const val MAX_HISTORY_DAYS = 30
     }
 }
+
+data class StepCounterDayPayload(
+    val dayKey: String,
+    val capturedAtMillis: Long,
+    val stepCount: Int,
+)

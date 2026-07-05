@@ -21,6 +21,7 @@ void main() {
     expect(scrollView.scrollDirection, Axis.horizontal);
     expect(scrollView.physics, isA<BouncingScrollPhysics>());
     expect(find.byKey(const Key('trend-line-chart')), findsOneWidget);
+    expect(_trendCurveSmoothness(tester), closeTo(0.16, 0.001));
 
     final controller = scrollView.controller!;
     expect(controller.offset, 0);
@@ -80,6 +81,13 @@ void main() {
 
     expect(_visibleTrendProgress(tester, _changedSevenDaySnapshot()), 1);
   });
+}
+
+double _trendCurveSmoothness(WidgetTester tester) {
+  final lineChart = tester.widget<LineChart>(
+    find.byKey(const Key('trend-line-chart')),
+  );
+  return lineChart.data.lineBarsData.single.curveSmoothness;
 }
 
 TrendSnapshot _thirtyDaySnapshot() {

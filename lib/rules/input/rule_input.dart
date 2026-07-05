@@ -59,11 +59,7 @@ class RuleInput {
 
   /// 片段化后的有效久坐片段。
   List<SedentaryActivitySegment> get sedentarySegments {
-    final sorted = confidentActivitySamples.toList()
-      ..sort(
-        (ActivitySample left, ActivitySample right) =>
-            left.capturedAt.compareTo(right.capturedAt),
-      );
+    final sorted = _withInferredStationaryCaptureGaps(confidentActivitySamples);
     final segments = <SedentaryActivitySegment>[];
     SedentaryActivitySegment? current;
 
@@ -97,6 +93,68 @@ class RuleInput {
     return _coalesceSedentarySegments(segments)
         .where((SedentaryActivitySegment segment) => segment.isEffective)
         .toList(growable: false);
+  }
+
+  /// 补齐相邻静坐样本之间的短采集空窗。
+  ///
+  /// 真机后台采集可能因为进程重启、传感器批量回放或系统调度出现几分钟无样本。
+  /// 如果空窗两侧都是高置信静坐，且中间没有明确的 walking/running/cycling 样本，
+  /// 规则层按“仍在静坐”推断这段时间，避免今日久坐在 02:58 -> 03:02 这类短空窗处被切断。
+  static List<ActivitySample> _withInferredStationaryCaptureGaps(
+    List<ActivitySample> samples,
+  ) {
+    if (samples.length < 2) {
+      return samples;
+    }
+
+    final sorted = samples.toList()
+      ..sort(
+        (ActivitySample left, ActivitySample right) =>
+            left.capturedAt.compareTo(right.capturedAt),
+      );
+    final enriched = <ActivitySample>[];
+    ActivitySample? previous;
+
+    for (final ActivitySample sample in sorted) {
+      if (previous != null) {
+        final previousEnd = previous.capturedAt.add(previous.duration);
+        final gap = sample.capturedAt.difference(previousEnd);
+        if (_shouldInferStationaryCaptureGap(
+          previous: previous,
+          current: sample,
+          gap: gap,
+        )) {
+          enriched.add(
+            ActivitySample(
+              capturedAt: previousEnd,
+              duration: gap,
+              type: ActivityType.stationary,
+              confidence: previous.confidence < sample.confidence
+                  ? previous.confidence
+                  : sample.confidence,
+              stepCount: 0,
+              source: previous.source,
+            ),
+          );
+        }
+      }
+      enriched.add(sample);
+      previous = sample;
+    }
+    return enriched;
+  }
+
+  static bool _shouldInferStationaryCaptureGap({
+    required ActivitySample previous,
+    required ActivitySample current,
+    required Duration gap,
+  }) {
+    if (gap <= Duration.zero ||
+        gap > SedentaryActivitySegment.maxInferredStationaryCaptureGap) {
+      return false;
+    }
+    return previous.type == ActivityType.stationary &&
+        current.type == ActivityType.stationary;
   }
 
   /// 将间隔不超过 [SedentaryActivitySegment.maxGap] 的相邻片段再合并一轮，
@@ -389,8 +447,12 @@ class SedentaryActivitySegment {
   }
 
   static const Duration minimumDuration = Duration(minutes: 3);
+
   /// 相邻静坐样本或片段之间允许合并的最大间隔。
   static const Duration maxGap = Duration(minutes: 3);
+
+  /// 相邻静坐样本之间可被推断为“采集空窗”的最长间隔。
+  static const Duration maxInferredStationaryCaptureGap = Duration(minutes: 5);
 
   final DateTime startedAt;
   final DateTime endedAt;

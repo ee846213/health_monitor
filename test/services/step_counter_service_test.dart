@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:health_monitor/services/android_step_delta_bridge.dart';
 import 'package:health_monitor/services/platform_bridge_service.dart';
 import 'package:health_monitor/services/step_counter_service.dart';
 
@@ -17,13 +18,13 @@ void main() {
     MethodCall? capturedCall;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(methodChannel, (MethodCall call) async {
-          capturedCall = call;
-          return <String, Object?>{
-            'capturedAtMillis': 1710000000000,
-            'stepCount': 5000,
-            'isAvailable': true,
-          };
-        });
+      capturedCall = call;
+      return <String, Object?>{
+        'capturedAtMillis': 1710000000000,
+        'stepCount': 5000,
+        'isAvailable': true,
+      };
+    });
 
     final service = StepCounterService(
       platformBridgeService: PlatformBridgeService(
@@ -38,5 +39,35 @@ void main() {
     expect(capturedCall?.method, 'android.steps.current');
     expect(reading.isAvailable, isTrue);
     expect(reading.stepCount, 5000);
+  });
+  test('普通计步历史应从原生按天读取', () async {
+    MethodCall? capturedCall;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(methodChannel, (MethodCall call) async {
+      capturedCall = call;
+      return <Object?>[
+        <String, Object?>{
+          'dayKey': '2026-07-04',
+          'capturedAtMillis': 1783180800000,
+          'stepCount': 4860,
+        },
+      ];
+    });
+
+    final bridge = AndroidStepDeltaBridge(
+      platformBridgeService: PlatformBridgeService(
+        methodChannel: methodChannel,
+        eventChannel: const EventChannel('health_monitor/platform_events_test'),
+      ),
+      isAndroid: () => true,
+    );
+
+    final summaries = await bridge.readHistoricalStepDays(maxDays: 30);
+
+    expect(capturedCall?.method, 'android.steps.readHistoricalDays');
+    expect(capturedCall?.arguments, <String, Object>{'maxDays': 30});
+    expect(summaries, hasLength(1));
+    expect(summaries.single.date, DateTime(2026, 7, 4));
+    expect(summaries.single.stepCount, 4860);
   });
 }

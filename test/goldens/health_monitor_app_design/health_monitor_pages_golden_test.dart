@@ -199,31 +199,31 @@ OverviewReadyData _readyData() => OverviewReadyData(
 
 DashboardSnapshot _dashboard() => DashboardSnapshot(
       generatedAt: DateTime(2026, 6, 22, 16, 42),
-      healthScore: HealthScoreBreakdown(
+      healthScore: const HealthScoreBreakdown(
         stepScore: 82,
         sedentaryScore: 74,
         screenScore: 78,
         totalScore: 80,
       ),
-      stepCard: DashboardStepCard(
+      stepCard: const DashboardStepCard(
         currentSteps: 4860,
         goalSteps: 6000,
         achievementPercent: 81,
       ),
-      sedentaryCard: DashboardSedentaryCard(
+      sedentaryCard: const DashboardSedentaryCard(
         totalMinutes: 96,
         longestSingleMinutes: 42,
       ),
-      screenCard: DashboardScreenCard(
+      screenCard: const DashboardScreenCard(
         totalMinutes: 148,
         yesterdayDeltaMinutes: -18,
         changeDirection: DashboardChangeDirection.down,
       ),
-      environmentSnapshot: DashboardEnvironmentSnapshot(
+      environmentSnapshot: const DashboardEnvironmentSnapshot(
         lightLabel: '舒适',
         noiseLabel: '正常',
       ),
-      dailyAdviceBubble: DailyAdviceBubble(
+      dailyAdviceBubble: const DailyAdviceBubble(
         text: '晚饭后散步 15 分钟会更稳。',
         source: DailyAdviceSource.llm,
       ),
@@ -261,6 +261,8 @@ TrendSnapshot _trendSnapshot(TrendTab tab, TrendRange range) => TrendSnapshot(
 
 BriefingViewModel _briefingViewModel(BriefingTimeRange range) =>
     BriefingViewModel(
+      selectionKey:
+          range == BriefingTimeRange.recent7Days ? 'recent7' : 'day:2026-06-22',
       selectedRange: range,
       windowLabel: range == BriefingTimeRange.recent7Days ? '最近 7 天' : '今日',
       screenState: OverviewScreenState.ready,

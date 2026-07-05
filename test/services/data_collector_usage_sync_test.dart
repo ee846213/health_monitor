@@ -4,13 +4,17 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:health_monitor/domain/environment/ambient_light_sample.dart';
 import 'package:health_monitor/domain/environment/noise_sample.dart';
+import 'package:health_monitor/domain/health/capture_checkpoint.dart';
 import 'package:health_monitor/domain/metrics/daily_metrics.dart';
 import 'package:health_monitor/domain/motion/activity_sample.dart';
+import 'package:health_monitor/domain/motion/hourly_step_bucket.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
 import 'package:health_monitor/services/ambient_light_capture_service.dart';
 import 'package:health_monitor/services/android_usage_stats_bridge.dart';
+import 'package:health_monitor/services/capture_health_service.dart';
 import 'package:health_monitor/services/data_collector.dart';
 import 'package:health_monitor/services/digital_usage_capture_service.dart';
+import 'package:health_monitor/services/health_connect_step_sync_service.dart';
 import 'package:health_monitor/services/location_capture_service.dart';
 import 'package:health_monitor/services/motion_capture_service.dart';
 import 'package:health_monitor/services/noise_capture_service.dart';
@@ -18,6 +22,7 @@ import 'package:health_monitor/services/platform_bridge_service.dart';
 import 'package:health_monitor/services/step_counter_service.dart';
 import 'package:health_monitor/storage/repositories/metrics_repository.dart';
 import 'package:health_monitor/storage/repositories/query_window.dart';
+import 'package:health_monitor/storage/repositories/capture_health_repository.dart';
 import 'package:health_monitor/storage/repositories/usage_summary_repository.dart';
 
 void main() {
@@ -410,6 +415,175 @@ void main() {
     expect(deliveredAt, hasLength(1));
   });
 
+  test('长时间未打开时原生步数同步最多回补最近 30 天', () async {
+    final requestedReferenceTimes = <DateTime>[];
+    var metricsChangedCount = 0;
+    final captureHealthRepository = InMemoryCaptureHealthRepository(
+      checkpoints: <CaptureCheckpoint>[
+        CaptureCheckpoint(
+          streamKey: streamSteps,
+          state: CaptureHealthState.healthy,
+          sampleCount: 0,
+          gapCount: 0,
+          recoveryCount: 0,
+          lastNativeSummaryDrainedAt: DateTime(2026, 7, 5, 1),
+        ),
+      ],
+    );
+    final collector = DataCollector(
+      activityRepository: SharedActivityRepository(),
+      noiseRepository: SharedNoiseRepository(),
+      locationRepository: SharedLocationRepository(),
+      usageRepository: InMemoryUsageSummaryRepository(
+        summaries: const <DigitalUsageSummary>[],
+      ),
+      metricsRepository: InMemoryMetricsRepository(metrics: const []),
+      motionCaptureService: MotionCaptureService(
+        sensorStreamFactory: ({
+          Duration samplingPeriod = const Duration(milliseconds: 200),
+        }) =>
+            const Stream<MotionVectorSample>.empty(),
+      ),
+      ambientLightCaptureService: AmbientLightCaptureService(
+        isAndroid: () => false,
+      ),
+      stepCounterService: StepCounterService(isAndroid: () => false),
+      noiseCaptureService: NoiseCaptureService(
+        noiseStreamFactory: () => const Stream<NoiseReadingSample>.empty(),
+      ),
+      locationCaptureService: LocationCaptureService(
+        positionStreamFactory: ({
+          Duration samplingPeriod = const Duration(seconds: 30),
+        }) =>
+            const Stream<GeoPositionSample>.empty(),
+        isLocationServiceEnabled: () async => true,
+        checkPermission: () async => GeoPermissionStatus.allowed,
+        requestPermission: () async => GeoPermissionStatus.allowed,
+      ),
+      androidUsageStatsBridge: AndroidUsageStatsBridge(isAndroid: () => false),
+      digitalUsageCaptureService: DigitalUsageCaptureService(
+        lifecycleEventStreamFactory: () => const Stream<AppUsageEvent>.empty(),
+      ),
+      captureHealthService: CaptureHealthService(
+        repository: captureHealthRepository,
+      ),
+      syncHealthConnectStepsForDay: (DateTime referenceTime) async {
+        requestedReferenceTimes.add(referenceTime);
+        return HealthConnectStepSyncResult.synced(
+          status: const HealthConnectStatus(
+            isAvailable: true,
+            hasStepsPermission: true,
+            needsInstall: false,
+          ),
+          bucketCount: 1,
+          totalSteps: 1200,
+        );
+      },
+      syncBackgroundStepDeltas: () async => 0,
+      onMetricsChanged: () {
+        metricsChangedCount += 1;
+      },
+    );
+    addTearDown(collector.dispose);
+
+    await collector.syncNativeStepCount(
+      referenceTime: DateTime(2026, 7, 5, 2, 17),
+    );
+
+    expect(requestedReferenceTimes, hasLength(30));
+    expect(
+      requestedReferenceTimes.first,
+      DateTime(2026, 6, 6, 23, 59, 59, 999),
+    );
+    expect(requestedReferenceTimes.last, DateTime(2026, 7, 5, 2, 17));
+    expect(metricsChangedCount, greaterThan(0));
+  });
+
+  test('已有 Health Connect checkpoint 时仍滚动回查最近 30 天', () async {
+    final requestedReferenceTimes = <DateTime>[];
+    final captureHealthRepository = InMemoryCaptureHealthRepository(
+      checkpoints: <CaptureCheckpoint>[
+        CaptureCheckpoint(
+          streamKey: streamHealthConnectSteps,
+          state: CaptureHealthState.healthy,
+          sampleCount: 0,
+          gapCount: 0,
+          recoveryCount: 0,
+          lastNativeSummaryDrainedAt: DateTime(2026, 7, 2, 10),
+        ),
+      ],
+    );
+    final collector = DataCollector(
+      activityRepository: SharedActivityRepository(),
+      noiseRepository: SharedNoiseRepository(),
+      locationRepository: SharedLocationRepository(),
+      usageRepository: InMemoryUsageSummaryRepository(
+        summaries: const <DigitalUsageSummary>[],
+      ),
+      metricsRepository: InMemoryMetricsRepository(metrics: const []),
+      motionCaptureService: MotionCaptureService(
+        sensorStreamFactory: ({
+          Duration samplingPeriod = const Duration(milliseconds: 200),
+        }) =>
+            const Stream<MotionVectorSample>.empty(),
+      ),
+      ambientLightCaptureService: AmbientLightCaptureService(
+        isAndroid: () => false,
+      ),
+      stepCounterService: StepCounterService(isAndroid: () => false),
+      noiseCaptureService: NoiseCaptureService(
+        noiseStreamFactory: () => const Stream<NoiseReadingSample>.empty(),
+      ),
+      locationCaptureService: LocationCaptureService(
+        positionStreamFactory: ({
+          Duration samplingPeriod = const Duration(seconds: 30),
+        }) =>
+            const Stream<GeoPositionSample>.empty(),
+        isLocationServiceEnabled: () async => true,
+        checkPermission: () async => GeoPermissionStatus.allowed,
+        requestPermission: () async => GeoPermissionStatus.allowed,
+      ),
+      androidUsageStatsBridge: AndroidUsageStatsBridge(isAndroid: () => false),
+      digitalUsageCaptureService: DigitalUsageCaptureService(
+        lifecycleEventStreamFactory: () => const Stream<AppUsageEvent>.empty(),
+      ),
+      captureHealthService: CaptureHealthService(
+        repository: captureHealthRepository,
+      ),
+      syncHealthConnectStepsForDay: (DateTime referenceTime) async {
+        requestedReferenceTimes.add(referenceTime);
+        return HealthConnectStepSyncResult.empty(
+          status: const HealthConnectStatus(
+            isAvailable: true,
+            hasStepsPermission: true,
+            needsInstall: false,
+          ),
+        );
+      },
+      syncBackgroundStepDeltas: () async => 0,
+    );
+    addTearDown(collector.dispose);
+
+    await collector.syncNativeStepCount(
+      referenceTime: DateTime(2026, 7, 5, 2, 17),
+    );
+
+    expect(requestedReferenceTimes, hasLength(30));
+    expect(
+      requestedReferenceTimes.first,
+      DateTime(2026, 6, 6, 23, 59, 59, 999),
+    );
+    expect(
+      requestedReferenceTimes,
+      contains(DateTime(2026, 7, 4, 23, 59, 59, 999)),
+    );
+    expect(requestedReferenceTimes.last, DateTime(2026, 7, 5, 2, 17));
+    final checkpoint = await captureHealthRepository.getCheckpoint(
+      streamHealthConnectSteps,
+    );
+    expect(checkpoint?.lastNativeSummaryDrainedAt, isNotNull);
+  });
+
   test('没有原生风险事件时不应重复触发提醒投递', () async {
     var deliveredCount = 0;
     final collector = DataCollector(
@@ -747,6 +921,76 @@ void main() {
     expect(await activityRepository.listByWindow(window), hasLength(1));
     expect(await noiseRepository.listByWindow(window), hasLength(1));
     expect(await lightRepository.listByWindow(window), hasLength(1));
+  });
+
+  test('每日久坐指标应使用去重后的有效片段口径', () async {
+    final day = DateTime(2026, 7, 4);
+    final activityRepository = SharedActivityRepository()
+      ..addSample(
+        ActivitySample(
+          capturedAt: day.add(const Duration(hours: 11)),
+          duration: const Duration(minutes: 30),
+          type: ActivityType.stationary,
+          confidence: 0.9,
+          stepCount: 0,
+          source: MotionSampleSource.sensorFusion,
+        ),
+      )
+      ..addSample(
+        ActivitySample(
+          capturedAt: day.add(const Duration(hours: 11)),
+          duration: const Duration(minutes: 30),
+          type: ActivityType.stationary,
+          confidence: 0.9,
+          stepCount: 0,
+          source: MotionSampleSource.sensorFusion,
+        ),
+      );
+    final metricsRepository = InMemoryMetricsRepository(
+      metrics: <DailyMetrics>[
+        DailyMetrics(
+          date: day,
+          stepCount: 0,
+          sedentaryDuration: const Duration(minutes: 60),
+          screenOnDuration: Duration.zero,
+          outdoorDuration: Duration.zero,
+          postureRiskCount: 2,
+          highNoiseExposureDuration: Duration.zero,
+        ),
+      ],
+    );
+    final collector = DataCollector(
+      activityRepository: activityRepository,
+      noiseRepository: SharedNoiseRepository(),
+      locationRepository: SharedLocationRepository(),
+      usageRepository: InMemoryUsageSummaryRepository(
+        summaries: const <DigitalUsageSummary>[],
+      ),
+      metricsRepository: metricsRepository,
+      ambientLightCaptureService: AmbientLightCaptureService(
+        isAndroid: () => false,
+      ),
+      stepCounterService: StepCounterService(isAndroid: () => false),
+      syncHealthConnectStepsForDay: (DateTime referenceTime) async {
+        return HealthConnectStepSyncResult.unavailable(
+          status: const HealthConnectStatus(
+            isAvailable: false,
+            hasStepsPermission: false,
+            needsInstall: false,
+          ),
+        );
+      },
+      syncBackgroundStepDeltas: () async => 0,
+    );
+    addTearDown(collector.dispose);
+
+    await collector.syncNativeStepCount(
+      referenceTime: day.add(const Duration(hours: 23)),
+    );
+
+    final metrics = await metricsRepository.getByDate(day);
+    expect(metrics?.sedentaryDuration, const Duration(minutes: 30));
+    expect(metrics?.postureRiskCount, 1);
   });
 }
 

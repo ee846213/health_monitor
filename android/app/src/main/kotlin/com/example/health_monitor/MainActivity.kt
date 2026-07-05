@@ -21,8 +21,11 @@ import com.example.health_monitor.background.SharedPreferencesAndroidBackgroundS
 import com.example.health_monitor.background.SharedPreferencesAndroidBackgroundCaptureStateStore
 import com.example.health_monitor.background.toChannelMap
 import com.example.health_monitor.background.withRuntimeServiceState
+import com.example.health_monitor.healthconnect.AndroidHealthConnectReader
+import com.example.health_monitor.healthconnect.toChannelMap
 import com.example.health_monitor.light.AndroidAmbientLightStreamHandler
 import com.example.health_monitor.stepcounter.AndroidStepCounterReader
+import com.example.health_monitor.stepcounter.StepCounterDayPayload
 import com.example.health_monitor.stepcounter.StepCounterPayload
 import com.example.health_monitor.usagestats.AndroidUsageStatsReader
 import com.example.health_monitor.usagestats.SharedPreferencesAndroidUsageSummarySnapshotStore
@@ -93,6 +96,10 @@ class MainActivity : FlutterActivity() {
             getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
         )
     }
+    private val healthConnectReader by lazy {
+        AndroidHealthConnectReader(this)
+    }
+    private var pendingHealthConnectPermissionResult: MethodChannel.Result? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -119,12 +126,35 @@ class MainActivity : FlutterActivity() {
                 METHOD_READ_RANGE_USAGE_SUMMARIES -> handleReadRangeUsageSummaries(call, result)
                 METHOD_DRAIN_PENDING_USAGE_SUMMARIES -> handleDrainPendingUsageSummaries(result)
                 METHOD_GET_STEP_COUNTER -> handleGetStepCounter(result)
+                METHOD_READ_HISTORICAL_STEP_DAYS -> handleReadHistoricalStepDays(call, result)
                 METHOD_DRAIN_BACKGROUND_STEP_DELTAS -> handleDrainBackgroundStepDeltas(result)
                 METHOD_DRAIN_WALKING_SCREEN_RISK_EVENTS -> handleDrainWalkingScreenRiskEvents(result)
                 METHOD_UPDATE_REMINDER_POLICY -> handleUpdateReminderPolicy(call, result)
+                METHOD_HEALTH_CONNECT_GET_STATUS -> handleHealthConnectGetStatus(result)
+                METHOD_HEALTH_CONNECT_READ_HOURLY_STEPS -> handleHealthConnectReadHourlySteps(call, result)
+                METHOD_HEALTH_CONNECT_REQUEST_PERMISSIONS -> handleHealthConnectRequestPermissions(result)
+                METHOD_HEALTH_CONNECT_OPEN_SETTINGS -> handleHealthConnectOpenSettings(result)
                 else -> result.notImplemented()
             }
         }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQUEST_HEALTH_CONNECT_PERMISSIONS) {
+            return
+        }
+        val result = pendingHealthConnectPermissionResult ?: return
+        pendingHealthConnectPermissionResult = null
+        val grantedPermissions = healthConnectReader.createPermissionContract()
+            .parseResult(resultCode, data)
+        result.success(
+            mapOf(
+                "granted" to grantedPermissions.containsAll(
+                    healthConnectReader.stepReadPermissions(),
+                ),
+            ),
+        )
     }
 
     private fun handleStartBackgroundCapture(call: MethodCall, result: MethodChannel.Result) {
@@ -258,6 +288,14 @@ class MainActivity : FlutterActivity() {
         result.success(payload.toChannelMap())
     }
 
+    private fun handleReadHistoricalStepDays(call: MethodCall, result: MethodChannel.Result) {
+        val maxDays = call.argument<Int>("maxDays") ?: 30
+        result.success(
+            stepCounterReader.readHistoricalDays(maxDays)
+                .map { item -> item.toChannelMap() },
+        )
+    }
+
     private fun handleDrainBackgroundStepDeltas(result: MethodChannel.Result) {
         val payload = SharedPreferencesAndroidBackgroundStepDeltaStore(
             getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
@@ -287,6 +325,57 @@ class MainActivity : FlutterActivity() {
             ),
         )
         result.success(true)
+    }
+
+    private fun handleHealthConnectGetStatus(result: MethodChannel.Result) {
+        result.success(healthConnectReader.getStatus())
+    }
+
+    private fun handleHealthConnectReadHourlySteps(call: MethodCall, result: MethodChannel.Result) {
+        val startMillis = call.argument<Long>("startMillis") ?: run {
+            result.success(emptyList<Map<String, Any?>>())
+            return
+        }
+        val endMillis = call.argument<Long>("endMillis") ?: run {
+            result.success(emptyList<Map<String, Any?>>())
+            return
+        }
+        result.success(
+            healthConnectReader.readHourlySteps(startMillis, endMillis)
+                .map { bucket -> bucket.toChannelMap() },
+        )
+    }
+
+    private fun handleHealthConnectRequestPermissions(result: MethodChannel.Result) {
+        if (healthConnectReader.canReadHourlySteps()) {
+            result.success(mapOf("granted" to true))
+            return
+        }
+        if (pendingHealthConnectPermissionResult != null) {
+            result.error(
+                "health_connect_permission_in_progress",
+                "Health Connect 步数权限申请正在进行中。",
+                null,
+            )
+            return
+        }
+        pendingHealthConnectPermissionResult = result
+        runCatching {
+            startActivityForResult(
+                healthConnectReader.createPermissionContract().createIntent(
+                    this,
+                    healthConnectReader.stepReadPermissions(),
+                ),
+                REQUEST_HEALTH_CONNECT_PERMISSIONS,
+            )
+        }.onFailure {
+            pendingHealthConnectPermissionResult = null
+            result.success(mapOf("granted" to false))
+        }
+    }
+
+    private fun handleHealthConnectOpenSettings(result: MethodChannel.Result) {
+        result.success(healthConnectReader.openHealthConnectSettings())
     }
 
     private fun hasUsageAccess(): Boolean {
@@ -354,11 +443,22 @@ class MainActivity : FlutterActivity() {
         private const val METHOD_DRAIN_PENDING_USAGE_SUMMARIES =
             "android.usage.drainPendingSummaries"
         private const val METHOD_GET_STEP_COUNTER = "android.steps.current"
+        private const val METHOD_READ_HISTORICAL_STEP_DAYS =
+            "android.steps.readHistoricalDays"
         private const val METHOD_DRAIN_BACKGROUND_STEP_DELTAS =
             "android.steps.drainBackgroundDeltas"
         private const val METHOD_DRAIN_WALKING_SCREEN_RISK_EVENTS =
             "android.riskEvents.drainWalkingScreenRisks"
         private const val METHOD_UPDATE_REMINDER_POLICY = "android.reminder.updatePolicy"
+        private const val METHOD_HEALTH_CONNECT_GET_STATUS =
+            "android.healthConnect.getStatus"
+        private const val METHOD_HEALTH_CONNECT_READ_HOURLY_STEPS =
+            "android.healthConnect.readHourlySteps"
+        private const val METHOD_HEALTH_CONNECT_REQUEST_PERMISSIONS =
+            "android.healthConnect.requestPermissions"
+        private const val METHOD_HEALTH_CONNECT_OPEN_SETTINGS =
+            "android.healthConnect.openSettings"
+        private const val REQUEST_HEALTH_CONNECT_PERMISSIONS = 7401
     }
 }
 
@@ -368,5 +468,13 @@ private fun StepCounterPayload.toChannelMap(): Map<String, Any?> {
         "stepCount" to stepCount,
         "isAvailable" to isAvailable,
         "reason" to reason,
+    )
+}
+
+private fun StepCounterDayPayload.toChannelMap(): Map<String, Any?> {
+    return mapOf(
+        "dayKey" to dayKey,
+        "capturedAtMillis" to capturedAtMillis,
+        "stepCount" to stepCount,
     )
 }

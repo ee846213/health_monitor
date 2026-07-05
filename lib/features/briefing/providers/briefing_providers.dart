@@ -2,10 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_monitor/domain/briefing/daily_brief_snapshot.dart';
-import 'package:health_monitor/domain/environment/ambient_light_sample.dart';
-import 'package:health_monitor/domain/environment/noise_sample.dart';
-import 'package:health_monitor/domain/location/location_summary.dart';
-import 'package:health_monitor/domain/metrics/daily_metrics.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
 import 'package:health_monitor/domain/dashboard/daily_rhythm_ui_builder.dart';
@@ -149,7 +145,10 @@ final briefingViewModelProvider =
       hasRealData: snapshot.hasRealData,
       hasReminderHistory: snapshot.reminderHistory.isNotEmpty,
     ),
-    briefSnapshot: _buildDailyBriefSnapshot(snapshot),
+    briefSnapshot: _buildDailyBriefSnapshot(
+      snapshot,
+      dashboard: dashboard,
+    ),
     dashboard: dashboard,
     permissionStatuses: permissionStatuses,
     missingDimensions: snapshot.input.missingDimensions
@@ -260,8 +259,7 @@ final briefingDailyRhythmProvider = Provider<DailyRhythmUiModel?>((Ref ref) {
   }
 
   final actualNow = ref.watch(briefingReferenceTimeProvider)();
-  final selectedDate =
-      ref.watch(briefingSelectedDateProvider) ?? actualNow;
+  final selectedDate = ref.watch(briefingSelectedDateProvider) ?? actualNow;
   final calendarDay = DateTime(
     selectedDate.year,
     selectedDate.month,
@@ -370,7 +368,7 @@ final briefingSedentaryDetailProvider =
         0,
         (current, point) => math.max(current, point.minutes),
       );
-      final rangeReferenceMinutes = dailyReferenceMinutes * 7;
+      const rangeReferenceMinutes = dailyReferenceMinutes * 7;
       return OverviewSedentaryDetailSnapshot(
         totalDuration: Duration(minutes: totalMinutes),
         longestDuration: Duration(minutes: longestMinutes),
@@ -487,7 +485,10 @@ String _windowLabelForSelection(
   return '${date.month}月${date.day}日';
 }
 
-DailyBriefSnapshot _buildDailyBriefSnapshot(HealthInsightSnapshot snapshot) {
+DailyBriefSnapshot _buildDailyBriefSnapshot(
+  HealthInsightSnapshot snapshot, {
+  DashboardSnapshot? dashboard,
+}) {
   final usageSummary = snapshot.screenUsageHabitSummary;
   final primaryVerdict =
       snapshot.verdicts.isEmpty ? null : snapshot.verdicts.first;
@@ -506,7 +507,8 @@ DailyBriefSnapshot _buildDailyBriefSnapshot(HealthInsightSnapshot snapshot) {
     ),
     DailyBriefMetric(
       label: '久坐',
-      value: '${snapshot.metrics.sedentaryMinutes}',
+      value:
+          '${dashboard?.sedentaryCard.totalMinutes ?? snapshot.metrics.sedentaryMinutes}',
       unit: '分钟',
     ),
     DailyBriefMetric(

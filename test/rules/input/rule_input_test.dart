@@ -201,7 +201,8 @@ void main() {
       expect(input.sedentarySegments, hasLength(1));
       expect(input.sedentarySegments.single.duration.inMinutes, 10);
       expect(input.sedentarySegments.single.startedAt, now);
-      expect(input.sedentarySegments.single.endedAt, now.add(const Duration(minutes: 12)));
+      expect(input.sedentarySegments.single.endedAt,
+          now.add(const Duration(minutes: 12)));
     });
 
     test('展示用结束时刻应与合并后的静坐时长对齐', () {
@@ -311,6 +312,88 @@ void main() {
 
       expect(summary.totalMinutes, 42);
       expect(summary.longestMinutes, 42);
+    });
+
+    test('连续 stationary 短采集空窗应补入久坐统计并保持同一片段', () {
+      final dayStart = DateTime(2026, 7, 5);
+      final samples = <ActivitySample>[
+        ActivitySample(
+          capturedAt: dayStart.add(
+            const Duration(hours: 2, minutes: 46, seconds: 19),
+          ),
+          duration: const Duration(minutes: 11, seconds: 59),
+          type: ActivityType.stationary,
+          confidence: 0.9,
+          stepCount: 0,
+          source: MotionSampleSource.sensorFusion,
+        ),
+        ActivitySample(
+          capturedAt: dayStart.add(
+            const Duration(hours: 3, seconds: 18),
+          ),
+          duration: const Duration(seconds: 1),
+          type: ActivityType.stationary,
+          confidence: 0.9,
+          stepCount: 0,
+          source: MotionSampleSource.sensorFusion,
+        ),
+        ActivitySample(
+          capturedAt: dayStart.add(
+            const Duration(hours: 3, minutes: 2, seconds: 48),
+          ),
+          duration: const Duration(minutes: 4, seconds: 50),
+          type: ActivityType.stationary,
+          confidence: 0.9,
+          stepCount: 0,
+          source: MotionSampleSource.sensorFusion,
+        ),
+      ];
+      final window = QueryWindow.calendarDay(referenceDate: dayStart);
+
+      final summary = summarizeSedentaryForWindow(
+        activitySamples: samples,
+        window: window,
+      );
+
+      expect(summary.segments, hasLength(1));
+      expect(summary.totalDuration, const Duration(minutes: 21, seconds: 19));
+      expect(summary.longestDuration, summary.totalDuration);
+      expect(
+        summary.segments.single.endedAt,
+        dayStart.add(const Duration(hours: 3, minutes: 7, seconds: 38)),
+      );
+    });
+
+    test('超过采集空窗上限的 stationary 间隔不应被推断为连续久坐', () {
+      final dayStart = DateTime(2026, 7, 5, 9);
+      final samples = <ActivitySample>[
+        ActivitySample(
+          capturedAt: dayStart,
+          duration: const Duration(minutes: 5),
+          type: ActivityType.stationary,
+          confidence: 0.9,
+          stepCount: 0,
+          source: MotionSampleSource.sensorFusion,
+        ),
+        ActivitySample(
+          capturedAt: dayStart.add(const Duration(minutes: 11)),
+          duration: const Duration(minutes: 5),
+          type: ActivityType.stationary,
+          confidence: 0.9,
+          stepCount: 0,
+          source: MotionSampleSource.sensorFusion,
+        ),
+      ];
+      final window = QueryWindow.calendarDay(referenceDate: dayStart);
+
+      final summary = summarizeSedentaryForWindow(
+        activitySamples: samples,
+        window: window,
+      );
+
+      expect(summary.segments, hasLength(2));
+      expect(summary.totalDuration, const Duration(minutes: 10));
+      expect(summary.longestDuration, const Duration(minutes: 5));
     });
 
     test('isDimensionAvailable 判断维度可用性', () {

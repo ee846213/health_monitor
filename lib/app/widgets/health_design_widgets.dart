@@ -152,7 +152,7 @@ class HealthSegmentedControl<T> extends StatelessWidget {
   }
 }
 
-/// 设计稿顶部导航圆形图标按钮：36×36、半透明白底、双层阴影。
+/// 顶部导航图标按钮：保留 36x36 点击热区，只显示图标本身。
 class HealthNavIconButton extends StatelessWidget {
   const HealthNavIconButton({
     super.key,
@@ -169,19 +169,6 @@ class HealthNavIconButton extends StatelessWidget {
   final double iconSize;
   final int weight;
 
-  static const List<BoxShadow> _shadow = <BoxShadow>[
-    BoxShadow(
-      color: Color(0x0A3D392F),
-      blurRadius: 8,
-      offset: Offset(0, 3),
-    ),
-    BoxShadow(
-      color: Color(0x123D392F),
-      blurRadius: 30,
-      offset: Offset(0, 14),
-    ),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final tokens = context.healthTheme;
@@ -193,14 +180,8 @@ class HealthNavIconButton extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           customBorder: const CircleBorder(),
-          child: Ink(
-            width: 36,
-            height: 36,
-            decoration: const BoxDecoration(
-              color: Color(0xCCFFFFFF),
-              shape: BoxShape.circle,
-              boxShadow: _shadow,
-            ),
+          child: SizedBox.square(
+            dimension: 36,
             child: Center(
               child: HealthVectorIcon(
                 icon,

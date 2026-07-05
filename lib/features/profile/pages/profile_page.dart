@@ -435,6 +435,12 @@ class _SettingsRow extends StatelessWidget {
 Future<void> _showPermissionSheet(BuildContext context, WidgetRef ref) {
   final statuses = ref.read(profilePermissionStatusesProvider);
   final rows = <(PermissionType, String, String)>[
+    if (defaultTargetPlatform == TargetPlatform.android)
+      (
+        PermissionType.healthConnect,
+        'Health Connect 步数',
+        '用于补回未打开 App 期间的历史步数'
+      ),
     (PermissionType.motion, '活动识别', '用于活动、久坐和姿势节奏判断'),
     (PermissionType.location, '位置', '用于室内外和活动范围判断'),
     (PermissionType.microphone, '麦克风环境噪音', '只评估等级，不保存原始音频'),
@@ -569,59 +575,60 @@ Future<void> _showReminderPreferences(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                    Text('提醒偏好', style: context.healthTheme.sectionTitleStyle),
-                    const SizedBox(height: 6),
-                    Text(
-                      '关闭后不会写入提醒记录，也不会发送系统通知。',
-                      style: context.healthTheme.bodyStyle,
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('总提醒开关'),
-                      value: preferences.masterEnabled,
-                      onChanged: (enabled) async {
-                        try {
-                          await ref
-                              .read(reminderPreferencesProvider.notifier)
-                              .save(preferences.toggleMaster(enabled));
-                        } catch (_) {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('保存失败，已恢复原设置')),
-                          );
-                        }
-                      },
-                    ),
-                    ..._profileReminderCategories.map(
-                      (category) => SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        title: Text(category.displayLabel),
-                        value: preferences.isCategoryEnabled(category),
-                        onChanged: preferences.masterEnabled
-                            ? (enabled) async {
-                                try {
-                                  await ref
-                                      .read(
-                                          reminderPreferencesProvider.notifier)
-                                      .save(
-                                        preferences.toggleCategory(
-                                          category,
-                                          enabled,
-                                        ),
-                                      );
-                                } catch (_) {
-                                  if (!context.mounted) return;
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('保存失败，已恢复原设置'),
-                                    ),
-                                  );
-                                }
-                              }
-                            : null,
+                      Text('提醒偏好',
+                          style: context.healthTheme.sectionTitleStyle),
+                      const SizedBox(height: 6),
+                      Text(
+                        '关闭后不会写入提醒记录，也不会发送系统通知。',
+                        style: context.healthTheme.bodyStyle,
                       ),
-                    ),
-                  ],
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('总提醒开关'),
+                        value: preferences.masterEnabled,
+                        onChanged: (enabled) async {
+                          try {
+                            await ref
+                                .read(reminderPreferencesProvider.notifier)
+                                .save(preferences.toggleMaster(enabled));
+                          } catch (_) {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('保存失败，已恢复原设置')),
+                            );
+                          }
+                        },
+                      ),
+                      ..._profileReminderCategories.map(
+                        (category) => SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(category.displayLabel),
+                          value: preferences.isCategoryEnabled(category),
+                          onChanged: preferences.masterEnabled
+                              ? (enabled) async {
+                                  try {
+                                    await ref
+                                        .read(reminderPreferencesProvider
+                                            .notifier)
+                                        .save(
+                                          preferences.toggleCategory(
+                                            category,
+                                            enabled,
+                                          ),
+                                        );
+                                  } catch (_) {
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('保存失败，已恢复原设置'),
+                                      ),
+                                    );
+                                  }
+                                }
+                              : null,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               );

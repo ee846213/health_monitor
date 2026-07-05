@@ -35,6 +35,41 @@ void main() {
     expect(find.text('近 7 天久坐趋势'), findsOneWidget);
   });
 
+  testWidgets('趋势页右上角范围按钮可打开并切换近 30 天', (WidgetTester tester) async {
+    final container = ProviderContainer(
+      overrides: <Override>[
+        trendAnalysisViewModelProvider.overrideWith((Ref ref) async {
+          final selectedTab = ref.watch(trendSelectedTabProvider);
+          final selectedRange =
+              ref.watch(trendRangeForTabProvider(selectedTab));
+          return _buildTrendSnapshot(selectedTab, range: selectedRange);
+        }),
+      ],
+    );
+    addTearDown(container.dispose);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: const MaterialApp(home: TrendAnalysisPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('trend-range-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('选择趋势范围'), findsOneWidget);
+
+    await tester.tap(find.text(TrendRange.days30.label).last);
+    await tester.pumpAndSettle();
+
+    expect(
+      container.read(trendRangeForTabProvider(TrendTab.steps)),
+      TrendRange.days30,
+    );
+  });
+
   testWidgets('趋势数据刷新时保留当前卡片，不回退为整页加载', (
     WidgetTester tester,
   ) async {
@@ -86,7 +121,10 @@ void main() {
   });
 }
 
-TrendSnapshot _buildTrendSnapshot(TrendTab selectedTab) {
+TrendSnapshot _buildTrendSnapshot(
+  TrendTab selectedTab, {
+  TrendRange range = TrendRange.days7,
+}) {
   switch (selectedTab) {
     case TrendTab.steps:
       return TrendSnapshot(
@@ -104,6 +142,7 @@ TrendSnapshot _buildTrendSnapshot(TrendTab selectedTab) {
           TrendPoint(label: '6/16', value: 4860),
         ],
         insightText: '过去一周你有 2 天步数超过 6000。',
+        range: range,
       );
     case TrendTab.sedentary:
       return TrendSnapshot(
@@ -121,6 +160,7 @@ TrendSnapshot _buildTrendSnapshot(TrendTab selectedTab) {
           TrendPoint(label: '6/16', value: 96),
         ],
         insightText: '最近两天久坐时长开始回落。',
+        range: range,
       );
     case TrendTab.screen:
       return TrendSnapshot(
@@ -130,6 +170,7 @@ TrendSnapshot _buildTrendSnapshot(TrendTab selectedTab) {
         unitLabel: '分钟',
         points: const <TrendPoint>[],
         insightText: '最近一周亮屏时长总体平稳。',
+        range: range,
       );
   }
 }
