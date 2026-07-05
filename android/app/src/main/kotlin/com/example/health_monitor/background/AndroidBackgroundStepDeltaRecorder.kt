@@ -27,10 +27,6 @@ class AndroidBackgroundStepDeltaRecorder(
             if (!started) {
                 return
             }
-            if (healthConnectReader.canReadHourlySteps()) {
-                stop()
-                return
-            }
             recordDeltaIfNeeded(allowStationaryEvent = true)
             handler.postDelayed(this, pollIntervalMillis)
         }
@@ -38,16 +34,15 @@ class AndroidBackgroundStepDeltaRecorder(
 
     fun start(pollIntervalMinutes: Int) {
         pollIntervalMillis = pollIntervalMinutes.coerceAtLeast(MIN_POLL_INTERVAL_MINUTES) * 60_000L
-        if (healthConnectReader.canReadHourlySteps()) {
-            stop()
-            return
-        }
         if (started) {
             handler.removeCallbacks(pollRunnable)
             handler.postDelayed(pollRunnable, pollIntervalMillis)
             return
         }
         started = true
+        // 即使 Health Connect 已授权，也继续保留后台步数兜底。
+        // 真机上可能出现“有权限但当前时段没有小时桶”的情况；真正入库时
+        // Flutter 侧会再按 Health Connect 覆盖小时做去重，这里不应提前停掉兜底采样。
         recordDeltaIfNeeded(allowStationaryEvent = false)
         handler.postDelayed(pollRunnable, pollIntervalMillis)
     }
