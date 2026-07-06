@@ -6,8 +6,12 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:health_monitor/app/background_capture_bootstrap.dart';
 import 'package:health_monitor/app/router.dart';
 import 'package:health_monitor/app/theme.dart';
+import 'package:health_monitor/features/briefing/providers/briefing_providers.dart';
 import 'package:health_monitor/features/diagnostics/providers/diagnostics_providers.dart';
+import 'package:health_monitor/features/overview/providers/daily_rhythm_clock_provider.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
+import 'package:health_monitor/features/overview/providers/overview_ready_providers.dart';
+import 'package:health_monitor/features/trends/providers/trend_analysis_provider.dart';
 import 'package:health_monitor/services/data_collector.dart';
 
 class HealthMonitorApp extends StatelessWidget {
@@ -67,12 +71,38 @@ class _AppLifecycleRefreshScopeState
   }
 
   void _runStartupSyncAfterFirstFrame() {
-    // 首帧先让应用壳可见；后台采集、使用统计和风险事件同步随后进入异步链路。
     unawaited(
         ref.read(androidBackgroundCaptureBootstrapServiceProvider).sync());
     unawaited(ref.read(dataCollectorProvider).syncNativeStepCount());
     unawaited(ref.read(dataCollectorProvider).syncUsageSummary());
     unawaited(ref.read(dataCollectorProvider).syncNativeRiskEvents());
+  }
+
+  void _invalidateForegroundDataProviders() {
+    ref.invalidate(permissionStatusProvider);
+    ref.invalidate(diagnosticsSnapshotProvider);
+    ref.invalidate(dailyRhythmClockProvider);
+    ref.invalidate(overviewReadyDataProvider);
+    ref.invalidate(overviewViewModelProvider);
+    ref.invalidate(briefingViewModelProvider);
+    ref.invalidate(trendAnalysisViewModelProvider);
+    ref.invalidate(reminderListProvider);
+    ref.invalidate(latestReminderProvider);
+  }
+
+  Future<void> _refreshForegroundDataAfterResume() async {
+    _invalidateForegroundDataProviders();
+    await Future.wait<void>(<Future<void>>[
+      ref.read(dataCollectorProvider).syncNativeStepCount(),
+      ref.read(androidBackgroundCaptureBootstrapServiceProvider).sync(),
+      ref.read(dataCollectorProvider).syncUsageSummary(),
+      ref.read(dataCollectorProvider).syncNativeRiskEvents(),
+    ]);
+    if (!mounted) {
+      return;
+    }
+    // 恢复前台后再补一次失效，避免页面停留在同步前的缓存快照。
+    _invalidateForegroundDataProviders();
   }
 
   @override
@@ -94,13 +124,7 @@ class _AppLifecycleRefreshScopeState
     }
 
     ref.read(dataCollectorProvider).resumeForegroundCapture();
-    unawaited(ref.read(dataCollectorProvider).syncNativeStepCount());
-    unawaited(
-        ref.read(androidBackgroundCaptureBootstrapServiceProvider).sync());
-    unawaited(ref.read(dataCollectorProvider).syncUsageSummary());
-    unawaited(ref.read(dataCollectorProvider).syncNativeRiskEvents());
-    ref.invalidate(permissionStatusProvider);
-    ref.invalidate(diagnosticsSnapshotProvider);
+    unawaited(_refreshForegroundDataAfterResume());
   }
 
   @override
