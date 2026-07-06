@@ -10,6 +10,8 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Build
 import androidx.core.content.ContextCompat
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicBoolean
 import org.json.JSONObject
@@ -133,6 +135,7 @@ private class StepCounterStateStore(
         val state = readState()
         if (state != null) {
             persistDaySnapshot(state)
+            recoverMissedPreviousDaySnapshot(state.dayKey, state.dayStartRaw)
         }
         return readHistory()
             .values
@@ -161,6 +164,7 @@ private class StepCounterStateStore(
             currentDayKey != nowDayKey || currentState == null -> {
                 if (currentState != null) {
                     persistDaySnapshot(currentState)
+                    recoverMissedPreviousDaySnapshot(nowDayKey, rawTotal)
                 }
                 StepCounterState(
                     dayKey = nowDayKey,
@@ -218,6 +222,41 @@ private class StepCounterStateStore(
         ) {
             history[state.dayKey] = state
         }
+        writeHistory(history)
+    }
+
+    private fun recoverMissedPreviousDaySnapshot(
+        currentDayKey: String,
+        currentDayStartRaw: Double,
+    ) {
+        val history = readHistory()
+        val recovered = recoverMissedPreviousDaySnapshot(
+            currentDayKey = currentDayKey,
+            currentDayStartRaw = currentDayStartRaw,
+            history = history.values.map { state ->
+                StepCounterHistorySnapshot(
+                    dayKey = state.dayKey,
+                    capturedAtMillis = state.capturedAtMillis,
+                    stepCount = state.stepCount,
+                    dayStartRaw = state.dayStartRaw,
+                    lastRaw = state.lastRaw,
+                )
+            },
+        ) ?: return
+        val existing = history[recovered.dayKey]
+        if (existing != null && existing.stepCount >= recovered.stepCount) {
+            return
+        }
+        // Health Connect 在部分机型上可能已授权但聚合为空。跨日后首次收到
+        // TYPE_STEP_COUNTER raw total 时，用 raw 差值为缺失的前一日补一个降级快照，
+        // 避免昨天在每日指标里彻底消失。
+        history[recovered.dayKey] = StepCounterState(
+            dayKey = recovered.dayKey,
+            capturedAtMillis = recovered.capturedAtMillis,
+            stepCount = recovered.stepCount,
+            dayStartRaw = recovered.dayStartRaw,
+            lastRaw = recovered.lastRaw,
+        )
         writeHistory(history)
     }
 
@@ -306,3 +345,62 @@ data class StepCounterDayPayload(
     val capturedAtMillis: Long,
     val stepCount: Int,
 )
+
+internal data class StepCounterHistorySnapshot(
+    val dayKey: String,
+    val capturedAtMillis: Long,
+    val stepCount: Int,
+    val dayStartRaw: Double,
+    val lastRaw: Double,
+)
+
+internal fun recoverMissedPreviousDaySnapshot(
+    currentDayKey: String,
+    currentDayStartRaw: Double,
+    history: Collection<StepCounterHistorySnapshot>,
+    zoneId: ZoneId = ZoneId.systemDefault(),
+): StepCounterHistorySnapshot? {
+    val currentDate = runCatching { LocalDate.parse(currentDayKey) }.getOrNull()
+        ?: return null
+    val targetDate = currentDate.minusDays(1)
+    val latestBeforeCurrent = history
+        .mapNotNull { snapshot ->
+            val date = runCatching { LocalDate.parse(snapshot.dayKey) }.getOrNull()
+                ?: return@mapNotNull null
+            if (date.isBefore(currentDate)) {
+                date to snapshot
+            } else {
+                null
+            }
+        }
+        .maxByOrNull { it.first }
+        ?: return null
+    val existingTarget = history.firstOrNull { it.dayKey == targetDate.toString() }
+    if (existingTarget != null && existingTarget.stepCount > 0) {
+        return null
+    }
+
+    val previousDate = latestBeforeCurrent.first
+    val previousSnapshot = latestBeforeCurrent.second
+    val gapStepCount = (currentDayStartRaw - previousSnapshot.lastRaw).toInt()
+    if (gapStepCount <= 0) {
+        return null
+    }
+    val recoveredStepCount = if (previousDate == targetDate) {
+        previousSnapshot.stepCount + gapStepCount
+    } else {
+        gapStepCount
+    }
+    val capturedAtMillis = targetDate
+        .plusDays(1)
+        .atStartOfDay(zoneId)
+        .toInstant()
+        .toEpochMilli() - 1L
+    return StepCounterHistorySnapshot(
+        dayKey = targetDate.toString(),
+        capturedAtMillis = capturedAtMillis,
+        stepCount = recoveredStepCount,
+        dayStartRaw = previousSnapshot.lastRaw,
+        lastRaw = currentDayStartRaw,
+    )
+}

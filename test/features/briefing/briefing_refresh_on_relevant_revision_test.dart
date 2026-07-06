@@ -8,13 +8,16 @@ import 'package:health_monitor/domain/environment/noise_sample.dart';
 import 'package:health_monitor/domain/location/location_summary.dart';
 import 'package:health_monitor/domain/metrics/daily_metrics.dart';
 import 'package:health_monitor/domain/motion/activity_sample.dart';
+import 'package:health_monitor/domain/motion/hourly_step_bucket.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
 import 'package:health_monitor/features/briefing/providers/briefing_providers.dart';
 import 'package:health_monitor/features/overview/providers/overview_providers.dart';
+import 'package:health_monitor/services/android_usage_stats_bridge.dart';
 import 'package:health_monitor/services/data_collector.dart';
 import 'package:health_monitor/services/dashboard_service.dart';
 import 'package:health_monitor/services/digital_usage_capture_service.dart';
+import 'package:health_monitor/services/health_connect_step_sync_service.dart';
 import 'package:health_monitor/services/location_capture_service.dart';
 import 'package:health_monitor/services/motion_capture_service.dart';
 import 'package:health_monitor/services/noise_capture_service.dart';
@@ -118,12 +121,78 @@ void main() {
 
     expect(refreshCount, 0);
   });
+
+  test('selected historical day syncs native data before building briefing',
+      () async {
+    final referenceTime = DateTime(2026, 6, 16, 10);
+    final selectedDay = DateTime(2026, 6, 14);
+    final stepSyncReferenceTimes = <DateTime>[];
+    final usageSyncReferenceTimes = <DateTime>[];
+    late SharedMetricsRepository metricsRepository;
+
+    final container = _createContainer(
+      referenceTime: referenceTime,
+      androidUsageStatsBridge: _FakeAndroidUsageStatsBridge(
+        onReadDailySummary: usageSyncReferenceTimes.add,
+      ),
+      syncHealthConnectStepsForDay: (DateTime syncReferenceTime) async {
+        stepSyncReferenceTimes.add(syncReferenceTime);
+        if (_dayKey(syncReferenceTime) == _dayKey(selectedDay)) {
+          await metricsRepository.upsertMetrics(
+            DailyMetrics(
+              date: selectedDay,
+              stepCount: 7899,
+              sedentaryDuration: Duration.zero,
+              screenOnDuration: Duration.zero,
+              outdoorDuration: Duration.zero,
+              postureRiskCount: 0,
+              highNoiseExposureDuration: Duration.zero,
+            ),
+          );
+          return HealthConnectStepSyncResult.synced(
+            status: const HealthConnectStatus(
+              isAvailable: true,
+              hasStepsPermission: true,
+              needsInstall: false,
+            ),
+            bucketCount: 1,
+            totalSteps: 7899,
+          );
+        }
+        return HealthConnectStepSyncResult.empty(
+          status: const HealthConnectStatus(
+            isAvailable: true,
+            hasStepsPermission: true,
+            needsInstall: false,
+          ),
+        );
+      },
+      exposeMetricsRepository: (SharedMetricsRepository repository) {
+        metricsRepository = repository;
+      },
+    );
+    addTearDown(container.dispose);
+
+    container.read(briefingSelectedDateProvider.notifier).state = selectedDay;
+    final viewModel = await container.read(briefingViewModelProvider.future);
+
+    expect(
+      stepSyncReferenceTimes.map(_dayKey),
+      contains(_dayKey(selectedDay)),
+    );
+    expect(usageSyncReferenceTimes.single, selectedDay);
+    expect(viewModel.briefSnapshot.metrics[0].value, '7899');
+    expect(viewModel.briefSnapshot.metrics[2].value, '123');
+  });
 }
 
 ProviderContainer _createContainer({
   required DateTime referenceTime,
   int todaySedentaryActivityMinutes = 0,
   int todaySedentaryMetricMinutes = 60,
+  AndroidUsageStatsBridge? androidUsageStatsBridge,
+  SyncHealthConnectStepsForDay? syncHealthConnectStepsForDay,
+  void Function(SharedMetricsRepository repository)? exposeMetricsRepository,
 }) {
   final activityRepository = SharedActivityRepository();
   final ambientLightRepository = SharedAmbientLightRepository();
@@ -131,6 +200,7 @@ ProviderContainer _createContainer({
   final locationRepository = SharedLocationRepository();
   final usageRepository = SharedUsageRepository();
   final metricsRepository = SharedMetricsRepository();
+  exposeMetricsRepository?.call(metricsRepository);
 
   final collector = DataCollector(
     activityRepository: activityRepository,
@@ -159,6 +229,9 @@ ProviderContainer _createContainer({
     digitalUsageCaptureService: DigitalUsageCaptureService(
       lifecycleEventStreamFactory: () => const Stream<AppUsageEvent>.empty(),
     ),
+    androidUsageStatsBridge: androidUsageStatsBridge,
+    syncHealthConnectStepsForDay: syncHealthConnectStepsForDay,
+    syncBackgroundStepDeltas: () async => 0,
   );
 
   _seedDay(
@@ -318,6 +391,44 @@ class _GrantedPermissionStatusService implements PermissionStatusService {
       PermissionType.usageAccess: PermissionGrantStatus.granted,
       PermissionType.backgroundCapture: PermissionGrantStatus.granted,
     };
+  }
+}
+
+class _FakeAndroidUsageStatsBridge extends AndroidUsageStatsBridge {
+  _FakeAndroidUsageStatsBridge({
+    required this.onReadDailySummary,
+  }) : super(isAndroid: () => true);
+
+  final void Function(DateTime referenceTime) onReadDailySummary;
+
+  @override
+  Future<AndroidUsageCapabilityStatus> getCapabilityStatus() async {
+    return const AndroidUsageCapabilityStatus(
+      isSupported: true,
+      hasUsageAccess: true,
+    );
+  }
+
+  @override
+  Future<List<DigitalUsageSummary>> drainPendingSummaries() async {
+    return const <DigitalUsageSummary>[];
+  }
+
+  @override
+  Future<DigitalUsageSummary?> readDailySummary({
+    DateTime? referenceTime,
+  }) async {
+    final day = referenceTime ?? DateTime(2026, 6, 14);
+    onReadDailySummary(day);
+    return DigitalUsageSummary(
+      date: day,
+      screenOnDuration: const Duration(minutes: 123),
+      unlockCount: 12,
+      nighttimeUsageDuration: const Duration(minutes: 20),
+      focusSessionBreakCount: 2,
+      topCategory: UsageCategory.tools,
+      source: DigitalUsageSource.androidUsageStats,
+    );
   }
 }
 

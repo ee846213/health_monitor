@@ -108,7 +108,7 @@ final briefingRangeRevisionProvider = Provider<String>((Ref ref) {
 final briefingViewModelProvider =
     FutureProvider<BriefingViewModel>((Ref ref) async {
   ref.watch(briefingRangeRevisionProvider);
-  ref.watch(dataCollectorProvider);
+  final dataCollector = ref.watch(dataCollectorProvider);
   final selectedRange = ref.watch(briefingTimeRangeProvider);
   final selectedDate = ref.watch(briefingSelectedDateProvider);
   final permissionStatuses = await ref.watch(permissionStatusProvider.future);
@@ -116,6 +116,13 @@ final briefingViewModelProvider =
   final dashboardService = ref.watch(dashboardServiceProvider);
   final actualNow = ref.watch(briefingReferenceTimeProvider)();
   final now = selectedDate ?? actualNow;
+  await _syncHistoricalSelectionIfNeeded(
+    ref: ref,
+    dataCollector: dataCollector,
+    range: selectedRange,
+    referenceTime: now,
+    actualNow: actualNow,
+  );
   final snapshot = await insightService.buildSnapshot(
     window: _windowForRange(selectedRange, referenceTime: now),
     referenceTime: now,
@@ -597,4 +604,45 @@ String _selectionKey({
 
 DateTime _maxDateTime(DateTime left, DateTime right) {
   return left.isAfter(right) ? left : right;
+}
+
+Future<void> _syncHistoricalSelectionIfNeeded({
+  required Ref ref,
+  required DataCollector dataCollector,
+  required BriefingTimeRange range,
+  required DateTime referenceTime,
+  required DateTime actualNow,
+}) async {
+  if (range == BriefingTimeRange.recent7Days) {
+    return;
+  }
+  final anchorDate = _anchorDateForRange(range, referenceTime);
+  final dayStart = DateTime(anchorDate.year, anchorDate.month, anchorDate.day);
+  final todayStart = DateTime(actualNow.year, actualNow.month, actualNow.day);
+  if (!dayStart.isBefore(todayStart)) {
+    return;
+  }
+
+  final metricsRepository = ref.watch(metricsRepositoryProvider);
+  final usageRepository = ref.watch(usageSummaryRepositoryProvider);
+  final metrics = await metricsRepository.getByDate(dayStart);
+  final usage = await usageRepository.getByDate(dayStart);
+  final futures = <Future<void>>[];
+
+  // 历史日简报读取的是本地仓库快照；当步数指标缺失或仍为 0 时，
+  // 先给原生计步 / Health Connect 一次按日回补机会，再构建简报。
+  if (metrics == null || metrics.stepCount == 0) {
+    futures.add(dataCollector.syncNativeStepCount(referenceTime: dayStart));
+  }
+
+  // Android UsageStats 可以按 referenceTime 读取指定自然日摘要；
+  // 本地没有屏幕使用摘要时，切换历史日应先补一次轻量同步。
+  if (usage == null) {
+    futures.add(dataCollector.syncUsageSummary(referenceTime: dayStart));
+  }
+
+  if (futures.isEmpty) {
+    return;
+  }
+  await Future.wait<void>(futures);
 }
