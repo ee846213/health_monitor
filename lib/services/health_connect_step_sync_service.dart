@@ -54,13 +54,6 @@ class HealthConnectStepSyncService {
     );
     final isFullDayQuery = _isFullDayQuery(dayEnd, queryEnd);
     if (buckets.isEmpty) {
-      if (isFullDayQuery) {
-        await _upsertDailyMetrics(
-          dayStart,
-          buckets,
-          allowStepCountDecrease: true,
-        );
-      }
       return HealthConnectStepSyncResult.empty(status: status);
     }
 

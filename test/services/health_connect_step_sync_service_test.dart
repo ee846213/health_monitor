@@ -136,7 +136,7 @@ void main() {
     expect(metrics?.stepCount, 1200);
   });
 
-  test('历史整天 Health Connect 为空时应清除本地步数误归属', () async {
+  test('历史整天 Health Connect 为空时不应清除本地已有步数', () async {
     final metricsRepository = _MemoryMetricsRepository()
       ..seed(
         DailyMetrics(
@@ -161,7 +161,7 @@ void main() {
     );
 
     final metrics = await metricsRepository.getByDate(DateTime(2026, 7, 12));
-    expect(metrics?.stepCount, 0);
+    expect(metrics?.stepCount, 11941);
   });
 }
 

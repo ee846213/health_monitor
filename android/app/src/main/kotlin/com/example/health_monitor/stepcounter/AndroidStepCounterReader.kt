@@ -271,10 +271,7 @@ private class StepCounterStateStore(
                 )
             },
         )
-        if (sanitized.size == history.size) {
-            return history
-        }
-        val sanitizedHistory = sanitized.associate { snapshot ->
+        return sanitized.associate { snapshot ->
             snapshot.dayKey to StepCounterState(
                 dayKey = snapshot.dayKey,
                 capturedAtMillis = snapshot.capturedAtMillis,
@@ -283,8 +280,6 @@ private class StepCounterStateStore(
                 lastRaw = snapshot.lastRaw,
             )
         }.toMutableMap()
-        writeHistory(sanitizedHistory)
-        return sanitizedHistory
     }
 
     private fun readHistory(): MutableMap<String, StepCounterState> {
@@ -381,17 +376,59 @@ internal data class StepCounterHistorySnapshot(
     val lastRaw: Double,
 )
 
-@Suppress("UNUSED_PARAMETER")
 internal fun recoverMissedPreviousDaySnapshot(
     currentDayKey: String,
     currentDayStartRaw: Double,
     history: Collection<StepCounterHistorySnapshot>,
     zoneId: ZoneId = ZoneId.systemDefault(),
 ): StepCounterHistorySnapshot? {
-    // TYPE_STEP_COUNTER exposes an accumulated total, not timestamped step
-    // records. Historical gaps must be filled by sources that preserve time
-    // buckets, such as Health Connect.
-    return null
+    val currentDate = runCatching { LocalDate.parse(currentDayKey) }.getOrNull()
+        ?: return null
+    val targetDate = currentDate.minusDays(1)
+    val latestBeforeCurrent = history
+        .mapNotNull { snapshot ->
+            val date = runCatching { LocalDate.parse(snapshot.dayKey) }.getOrNull()
+                ?: return@mapNotNull null
+            if (date.isBefore(currentDate)) {
+                date to snapshot
+            } else {
+                null
+            }
+        }
+        .maxByOrNull { it.first }
+        ?: return null
+    val existingTarget = history.firstOrNull { it.dayKey == targetDate.toString() }
+    if (existingTarget != null && existingTarget.stepCount > 0) {
+        return null
+    }
+
+    val previousDate = latestBeforeCurrent.first
+    val previousSnapshot = latestBeforeCurrent.second
+    val daysSincePrevious = currentDate.toEpochDay() - previousDate.toEpochDay()
+    if (daysSincePrevious > 2L) {
+        return null
+    }
+    val gapStepCount = (currentDayStartRaw - previousSnapshot.lastRaw).toInt()
+    if (gapStepCount <= 0) {
+        return null
+    }
+    val recoveredStepCount = if (previousDate == targetDate) {
+        previousSnapshot.stepCount + gapStepCount
+    } else {
+        gapStepCount
+    }
+    val capturedAtMillis = targetDate
+        .plusDays(1)
+        .atStartOfDay(zoneId)
+        .toInstant()
+        .toEpochMilli() - 1L
+    return StepCounterHistorySnapshot(
+        dayKey = targetDate.toString(),
+        capturedAtMillis = capturedAtMillis,
+        stepCount = recoveredStepCount,
+        dayStartRaw = previousSnapshot.lastRaw,
+        lastRaw = currentDayStartRaw,
+    )
 }
 
 internal fun sanitizeAmbiguousStepCounterHistory(
@@ -408,7 +445,7 @@ internal fun sanitizeAmbiguousStepCounterHistory(
     var previous: Pair<LocalDate, StepCounterHistorySnapshot>? = null
     for ((date, snapshot) in sorted) {
         if (previous != null &&
-            isRecoveredRawGapSnapshot(
+            isAmbiguousRecoveredRawGapSnapshot(
                 previousDate = previous.first,
                 previousSnapshot = previous.second,
                 currentDate = date,
@@ -424,14 +461,14 @@ internal fun sanitizeAmbiguousStepCounterHistory(
     return result.map { it.second }
 }
 
-private fun isRecoveredRawGapSnapshot(
+private fun isAmbiguousRecoveredRawGapSnapshot(
     previousDate: LocalDate,
     previousSnapshot: StepCounterHistorySnapshot,
     currentDate: LocalDate,
     currentSnapshot: StepCounterHistorySnapshot,
 ): Boolean {
     val dayGap = currentDate.toEpochDay() - previousDate.toEpochDay()
-    if (dayGap < 1L || currentSnapshot.stepCount <= 0) {
+    if (dayGap <= 1L || currentSnapshot.stepCount <= 0) {
         return false
     }
     val expectedEndOfDayMillis = currentDate

@@ -7,7 +7,7 @@ import org.junit.Test
 
 class StepCounterHistoryRecoveryTest {
     @Test
-    fun shouldNotRecoverMissingPreviousDayFromRawGap() {
+    fun shouldRecoverMissingPreviousDayFromRawGap() {
         val recovered = recoverMissedPreviousDaySnapshot(
             currentDayKey = "2026-07-07",
             currentDayStartRaw = 27041.0,
@@ -23,7 +23,10 @@ class StepCounterHistoryRecoveryTest {
             zoneId = ZoneId.of("Asia/Shanghai"),
         )
 
-        assertNull(recovered)
+        requireNotNull(recovered)
+        assertEquals("2026-07-06", recovered.dayKey)
+        assertEquals(7899, recovered.stepCount)
+        assertEquals(27041.0, recovered.lastRaw, 0.0)
     }
 
     @Test
@@ -78,7 +81,7 @@ class StepCounterHistoryRecoveryTest {
     }
 
     @Test
-    fun shouldDropSingleDayRawGapRecoveredSnapshotFromOldHistory() {
+    fun shouldKeepSingleDayRawGapRecoveredSnapshotFromOldHistory() {
         val sanitized = sanitizeAmbiguousStepCounterHistory(
             listOf(
                 StepCounterHistorySnapshot(
@@ -98,6 +101,6 @@ class StepCounterHistoryRecoveryTest {
             ),
         )
 
-        assertEquals(listOf("2026-07-05"), sanitized.map { it.dayKey })
+        assertEquals(listOf("2026-07-05", "2026-07-06"), sanitized.map { it.dayKey })
     }
 }
