@@ -10,7 +10,8 @@ import 'package:health_monitor/storage/repositories/query_window.dart';
 
 void main() {
   test('Health Connect 小时桶应覆盖写入节奏轴样本', () async {
-    final activityRepository = InMemoryActivityRepository(samples: <ActivitySample>[]);
+    final activityRepository =
+        InMemoryActivityRepository(samples: <ActivitySample>[]);
     final metricsRepository = _MemoryMetricsRepository();
     final service = HealthConnectStepSyncService(
       bridge: _FakeHealthConnectBridge(
@@ -98,6 +99,70 @@ void main() {
     expect(samples.last.capturedAt.hour, 18);
     expect(samples.last.stepCount, 260);
   });
+
+  test('历史整天 Health Connect 结果应纠正本地更高的错误步数', () async {
+    final metricsRepository = _MemoryMetricsRepository()
+      ..seed(
+        DailyMetrics(
+          date: DateTime(2026, 7, 12),
+          stepCount: 11941,
+          sedentaryDuration: Duration.zero,
+          screenOnDuration: Duration.zero,
+          outdoorDuration: Duration.zero,
+          postureRiskCount: 0,
+          highNoiseExposureDuration: Duration.zero,
+        ),
+      );
+    final service = HealthConnectStepSyncService(
+      bridge: _FakeHealthConnectBridge(
+        buckets: <HourlyStepBucket>[
+          HourlyStepBucket(
+            startAt: DateTime(2026, 7, 12, 10),
+            endAt: DateTime(2026, 7, 12, 11),
+            stepCount: 1200,
+          ),
+        ],
+      ),
+      activityRepository:
+          InMemoryActivityRepository(samples: const <ActivitySample>[]),
+      metricsRepository: metricsRepository,
+    );
+
+    await service.syncForDay(
+      referenceTime: DateTime(2026, 7, 12, 23, 59, 59, 999),
+    );
+
+    final metrics = await metricsRepository.getByDate(DateTime(2026, 7, 12));
+    expect(metrics?.stepCount, 1200);
+  });
+
+  test('历史整天 Health Connect 为空时应清除本地步数误归属', () async {
+    final metricsRepository = _MemoryMetricsRepository()
+      ..seed(
+        DailyMetrics(
+          date: DateTime(2026, 7, 12),
+          stepCount: 11941,
+          sedentaryDuration: Duration.zero,
+          screenOnDuration: Duration.zero,
+          outdoorDuration: Duration.zero,
+          postureRiskCount: 0,
+          highNoiseExposureDuration: Duration.zero,
+        ),
+      );
+    final service = HealthConnectStepSyncService(
+      bridge: _FakeHealthConnectBridge(buckets: const <HourlyStepBucket>[]),
+      activityRepository:
+          InMemoryActivityRepository(samples: const <ActivitySample>[]),
+      metricsRepository: metricsRepository,
+    );
+
+    await service.syncForDay(
+      referenceTime: DateTime(2026, 7, 12, 23, 59, 59, 999),
+    );
+
+    final metrics = await metricsRepository.getByDate(DateTime(2026, 7, 12));
+    expect(metrics?.stepCount, 0);
+  });
 }
 
 class _FakeHealthConnectBridge extends HealthConnectBridge {
@@ -130,6 +195,10 @@ class _MemoryMetricsRepository implements MetricsRepository {
 
   String _key(DateTime date) => '${date.year}-${date.month}-${date.day}';
 
+  void seed(DailyMetrics metrics) {
+    _store[_key(metrics.date)] = metrics;
+  }
+
   @override
   Future<DailyMetrics?> getByDate(DateTime date) async {
     return _store[_key(date)];
@@ -141,7 +210,10 @@ class _MemoryMetricsRepository implements MetricsRepository {
   }
 
   @override
-  Future<List<DailyMetrics>> listRecentDays(int days, {DateTime? referenceDate}) {
+  Future<List<DailyMetrics>> listRecentDays(
+    int days, {
+    required DateTime referenceDate,
+  }) {
     throw UnimplementedError();
   }
 }

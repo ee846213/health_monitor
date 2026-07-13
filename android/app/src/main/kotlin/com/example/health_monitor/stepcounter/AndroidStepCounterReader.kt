@@ -14,6 +14,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.abs
 import org.json.JSONObject
 
 class AndroidStepCounterReader(
@@ -99,12 +100,12 @@ private class StepCounterStateStore(
         val state = readState() ?: return null
         val todayKey = dayKey(System.currentTimeMillis())
         if (state.dayKey != todayKey) {
-          persistDaySnapshot(state)
-          return StepCounterPayload(
-              capturedAtMillis = System.currentTimeMillis(),
-              stepCount = 0,
-              isAvailable = true,
-          )
+            persistDaySnapshot(state)
+            return StepCounterPayload(
+                capturedAtMillis = System.currentTimeMillis(),
+                stepCount = 0,
+                isAvailable = true,
+            )
         }
         return StepCounterPayload(
             capturedAtMillis = state.capturedAtMillis,
@@ -137,7 +138,7 @@ private class StepCounterStateStore(
             persistDaySnapshot(state)
             recoverMissedPreviousDaySnapshot(state.dayKey, state.dayStartRaw)
         }
-        return readHistory()
+        return sanitizeHistory()
             .values
             .sortedByDescending { it.dayKey }
             .take(maxDays.coerceAtLeast(1))
@@ -247,9 +248,6 @@ private class StepCounterStateStore(
         if (existing != null && existing.stepCount >= recovered.stepCount) {
             return
         }
-        // Health Connect 在部分机型上可能已授权但聚合为空。跨日后首次收到
-        // TYPE_STEP_COUNTER raw total 时，用 raw 差值为缺失的前一日补一个降级快照，
-        // 避免昨天在每日指标里彻底消失。
         history[recovered.dayKey] = StepCounterState(
             dayKey = recovered.dayKey,
             capturedAtMillis = recovered.capturedAtMillis,
@@ -258,6 +256,35 @@ private class StepCounterStateStore(
             lastRaw = recovered.lastRaw,
         )
         writeHistory(history)
+    }
+
+    private fun sanitizeHistory(): MutableMap<String, StepCounterState> {
+        val history = readHistory()
+        val sanitized = sanitizeAmbiguousStepCounterHistory(
+            history.values.map { state ->
+                StepCounterHistorySnapshot(
+                    dayKey = state.dayKey,
+                    capturedAtMillis = state.capturedAtMillis,
+                    stepCount = state.stepCount,
+                    dayStartRaw = state.dayStartRaw,
+                    lastRaw = state.lastRaw,
+                )
+            },
+        )
+        if (sanitized.size == history.size) {
+            return history
+        }
+        val sanitizedHistory = sanitized.associate { snapshot ->
+            snapshot.dayKey to StepCounterState(
+                dayKey = snapshot.dayKey,
+                capturedAtMillis = snapshot.capturedAtMillis,
+                stepCount = snapshot.stepCount,
+                dayStartRaw = snapshot.dayStartRaw,
+                lastRaw = snapshot.lastRaw,
+            )
+        }.toMutableMap()
+        writeHistory(sanitizedHistory)
+        return sanitizedHistory
     }
 
     private fun readHistory(): MutableMap<String, StepCounterState> {
@@ -354,53 +381,68 @@ internal data class StepCounterHistorySnapshot(
     val lastRaw: Double,
 )
 
+@Suppress("UNUSED_PARAMETER")
 internal fun recoverMissedPreviousDaySnapshot(
     currentDayKey: String,
     currentDayStartRaw: Double,
     history: Collection<StepCounterHistorySnapshot>,
     zoneId: ZoneId = ZoneId.systemDefault(),
 ): StepCounterHistorySnapshot? {
-    val currentDate = runCatching { LocalDate.parse(currentDayKey) }.getOrNull()
-        ?: return null
-    val targetDate = currentDate.minusDays(1)
-    val latestBeforeCurrent = history
+    // TYPE_STEP_COUNTER exposes an accumulated total, not timestamped step
+    // records. Historical gaps must be filled by sources that preserve time
+    // buckets, such as Health Connect.
+    return null
+}
+
+internal fun sanitizeAmbiguousStepCounterHistory(
+    history: Collection<StepCounterHistorySnapshot>,
+): List<StepCounterHistorySnapshot> {
+    val sorted = history
         .mapNotNull { snapshot ->
             val date = runCatching { LocalDate.parse(snapshot.dayKey) }.getOrNull()
                 ?: return@mapNotNull null
-            if (date.isBefore(currentDate)) {
-                date to snapshot
-            } else {
-                null
-            }
+            date to snapshot
         }
-        .maxByOrNull { it.first }
-        ?: return null
-    val existingTarget = history.firstOrNull { it.dayKey == targetDate.toString() }
-    if (existingTarget != null && existingTarget.stepCount > 0) {
-        return null
+        .sortedBy { it.first }
+    val result = mutableListOf<Pair<LocalDate, StepCounterHistorySnapshot>>()
+    var previous: Pair<LocalDate, StepCounterHistorySnapshot>? = null
+    for ((date, snapshot) in sorted) {
+        if (previous != null &&
+            isRecoveredRawGapSnapshot(
+                previousDate = previous.first,
+                previousSnapshot = previous.second,
+                currentDate = date,
+                currentSnapshot = snapshot,
+            )
+        ) {
+            previous = date to snapshot
+            continue
+        }
+        result.add(date to snapshot)
+        previous = date to snapshot
     }
+    return result.map { it.second }
+}
 
-    val previousDate = latestBeforeCurrent.first
-    val previousSnapshot = latestBeforeCurrent.second
-    val gapStepCount = (currentDayStartRaw - previousSnapshot.lastRaw).toInt()
-    if (gapStepCount <= 0) {
-        return null
+private fun isRecoveredRawGapSnapshot(
+    previousDate: LocalDate,
+    previousSnapshot: StepCounterHistorySnapshot,
+    currentDate: LocalDate,
+    currentSnapshot: StepCounterHistorySnapshot,
+): Boolean {
+    val dayGap = currentDate.toEpochDay() - previousDate.toEpochDay()
+    if (dayGap < 1L || currentSnapshot.stepCount <= 0) {
+        return false
     }
-    val recoveredStepCount = if (previousDate == targetDate) {
-        previousSnapshot.stepCount + gapStepCount
-    } else {
-        gapStepCount
-    }
-    val capturedAtMillis = targetDate
+    val expectedEndOfDayMillis = currentDate
         .plusDays(1)
-        .atStartOfDay(zoneId)
+        .atStartOfDay(ZoneId.systemDefault())
         .toInstant()
         .toEpochMilli() - 1L
-    return StepCounterHistorySnapshot(
-        dayKey = targetDate.toString(),
-        capturedAtMillis = capturedAtMillis,
-        stepCount = recoveredStepCount,
-        dayStartRaw = previousSnapshot.lastRaw,
-        lastRaw = currentDayStartRaw,
-    )
+    if (currentSnapshot.capturedAtMillis != expectedEndOfDayMillis) {
+        return false
+    }
+    val rawDelta = currentSnapshot.lastRaw - currentSnapshot.dayStartRaw
+    return abs(currentSnapshot.dayStartRaw - previousSnapshot.lastRaw) < 0.001 &&
+        currentSnapshot.stepCount == rawDelta.toInt()
 }

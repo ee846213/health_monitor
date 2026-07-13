@@ -52,22 +52,33 @@ class HealthConnectStepSyncService {
       startAt: dayStart,
       endAt: queryEnd,
     );
+    final isFullDayQuery = _isFullDayQuery(dayEnd, queryEnd);
     if (buckets.isEmpty) {
+      if (isFullDayQuery) {
+        await _upsertDailyMetrics(
+          dayStart,
+          buckets,
+          allowStepCountDecrease: true,
+        );
+      }
       return HealthConnectStepSyncResult.empty(status: status);
     }
 
-    final samples = buckets
-        .map(_toActivitySample)
-        .toList(growable: false);
+    final samples = buckets.map(_toActivitySample).toList(growable: false);
     await _activityRepository.replaceHealthConnectHourlyForDay(
       dayStart,
       samples,
     );
-    await _upsertDailyMetrics(dayStart, buckets, referenceTime);
+    await _upsertDailyMetrics(
+      dayStart,
+      buckets,
+      allowStepCountDecrease: isFullDayQuery,
+    );
     return HealthConnectStepSyncResult.synced(
       status: status,
       bucketCount: buckets.length,
-      totalSteps: buckets.fold<int>(0, (int sum, HourlyStepBucket b) => sum + b.stepCount),
+      totalSteps: buckets.fold<int>(
+          0, (int sum, HourlyStepBucket b) => sum + b.stepCount),
     );
   }
 
@@ -84,11 +95,11 @@ class HealthConnectStepSyncService {
 
   Future<void> _upsertDailyMetrics(
     DateTime dayStart,
-    List<HourlyStepBucket> buckets,
-    DateTime referenceTime,
-  ) async {
-    final bucketTotal =
-        buckets.fold<int>(0, (int sum, HourlyStepBucket b) => sum + b.stepCount);
+    List<HourlyStepBucket> buckets, {
+    required bool allowStepCountDecrease,
+  }) async {
+    final bucketTotal = buckets.fold<int>(
+        0, (int sum, HourlyStepBucket b) => sum + b.stepCount);
     final existing = await _metricsRepository.getByDate(dayStart) ??
         DailyMetrics(
           date: dayStart,
@@ -99,9 +110,11 @@ class HealthConnectStepSyncService {
           postureRiskCount: 0,
           highNoiseExposureDuration: Duration.zero,
         );
-    final nextStepCount = existing.stepCount > bucketTotal
-        ? existing.stepCount
-        : bucketTotal;
+    final nextStepCount = allowStepCountDecrease
+        ? bucketTotal
+        : existing.stepCount > bucketTotal
+            ? existing.stepCount
+            : bucketTotal;
     if (nextStepCount == existing.stepCount) {
       return;
     }
@@ -116,6 +129,10 @@ class HealthConnectStepSyncService {
         highNoiseExposureDuration: existing.highNoiseExposureDuration,
       ),
     );
+  }
+
+  bool _isFullDayQuery(DateTime dayEnd, DateTime queryEnd) {
+    return !queryEnd.add(const Duration(milliseconds: 1)).isBefore(dayEnd);
   }
 }
 

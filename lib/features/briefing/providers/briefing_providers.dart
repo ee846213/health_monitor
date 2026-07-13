@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:health_monitor/domain/briefing/daily_brief_snapshot.dart';
+import 'package:health_monitor/domain/metrics/daily_metrics.dart';
 import 'package:health_monitor/domain/permission/permission_descriptor.dart';
 import 'package:health_monitor/domain/usage/digital_usage_summary.dart';
 import 'package:health_monitor/domain/dashboard/daily_rhythm_ui_builder.dart';
@@ -618,6 +619,9 @@ Future<void> _syncHistoricalSelectionIfNeeded({
   }
   final anchorDate = _anchorDateForRange(range, referenceTime);
   final dayStart = DateTime(anchorDate.year, anchorDate.month, anchorDate.day);
+  final dayEnd = dayStart.add(const Duration(days: 1)).subtract(
+        const Duration(milliseconds: 1),
+      );
   final todayStart = DateTime(actualNow.year, actualNow.month, actualNow.day);
   if (!dayStart.isBefore(todayStart)) {
     return;
@@ -629,10 +633,10 @@ Future<void> _syncHistoricalSelectionIfNeeded({
   final usage = await usageRepository.getByDate(dayStart);
   final futures = <Future<void>>[];
 
-  // 历史日简报读取的是本地仓库快照；当步数指标缺失或仍为 0 时，
-  // 先给原生计步 / Health Connect 一次按日回补机会，再构建简报。
-  if (metrics == null || metrics.stepCount == 0) {
-    futures.add(dataCollector.syncNativeStepCount(referenceTime: dayStart));
+  // 历史日简报读取的是本地仓库快照；当关键指标为空或明显只有单一维度时，
+  // 先按完整自然日给原生计步 / Health Connect 一次回补机会，再构建简报。
+  if (_metricsNeedsHistoricalRefresh(metrics)) {
+    futures.add(dataCollector.syncNativeStepCount(referenceTime: dayEnd));
   }
 
   // Android UsageStats 可以按 referenceTime 读取指定自然日摘要；
@@ -645,4 +649,15 @@ Future<void> _syncHistoricalSelectionIfNeeded({
     return;
   }
   await Future.wait<void>(futures);
+}
+
+bool _metricsNeedsHistoricalRefresh(DailyMetrics? metrics) {
+  if (metrics == null || metrics.stepCount == 0) {
+    return true;
+  }
+  return metrics.sedentaryDuration == Duration.zero &&
+      metrics.screenOnDuration == Duration.zero &&
+      metrics.outdoorDuration == Duration.zero &&
+      metrics.postureRiskCount == 0 &&
+      metrics.highNoiseExposureDuration == Duration.zero;
 }
